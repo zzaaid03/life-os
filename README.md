@@ -57,18 +57,18 @@ Your life, beautifully organized.
 
 3. **Configure environment variables**
 
-   Copy `.env` to your local `.env` file (it's already gitignored):
+   Copy `.env.example` to `.env`:
 
    ```bash
-   cp .env .env.local
+   cp .env.example .env
    ```
 
    Fill in your Supabase credentials:
 
    ```
-   SUPABASE_URL=https://your-project-id.supabase.co
-   SUPABASE_ANON_KEY=your-anon-key-here
-   GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+   GOOGLE_CLIENT_ID=your_google_client_id
    ```
 
 4. **Run the app**
@@ -122,4 +122,4 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
 ## License
 
-Life OS is open-source software licensed under the MIT license.
+Life OS is open-source software licensed under the Apache License, Version 2.0.
