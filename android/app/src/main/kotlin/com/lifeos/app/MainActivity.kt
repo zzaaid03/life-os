@@ -1,4 +1,4 @@
-package com.lifeos.life_os
+package com.lifeos.app
 
 import io.flutter.embedding.android.FlutterActivity
 
