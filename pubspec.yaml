@@ -1,0 +1,63 @@
+name: life_os
+description: "Life OS — Your life, beautifully organized."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod: ^2.6.1
+
+  # Routing
+  go_router: ^14.8.1
+
+  # Backend
+  supabase_flutter: ^2.8.4
+
+  # Environment
+  flutter_dotenv: ^5.2.1
+
+  # Local Database
+  drift: ^2.25.1
+  sqlite3_flutter_libs: ^0.5.30
+
+  # UI
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.2
+
+  # Code Generation Support
+  equatable: ^2.0.7
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+  # Utilities
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Linting
+  flutter_lints: ^6.0.0
+
+  # Code Generation
+  build_runner: ^2.4.14
+  freezed: ^2.5.8
+  json_serializable: ^6.9.4
+  drift_dev: ^2.25.1
+
+  # Testing
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
