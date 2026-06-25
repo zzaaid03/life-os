@@ -30,24 +30,24 @@ abstract final class SupabaseService {
   /// Throws [StateError] if required environment variables are missing.
   static Future<Supabase> initialize() async {
     final url = dotenv.env[EnvConfig.supabaseUrlKey];
-    final anonKey = dotenv.env[EnvConfig.supabaseAnonKeyKey];
+    final publishableKey = dotenv.env[EnvConfig.supabasePublishableKeyKey];
 
-    if (url == null ||
-        url.isEmpty ||
-        url == 'https://your-project-id.supabase.co') {
+    if (url == null || url.isEmpty || url == 'your_supabase_url') {
       throw StateError(
         'SUPABASE_URL is not configured. '
-        'Copy .env to your local .env file and fill in your Supabase project URL.',
+        'Copy .env.example to .env and fill in your Supabase project URL.',
       );
     }
 
-    if (anonKey == null || anonKey.isEmpty || anonKey == 'your-anon-key-here') {
+    if (publishableKey == null ||
+        publishableKey.isEmpty ||
+        publishableKey == 'your_publishable_key') {
       throw StateError(
-        'SUPABASE_ANON_KEY is not configured. '
-        'Copy .env to your local .env file and fill in your Supabase anon key.',
+        'SUPABASE_PUBLISHABLE_KEY is not configured. '
+        'Copy .env.example to .env and fill in your Supabase publishable key.',
       );
     }
 
-    return Supabase.initialize(url: url, publishableKey: anonKey);
+    return Supabase.initialize(url: url, publishableKey: publishableKey);
   }
 }

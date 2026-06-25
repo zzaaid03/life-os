@@ -8,8 +8,8 @@ abstract final class EnvConfig {
   /// Supabase project URL.
   static const String supabaseUrlKey = 'SUPABASE_URL';
 
-  /// Supabase anonymous (public) key.
-  static const String supabaseAnonKeyKey = 'SUPABASE_ANON_KEY';
+  /// Supabase publishable (public) key.
+  static const String supabasePublishableKeyKey = 'SUPABASE_PUBLISHABLE_KEY';
 
   /// Google OAuth web client ID.
   static const String googleClientIdKey = 'GOOGLE_CLIENT_ID';
