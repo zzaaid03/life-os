@@ -45,14 +45,20 @@ The foundation has been laid. The project structure, architecture, design system
 
 ---
 
-## Milestone 3: Core Data Layer (v1.2.0)
+## Milestone 3: Data Foundation ✅
 
-- [ ] Supabase database schema
-- [ ] Drift table definitions
-- [ ] Data models (entries, habits, goals, etc.)
-- [ ] Repository implementations
-- [ ] Offline-first sync architecture
-- [ ] Data migration strategy
+- [x] Universal entity design (9 entities with base properties)
+- [x] Supabase migrations (002: tasks, notes, goals, habits, habit_entries, journal_entries, tags, entity_tags, attachments, sync_queue)
+- [x] Data models for all entities (Task, Note, Goal, Habit, HabitEntry, JournalEntry, Tag, Attachment)
+- [x] Repository interfaces for all entities (8 repositories)
+- [x] Use case skeletons (30 use cases across 6 features)
+- [x] Sync engine design document (SYNC_ENGINE.md)
+- [x] Data model documentation (DATA_MODEL.md)
+- [x] Unit tests for entity serialization and value equality
+- [x] RLS policies on all tables
+- [x] Proper indexes and foreign keys
+- [x] Soft deletes on all tables
+- [x] Zero analyzer warnings
 
 ---
 
