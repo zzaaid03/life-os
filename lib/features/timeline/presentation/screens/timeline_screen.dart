@@ -2,7 +2,10 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/shared/widgets/floating_nav_bar.dart';
 
 class TimelineScreen extends StatelessWidget {
   const TimelineScreen({super.key});
@@ -16,14 +19,27 @@ class TimelineScreen extends StatelessWidget {
       body: Padding(
         padding: AppSpacing.screenPadding,
         child: Center(
-          child: Text(
-            'Your timeline will appear here.',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.timeline_rounded,
+                size: 56,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.12),
+              ).animate().fadeIn(duration: 400.ms),
+              const SizedBox(height: AppSpacing.xl),
+              Text(
+                'Your journey begins today.',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                ),
+                textAlign: TextAlign.center,
+              ).animate().fadeIn(duration: 400.ms, delay: 150.ms),
+            ],
           ),
         ),
       ),
+      bottomNavigationBar: const FloatingNavBar(currentLocation: '/timeline'),
     );
   }
 }
