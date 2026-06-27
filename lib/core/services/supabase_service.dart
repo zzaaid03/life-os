@@ -9,15 +9,24 @@ import 'package:life_os/core/config/env_config.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// The initialized Supabase instance.
+///
+/// Set after [SupabaseService.initialize] is called in [main].
+Supabase? _supabaseInstance;
+
 /// Provider for the Supabase client.
 ///
 /// This is the single source of truth for all Supabase interactions.
 /// All repositories should depend on this provider.
 final supabaseClientProvider = Provider<SupabaseClient>((ref) {
-  throw UnimplementedError(
-    'SupabaseClient must be initialized before use. '
-    'Call SupabaseService.initialize() in main() before runApp().',
-  );
+  final instance = _supabaseInstance;
+  if (instance == null) {
+    throw StateError(
+      'SupabaseClient must be initialized before use. '
+      'Call SupabaseService.initialize() in main() before runApp().',
+    );
+  }
+  return instance.client;
 });
 
 /// Service responsible for initializing and managing Supabase.
@@ -48,6 +57,11 @@ abstract final class SupabaseService {
       );
     }
 
-    return Supabase.initialize(url: url, publishableKey: publishableKey);
+    _supabaseInstance = await Supabase.initialize(
+      url: url,
+      publishableKey: publishableKey,
+    );
+
+    return _supabaseInstance!;
   }
 }
