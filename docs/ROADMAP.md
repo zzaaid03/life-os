@@ -1,6 +1,6 @@
 # ROADMAP.md
 
-## Current Version: 1.0.0 (Foundation)
+## Current Version: 1.1.0 (Identity)
 
 The foundation has been laid. The project structure, architecture, design system, authentication scaffolding, and routing are in place.
 
@@ -21,13 +21,24 @@ The foundation has been laid. The project structure, architecture, design system
 
 ---
 
-## Milestone 2: Authentication Implementation (v1.1.0)
+## Milestone 2: Identity — UX, Authentication & First Experience ✅
 
-- [ ] Complete email/password sign-in flow
-- [ ] Complete Google OAuth sign-in flow
-- [ ] Sign-up screen with validation
-- [ ] Password reset flow
-- [ ] Email verification
+- [x] Premium splash screen with custom animations
+- [x] Minimal welcome screen
+- [x] Complete Google OAuth sign-in flow
+- [x] Complete email/password sign-in flow
+- [x] Sign-up screen with validation
+- [x] Password reset flow with confirmation UI
+- [x] Session persistence and auto-restore
+- [x] Profile creation (single question flow)
+- [x] Permission screens (notifications, calendar, files)
+- [x] Home first experience with greeting + setup progress
+- [x] Floating bottom navigation with glass effect
+- [x] Beautiful empty states for all tabs
+- [x] Smooth animations throughout
+- [x] Accessibility (semantic labels, tooltips, screen readers)
+- [x] UX documentation
+- [x] Zero analyzer warnings
 - [ ] Session persistence
 - [ ] Auth error handling and user feedback
 - [ ] Auth integration tests
