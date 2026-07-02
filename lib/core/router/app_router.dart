@@ -23,6 +23,7 @@ import 'package:life_os/features/profile/presentation/screens/create_profile_scr
 import 'package:life_os/features/search/presentation/screens/search_screen.dart';
 import 'package:life_os/features/settings/presentation/screens/settings_screen.dart';
 import 'package:life_os/features/timeline/presentation/screens/timeline_screen.dart';
+import 'package:life_os/shared/widgets/app_shell.dart';
 
 /// Named route constants.
 abstract final class AppRoutes {
@@ -153,31 +154,36 @@ GoRouter createRouter({required WidgetRef ref}) {
         builder: (context, state) => const FilesPermissionScreen(),
       ),
 
-      // Main app
-      GoRoute(
-        path: AppRoutes.home,
-        name: 'home',
-        builder: (context, state) => const HomeScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.timeline,
-        name: 'timeline',
-        builder: (context, state) => const TimelineScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.life,
-        name: 'life',
-        builder: (context, state) => const LifeScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.search,
-        name: 'search',
-        builder: (context, state) => const SearchScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.settings,
-        name: 'settings',
-        builder: (context, state) => const SettingsScreen(),
+      // Main app — wrapped in AppShell with floating nav + FAB
+      ShellRoute(
+        builder: (context, state, child) => AppShell(child: child),
+        routes: [
+          GoRoute(
+            path: AppRoutes.home,
+            name: 'home',
+            builder: (context, state) => const HomeScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.timeline,
+            name: 'timeline',
+            builder: (context, state) => const TimelineScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.life,
+            name: 'life',
+            builder: (context, state) => const LifeScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.search,
+            name: 'search',
+            builder: (context, state) => const SearchScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.settings,
+            name: 'settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
+        ],
       ),
     ],
 
