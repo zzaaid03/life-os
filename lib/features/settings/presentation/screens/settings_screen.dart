@@ -6,9 +6,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:life_os/core/router/app_router.dart';
+import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
-import 'package:life_os/shared/widgets/floating_nav_bar.dart';
+import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -16,50 +17,249 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final authState = ref.watch(authProvider);
+    final profileState = ref.watch(profileProvider);
+    final displayName =
+        profileState.profile?.displayName ?? authState.displayName ?? 'User';
+    final email = authState.email ?? '';
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: Padding(
-        padding: AppSpacing.screenPadding,
-        child: Column(
-          children: [
-            const SizedBox(height: AppSpacing.xxxl),
-            Icon(
-              Icons.tune_rounded,
-              size: 56,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.12),
-            ).animate().fadeIn(duration: 400.ms),
-            const SizedBox(height: AppSpacing.xl),
-            Text(
-              'Everything, your way.',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
-              textAlign: TextAlign.center,
-            ).animate().fadeIn(duration: 400.ms, delay: 150.ms),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () async {
-                  await ref.read(authProvider.notifier).signOut();
-                  if (context.mounted) {
-                    context.go(AppRoutes.welcome);
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: theme.colorScheme.error,
-                  side: BorderSide(
-                    color: theme.colorScheme.error.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: const Text('Sign Out'),
-              ),
+    return SingleChildScrollView(
+      padding: AppSpacing.screenPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSpacing.xxl),
+          Text(
+            'Settings',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-          ],
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+
+          // Profile section
+          _SettingsGroup(
+            title: 'Account',
+            children: [
+              _SettingsTile(
+                icon: Icons.person_outline_rounded,
+                title: displayName,
+                subtitle: email.isNotEmpty ? email : null,
+              ),
+            ],
+          ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // Preferences section
+          _SettingsGroup(
+            title: 'Preferences',
+            children: [
+              _SettingsTile(
+                icon: Icons.dark_mode_outlined,
+                title: 'Appearance',
+                subtitle: 'System',
+                onTap: () => _showComingSoon(context, 'Appearance'),
+              ),
+              _SettingsTile(
+                icon: Icons.notifications_outlined,
+                title: 'Notifications',
+                onTap: () => _showComingSoon(context, 'Notifications'),
+              ),
+              _SettingsTile(
+                icon: Icons.language_rounded,
+                title: 'Language',
+                subtitle: 'English',
+                onTap: () => _showComingSoon(context, 'Language'),
+              ),
+            ],
+          ).animate().fadeIn(duration: 400.ms, delay: 300.ms),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // About section
+          _SettingsGroup(
+            title: 'About',
+            children: [
+              const _SettingsTile(
+                icon: Icons.info_outline_rounded,
+                title: 'Version',
+                subtitle: '1.0.0',
+              ),
+              _SettingsTile(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Privacy',
+                onTap: () => _showComingSoon(context, 'Privacy'),
+              ),
+            ],
+          ).animate().fadeIn(duration: 400.ms, delay: 400.ms),
+
+          const SizedBox(height: AppSpacing.xxxl),
+
+          // Sign out
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () async {
+                await ref.read(authProvider.notifier).signOut();
+                if (context.mounted) {
+                  context.go(AppRoutes.welcome);
+                }
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.error,
+                side: BorderSide(
+                  color: theme.colorScheme.error.withValues(alpha: 0.3),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: AppRadius.button,
+                ),
+              ),
+              child: const Text('Sign Out'),
+            ),
+          ).animate().fadeIn(duration: 400.ms, delay: 500.ms),
+
+          const SizedBox(height: AppSpacing.massive),
+        ],
+      ),
+    );
+  }
+
+  void _showComingSoon(BuildContext context, String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature settings are coming soon.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+            left: AppSpacing.xs,
+            bottom: AppSpacing.sm,
+          ),
+          child: Text(
+            title.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Column(
+            children: [
+              for (int i = 0; i < children.length; i++) ...[
+                children[i],
+                if (i < children.length - 1)
+                  Divider(
+                    height: 1,
+                    indent: AppSpacing.lg + 24,
+                    color: theme.colorScheme.outline.withValues(alpha: 0.06),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (onTap != null)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                ),
+            ],
+          ),
         ),
       ),
-      bottomNavigationBar: const FloatingNavBar(currentLocation: '/settings'),
     );
   }
 }

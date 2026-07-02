@@ -3,42 +3,80 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:life_os/core/theme/app_colors.dart';
+import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
-import 'package:life_os/shared/widgets/floating_nav_bar.dart';
+import 'package:life_os/shared/widgets/empty_state_widget.dart';
 
-class SearchScreen extends StatelessWidget {
+class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
+
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Search')),
-      body: Padding(
-        padding: AppSpacing.screenPadding,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.search_rounded,
-                size: 56,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.12),
-              ).animate().fadeIn(duration: 400.ms),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                'Search your life.',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                ),
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(duration: 400.ms, delay: 150.ms),
-            ],
+    return SingleChildScrollView(
+      padding: AppSpacing.screenPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSpacing.xxl),
+          Text(
+            'Search',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
+          const SizedBox(height: AppSpacing.xxl),
+          TextField(
+            controller: _controller,
+            decoration: InputDecoration(
+              hintText: 'Search your life...',
+              prefixIcon: const Icon(Icons.search_rounded),
+              filled: true,
+              fillColor: theme.colorScheme.surface,
+              border: OutlineInputBorder(
+                borderRadius: AppRadius.input,
+                borderSide: BorderSide(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: AppRadius.input,
+                borderSide: BorderSide(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                ),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderRadius: AppRadius.input,
+                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+              ),
+            ),
+          ).animate().fadeIn(duration: 400.ms),
+          const SizedBox(height: AppSpacing.xxxl),
+          const Center(
+            child: EmptyStateWidget(
+              icon: Icons.search_rounded,
+              title: 'Search your life.',
+              subtitle:
+                  'Find tasks, notes, habits, goals, and journal entries.',
+            ),
+          ).animate().fadeIn(duration: 400.ms, delay: 300.ms),
+        ],
       ),
-      bottomNavigationBar: const FloatingNavBar(currentLocation: '/search'),
     );
   }
 }

@@ -3,43 +3,36 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-
 import 'package:life_os/core/theme/app_spacing.dart';
-import 'package:life_os/shared/widgets/floating_nav_bar.dart';
+import 'package:life_os/shared/widgets/empty_state_widget.dart';
 
 class TimelineScreen extends StatelessWidget {
   const TimelineScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Timeline')),
-      body: Padding(
-        padding: AppSpacing.screenPadding,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.timeline_rounded,
-                size: 56,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.12),
-              ).animate().fadeIn(duration: 400.ms),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                'Your journey begins today.',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                ),
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(duration: 400.ms, delay: 150.ms),
-            ],
+    return SingleChildScrollView(
+      padding: AppSpacing.screenPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSpacing.xxl),
+          Text(
+            'Timeline',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
-        ),
+          const SizedBox(height: AppSpacing.xxxl),
+          const Center(
+            child: EmptyStateWidget(
+              icon: Icons.timeline_rounded,
+              title: 'Your journey begins today.',
+              subtitle: 'Entries, habits, and milestones will appear here.',
+            ),
+          ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
+        ],
       ),
-      bottomNavigationBar: const FloatingNavBar(currentLocation: '/timeline'),
     );
   }
 }
