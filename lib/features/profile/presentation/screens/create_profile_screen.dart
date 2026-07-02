@@ -75,12 +75,13 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
       await ref.read(profileProvider.notifier).upsertProfile(profile);
 
       if (mounted) {
+        setState(() => _isLoading = false);
         context.go(AppRoutes.permissionNotifications);
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Something went wrong. Please try again.';
+          _errorMessage = 'Failed to save profile. $e';
           _isLoading = false;
         });
       }

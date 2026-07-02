@@ -55,16 +55,17 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
   }
 
   /// Creates or updates the profile.
+  ///
+  /// Throws if the upsert fails, so callers can react to the
+  /// specific error. The error state is still set for UI observation.
   Future<void> upsertProfile(Profile profile) async {
     state = const ProfileState(status: ProfileStatus.loading);
     try {
       final updated = await _repository.upsertProfile(profile);
       state = ProfileState(status: ProfileStatus.loaded, profile: updated);
     } catch (e) {
-      state = const ProfileState(
-        status: ProfileStatus.error,
-        error: 'Failed to save profile. Please try again.',
-      );
+      state = ProfileState(status: ProfileStatus.error, error: e.toString());
+      rethrow;
     }
   }
 

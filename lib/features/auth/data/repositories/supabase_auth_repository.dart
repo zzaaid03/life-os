@@ -3,6 +3,7 @@
 /// Handles all authentication operations through Supabase Auth.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/features/auth/data/models/auth_state.dart';
 import 'package:life_os/features/auth/data/repositories/auth_repository.dart';
@@ -93,7 +94,19 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   Future<AuthState> signInWithGoogle() async {
-    final response = await _client.auth.signInWithOAuth(OAuthProvider.google);
+    // On web, Google needs to redirect back to the exact localhost origin
+    // (e.g. http://localhost:51915). Without redirectTo, Supabase defaults
+    // to the Site URL configured in the dashboard, which is the production
+    // URL — Google redirects there instead, breaking local dev.
+    //
+    // On native platforms (Android, iOS), OAuth uses platform-specific
+    // deep links / custom URL schemes, so no redirectTo is needed.
+    final redirectTo = kIsWeb ? Uri.base.origin : null;
+
+    final response = await _client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: redirectTo,
+    );
 
     // OAuth flow redirects; state will be updated via authStateChanges.
     if (response) {
