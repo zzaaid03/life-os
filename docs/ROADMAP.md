@@ -62,7 +62,25 @@ The foundation has been laid. The project structure, architecture, design system
 
 ---
 
-## Milestone 4: Timeline Feature (v1.3.0)
+## Milestone 4: App Shell & Dashboard ✅
+
+- [x] Production app shell with ShellRoute
+- [x] Floating bottom navigation (glass effect, animated labels)
+- [x] Floating action button (FAB) for quick create
+- [x] Home dashboard with personalized greeting
+- [x] Quick actions grid (New Task, Note, Habit, Goal)
+- [x] Dashboard cards with beautiful empty states
+- [x] Reusable widgets (DashboardCard, SectionHeader, QuickActionButton, EmptyStateWidget, AnimatedGreeting)
+- [x] Responsive layout (max-width centering for tablet/desktop/web)
+- [x] Settings screen with account info and preferences
+- [x] Search screen with search field
+- [x] Subtle fade-in and slide-up animations
+- [x] Accessibility (semantics, tap targets, dark mode)
+- [x] Zero analyzer warnings
+
+---
+
+## Milestone 5: Timeline Feature (v1.3.0)
 
 - [ ] Timeline UI with infinite scroll
 - [ ] Entry creation and editing
