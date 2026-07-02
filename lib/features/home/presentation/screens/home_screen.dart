@@ -1,85 +1,199 @@
-/// Home screen — the main dashboard and first experience.
+/// Home screen — the main dashboard.
 ///
-/// Displays a personalized greeting and setup progress.
-/// This is NOT the full dashboard. It's the calm first screen
-/// users see after completing onboarding.
+/// Displays a personalized greeting, quick actions grid,
+/// and dashboard cards for Tasks, Habits, Goals, and Journal.
+/// All cards show beautiful empty states until data exists.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:life_os/core/theme/app_colors.dart';
-
+import 'package:life_os/core/theme/app_icons.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
-import 'package:life_os/features/home/presentation/widgets/setup_progress_card.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
+import 'package:life_os/shared/widgets/animated_greeting.dart';
+import 'package:life_os/shared/widgets/coming_soon_dialog.dart';
+import 'package:life_os/shared/widgets/dashboard_card.dart';
+import 'package:life_os/shared/widgets/empty_state_widget.dart';
+import 'package:life_os/shared/widgets/quick_action_button.dart';
+import 'package:life_os/shared/widgets/section_header.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final authState = ref.watch(authProvider);
     final profileState = ref.watch(profileProvider);
     final displayName =
         profileState.profile?.displayName ?? authState.displayName ?? 'there';
 
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: AppSpacing.screenPadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: AppSpacing.xxl),
-              // Greeting
-              Text(
-                _greeting(),
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+    return SingleChildScrollView(
+      padding: AppSpacing.screenPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSpacing.xxl),
+
+          // Greeting
+          AnimatedGreeting(displayName: displayName),
+
+          const SizedBox(height: AppSpacing.xxxl),
+
+          // Quick Actions
+          const SectionHeader(title: 'Quick Actions'),
+          _QuickActionsGrid()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 300.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 300.ms),
+
+          const SizedBox(height: AppSpacing.xxxl),
+
+          // Today at a glance
+          const SectionHeader(title: 'Today at a Glance'),
+
+          // Tasks card
+          DashboardCard(
+                icon: Icons.check_circle_outline_rounded,
+                title: "Today's Tasks",
+                onTap: () => _showComingSoon(context, 'Tasks'),
+                child: const EmptyStateWidget(
+                  icon: Icons.task_alt_rounded,
+                  title: 'No tasks for today',
+                  subtitle: 'Enjoy the calm.',
+                  compact: true,
                 ),
-              ).animate().fadeIn(duration: 400.ms),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                displayName,
-                style: theme.textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+              )
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 400.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 400.ms),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // Habits card
+          DashboardCard(
+                icon: Icons.repeat_rounded,
+                title: 'Habits',
+                onTap: () => _showComingSoon(context, 'Habits'),
+                child: const EmptyStateWidget(
+                  icon: Icons.favorite_outline_rounded,
+                  title: 'No habits yet',
+                  subtitle: 'Build your first habit.',
+                  compact: true,
                 ),
-              ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
-              const SizedBox(height: AppSpacing.xxl),
-              // Welcome message
-              Text(
-                'Welcome to Life OS.',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              )
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 500.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 500.ms),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // Goals card
+          DashboardCard(
+                icon: Icons.flag_outlined,
+                title: 'Goals',
+                onTap: () => _showComingSoon(context, 'Goals'),
+                child: const EmptyStateWidget(
+                  icon: Icons.track_changes_rounded,
+                  title: 'Nothing in progress',
+                  subtitle: 'Create your first goal.',
+                  compact: true,
                 ),
-              ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
-              const SizedBox(height: AppSpacing.xxxl),
-              // Setup progress
-              const SetupProgressCard()
-                  .animate()
-                  .fadeIn(duration: 500.ms, delay: 400.ms)
-                  .slideY(
-                    begin: 0.06,
-                    end: 0,
-                    duration: 500.ms,
-                    delay: 400.ms,
-                    curve: Curves.easeOut,
-                  ),
-            ],
-          ),
-        ),
+              )
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 600.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 600.ms),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // Journal card
+          DashboardCard(
+                icon: Icons.book_outlined,
+                title: 'Journal',
+                onTap: () => _showComingSoon(context, 'Journal'),
+                child: const EmptyStateWidget(
+                  icon: Icons.edit_note_rounded,
+                  title: 'No journal entry today',
+                  subtitle: 'Capture today\'s thoughts.',
+                  compact: true,
+                ),
+              )
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 700.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 700.ms),
+
+          // Bottom spacing for FAB clearance
+          const SizedBox(height: AppSpacing.massive),
+        ],
       ),
     );
   }
 
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning,';
-    if (hour < 17) return 'Good afternoon,';
-    return 'Good evening,';
+  void _showComingSoon(BuildContext context, String feature) {
+    ComingSoonDialog.show(
+      context,
+      title: feature,
+      message:
+          '$feature are coming soon. This is where you\'ll manage '
+          'your $feature.',
+    );
+  }
+}
+
+class _QuickActionsGrid extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: QuickActionButton(
+            icon: AppIcons.add,
+            label: 'New Task',
+            onPressed: () => ComingSoonDialog.show(
+              context,
+              title: 'New Task',
+              message: 'Task creation is coming soon.',
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: QuickActionButton(
+            icon: Icons.edit_note_rounded,
+            label: 'New Note',
+            onPressed: () => ComingSoonDialog.show(
+              context,
+              title: 'New Note',
+              message: 'Note creation is coming soon.',
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: QuickActionButton(
+            icon: Icons.repeat_rounded,
+            label: 'New Habit',
+            onPressed: () => ComingSoonDialog.show(
+              context,
+              title: 'New Habit',
+              message: 'Habit creation is coming soon.',
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: QuickActionButton(
+            icon: Icons.flag_outlined,
+            label: 'New Goal',
+            onPressed: () => ComingSoonDialog.show(
+              context,
+              title: 'New Goal',
+              message: 'Goal creation is coming soon.',
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
