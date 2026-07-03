@@ -3,13 +3,17 @@
 /// Displays an icon, title, and subtitle with consistent
 /// spacing and typography. Used across all dashboard cards
 /// and feature screens when no data exists.
+///
+/// Optionally includes a call-to-action button to invite
+/// the user to create their first item.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 
-/// A premium empty state with icon, title, and subtitle.
+/// A premium empty state with icon, title, subtitle, and optional action.
 ///
 /// Every empty state in Life OS uses this widget to ensure
 /// consistent visual language and messaging tone.
@@ -22,6 +26,8 @@ class EmptyStateWidget extends StatelessWidget {
     required this.subtitle,
     this.iconColor,
     this.compact = false,
+    this.actionLabel,
+    this.onAction,
   });
 
   /// The icon to display.
@@ -38,6 +44,12 @@ class EmptyStateWidget extends StatelessWidget {
 
   /// When true, renders a smaller version for use inside cards.
   final bool compact;
+
+  /// Optional action button label (e.g., "Create first task").
+  final String? actionLabel;
+
+  /// Callback when the action button is tapped.
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +92,21 @@ class EmptyStateWidget extends StatelessWidget {
               ],
             ),
           ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(width: AppSpacing.sm),
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(actionLabel!),
+            ),
+          ],
         ],
       );
     }
@@ -113,6 +140,21 @@ class EmptyStateWidget extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
+        if (actionLabel != null && onAction != null) ...[
+          const SizedBox(height: AppSpacing.lg),
+          FilledButton.tonal(
+            onPressed: onAction,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryLight,
+              foregroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.sm,
+              ),
+            ),
+            child: Text(actionLabel!),
+          ),
+        ],
       ],
     );
   }

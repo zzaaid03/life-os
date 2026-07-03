@@ -2,7 +2,8 @@
 ///
 /// Displays a personalized greeting, quick actions grid,
 /// and dashboard cards for Tasks, Habits, Goals, and Journal.
-/// All cards show beautiful empty states until data exists.
+/// All cards show beautiful empty states with warm, encouraging
+/// copy that makes the dashboard feel alive.
 library;
 
 import 'package:flutter/material.dart';
@@ -50,19 +51,20 @@ class HomeScreen extends ConsumerWidget {
 
           const SizedBox(height: AppSpacing.xxxl),
 
-          // Today at a glance
-          const SectionHeader(title: 'Today at a Glance'),
+          // Focus for today
+          const SectionHeader(title: 'Focus for Today'),
 
-          // Tasks card
           DashboardCard(
-                icon: Icons.check_circle_outline_rounded,
+                icon: Icons.auto_awesome_outlined,
                 title: "Today's Tasks",
                 onTap: () => _showComingSoon(context, 'Tasks'),
-                child: const EmptyStateWidget(
+                child: EmptyStateWidget(
                   icon: Icons.task_alt_rounded,
-                  title: 'No tasks for today',
-                  subtitle: 'Enjoy the calm.',
+                  title: 'No tasks scheduled.',
+                  subtitle: 'Perfect day to plan something meaningful.',
                   compact: true,
+                  actionLabel: 'Create first task',
+                  onAction: () => _showComingSoon(context, 'Tasks'),
                 ),
               )
               .animate()
@@ -71,16 +73,18 @@ class HomeScreen extends ConsumerWidget {
 
           const SizedBox(height: AppSpacing.md),
 
-          // Habits card
+          // Habits
           DashboardCard(
                 icon: Icons.repeat_rounded,
                 title: 'Habits',
                 onTap: () => _showComingSoon(context, 'Habits'),
-                child: const EmptyStateWidget(
+                child: EmptyStateWidget(
                   icon: Icons.favorite_outline_rounded,
-                  title: 'No habits yet',
-                  subtitle: 'Build your first habit.',
+                  title: 'No habits yet.',
+                  subtitle: "You're one habit away from changing your life.",
                   compact: true,
+                  actionLabel: 'Build a habit',
+                  onAction: () => _showComingSoon(context, 'Habits'),
                 ),
               )
               .animate()
@@ -89,16 +93,18 @@ class HomeScreen extends ConsumerWidget {
 
           const SizedBox(height: AppSpacing.md),
 
-          // Goals card
+          // Goal of the week
           DashboardCard(
                 icon: Icons.flag_outlined,
-                title: 'Goals',
+                title: 'Goal of the Week',
                 onTap: () => _showComingSoon(context, 'Goals'),
-                child: const EmptyStateWidget(
+                child: EmptyStateWidget(
                   icon: Icons.track_changes_rounded,
-                  title: 'Nothing in progress',
-                  subtitle: 'Create your first goal.',
+                  title: 'No goal set.',
+                  subtitle: 'Start by creating one. Small steps, big change.',
                   compact: true,
+                  actionLabel: 'Set a goal',
+                  onAction: () => _showComingSoon(context, 'Goals'),
                 ),
               )
               .animate()
@@ -107,16 +113,18 @@ class HomeScreen extends ConsumerWidget {
 
           const SizedBox(height: AppSpacing.md),
 
-          // Journal card
+          // Journal
           DashboardCard(
                 icon: Icons.book_outlined,
                 title: 'Journal',
                 onTap: () => _showComingSoon(context, 'Journal'),
-                child: const EmptyStateWidget(
+                child: EmptyStateWidget(
                   icon: Icons.edit_note_rounded,
-                  title: 'No journal entry today',
-                  subtitle: 'Capture today\'s thoughts.',
+                  title: 'No journal entry today.',
+                  subtitle: "Capture today's thoughts.",
                   compact: true,
+                  actionLabel: 'Write',
+                  onAction: () => _showComingSoon(context, 'Journal'),
                 ),
               )
               .animate()
