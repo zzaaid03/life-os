@@ -1,0 +1,321 @@
+/// Task editor bottom sheet.
+///
+/// A premium modal bottom sheet for creating and editing tasks.
+/// Fields: title, description, priority, due date.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:life_os/core/theme/app_colors.dart';
+import 'package:life_os/core/theme/app_radius.dart';
+import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/features/tasks/data/models/task.dart';
+
+/// A bottom sheet for creating or editing a task.
+///
+/// Pass an existing [Task] to edit, or null to create a new one.
+/// Returns the edited/created [Task] via the sheet's return value,
+/// or null if cancelled.
+class TaskEditorSheet extends StatefulWidget {
+  /// Creates a [TaskEditorSheet].
+  const TaskEditorSheet({
+    super.key,
+    this.task,
+    this.defaultPriority = TaskPriority.none,
+  });
+
+  /// The task to edit, or null for a new task.
+  final Task? task;
+
+  /// Default priority for new tasks.
+  final TaskPriority defaultPriority;
+
+  /// Shows the sheet as a modal bottom sheet.
+  static Future<Task?> show(
+    BuildContext context, {
+    Task? task,
+    TaskPriority defaultPriority = TaskPriority.none,
+  }) {
+    return showModalBottomSheet<Task>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
+      builder: (context) =>
+          TaskEditorSheet(task: task, defaultPriority: defaultPriority),
+    );
+  }
+
+  @override
+  State<TaskEditorSheet> createState() => _TaskEditorSheetState();
+}
+
+class _TaskEditorSheetState extends State<TaskEditorSheet> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
+  late TaskPriority _priority;
+  DateTime? _dueDate;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.task?.title ?? '');
+    _descriptionController = TextEditingController(
+      text: widget.task?.description ?? '',
+    );
+    _priority = widget.task?.priority ?? widget.defaultPriority;
+    _dueDate = widget.task?.dueDate;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  bool get _isValid => _titleController.text.trim().isNotEmpty;
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _dueDate = picked);
+    }
+  }
+
+  void _save() {
+    if (!_isValid || _isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    final task =
+        widget.task?.copyWith(
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text.trim(),
+          priority: _priority,
+          dueDate: _dueDate,
+          updatedAt: DateTime.now(),
+        ) ??
+        Task(
+          id: '',
+          userId: '',
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text.trim(),
+          priority: _priority,
+          dueDate: _dueDate,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+    Navigator.of(context).pop(task);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              // Title
+              Text(
+                widget.task != null ? 'Edit Task' : 'New Task',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              // Title field
+              TextField(
+                controller: _titleController,
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Title',
+                  hintText: 'What needs to be done?',
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Description field
+              TextField(
+                controller: _descriptionController,
+                maxLines: 3,
+                textInputAction: TextInputAction.newline,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'Add details (optional)',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Priority selector
+              Text(
+                'Priority',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _PrioritySelector(
+                value: _priority,
+                onChanged: (p) => setState(() => _priority = p),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Due date
+              Text(
+                'Due Date',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _DueDateButton(
+                dueDate: _dueDate,
+                onTap: _pickDate,
+                onClear: () => setState(() => _dueDate = null),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+
+              // Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _isValid && !_isSaving ? _save : null,
+                      child: Text(widget.task != null ? 'Save' : 'Create'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PrioritySelector extends StatelessWidget {
+  const _PrioritySelector({required this.value, required this.onChanged});
+
+  final TaskPriority value;
+  final ValueChanged<TaskPriority> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<TaskPriority>(
+      segments: const [
+        ButtonSegment(value: TaskPriority.none, label: Text('None')),
+        ButtonSegment(value: TaskPriority.low, label: Text('Low')),
+        ButtonSegment(value: TaskPriority.medium, label: Text('Medium')),
+        ButtonSegment(value: TaskPriority.high, label: Text('High')),
+      ],
+      selected: {value},
+      onSelectionChanged: (set) => onChanged(set.first),
+      style: SegmentedButton.styleFrom(
+        selectedForegroundColor: AppColors.primary,
+      ),
+    );
+  }
+}
+
+class _DueDateButton extends StatelessWidget {
+  const _DueDateButton({
+    required this.dueDate,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final DateTime? dueDate;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.3),
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 20,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                dueDate != null
+                    ? '${dueDate!.month}/${dueDate!.day}/${dueDate!.year}'
+                    : 'No date',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            if (dueDate != null)
+              IconButton(
+                icon: const Icon(Icons.close_rounded, size: 18),
+                onPressed: onClear,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Clear date',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
