@@ -3,6 +3,9 @@
 /// Reads always hit the local Drift database for instant feedback.
 /// Writes are applied locally first with an appropriate [SyncStatus],
 /// then a background sync is triggered to push changes to Supabase.
+///
+/// On web (where Drift is not available), use [TaskRepositoryImpl.remoteOnly]
+/// which reads and writes directly to Supabase.
 library;
 
 import 'package:life_os/core/data/entity.dart';
@@ -22,27 +25,53 @@ class TaskRepositoryImpl implements TaskRepository {
     required this._syncQueue,
   });
 
-  final TaskLocalDataSource _local;
+  /// Creates a remote-only [TaskRepositoryImpl] for web platforms
+  /// where Drift (local SQLite) is not available.
+  ///
+  /// All reads and writes go directly to Supabase.
+  const TaskRepositoryImpl.remoteOnly({
+    required this._remote,
+    required this._syncQueue,
+  }) : _local = null;
+
+  final TaskLocalDataSource? _local;
   final TaskRemoteDataSource _remote;
   final SyncQueue _syncQueue;
 
   @override
-  Future<Task?> getById(String id) => _local.getById(id);
+  Future<Task?> getById(String id) async {
+    final local = _local;
+    if (local != null) return local.getById(id);
+    return _remote.getById(id);
+  }
 
   @override
-  Future<List<Task>> getAll(String userId) => _local.getAll(userId);
+  Future<List<Task>> getAll(String userId) async {
+    final local = _local;
+    if (local != null) return local.getAll(userId);
+    return _remote.getAll(userId);
+  }
 
   @override
   Future<Task> create(Task task) async {
     final now = DateTime.now();
     final newTask = task.copyWith(
-      syncStatus: SyncStatus.pendingCreate,
+      syncStatus: SyncStatus.synced,
       version: 1,
       createdAt: now,
       updatedAt: now,
     );
-    await _local.insert(newTask);
-    _syncQueue.enqueue(task.userId);
+
+    final local = _local;
+    if (local != null) {
+      final localTask = newTask.copyWith(syncStatus: SyncStatus.pendingCreate);
+      await local.insert(localTask);
+      _syncQueue.enqueue(task.userId);
+      return localTask;
+    }
+
+    // Web: write directly to remote
+    await _remote.upsert(newTask);
     return newTask;
   }
 
@@ -53,28 +82,52 @@ class TaskRepositoryImpl implements TaskRepository {
       version: task.version + 1,
       updatedAt: DateTime.now(),
     );
-    await _local.update(updated);
-    _syncQueue.enqueue(task.userId);
-    return updated;
+
+    final local = _local;
+    if (local != null) {
+      await local.update(updated);
+      _syncQueue.enqueue(task.userId);
+      return updated;
+    }
+
+    // Web: write directly to remote
+    final remoteUpdated = updated.copyWith(syncStatus: SyncStatus.synced);
+    await _remote.upsert(remoteUpdated);
+    return remoteUpdated;
   }
 
   @override
   Future<void> delete(String id) async {
-    final existing = await _local.getById(id);
-    if (existing == null) return;
-    await _local.softDelete(id);
-    _syncQueue.enqueue(existing.userId);
+    final local = _local;
+    if (local != null) {
+      final existing = await local.getById(id);
+      if (existing == null) return;
+      await local.softDelete(id);
+      _syncQueue.enqueue(existing.userId);
+      return;
+    }
+
+    // Web: soft-delete on remote
+    await _remote.delete(id);
   }
 
   @override
-  Future<void> purge(String id) => _local.purge(id);
+  Future<void> purge(String id) async {
+    final local = _local;
+    if (local != null) {
+      await local.purge(id);
+    }
+    await _remote.delete(id);
+  }
 
   /// Synchronizes local and remote task stores for [userId].
   ///
   /// Delegates to the [SyncService] which pushes pending local
   /// changes and pulls remote updates.
   Future<void> sync(String userId) async {
-    final syncService = SyncService(localTasks: _local, remoteTasks: _remote);
+    final local = _local;
+    if (local == null) return; // No sync needed on web
+    final syncService = SyncService(localTasks: local, remoteTasks: _remote);
     await syncService.syncTasks(userId);
   }
 }

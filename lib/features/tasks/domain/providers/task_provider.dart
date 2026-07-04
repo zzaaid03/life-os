@@ -4,8 +4,12 @@
 /// repository, the sync service, and a [TaskListNotifier] that
 /// exposes task list state to the UI. Also provides filtered
 /// derived providers for today, upcoming, and completed tasks.
+///
+/// On web (where Drift is not supported), the local data source
+/// is replaced with a remote-only fallback.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:life_os/core/services/app_database.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/core/sync/sync_service.dart';
@@ -18,12 +22,16 @@ import 'package:life_os/features/tasks/data/repositories/task_repository_impl.da
 import 'package:riverpod/riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-/// Provides the singleton [AppDatabase] instance.
+/// Provides the singleton [AppDatabase] instance (native only).
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   return AppDatabase();
 });
 
 /// Provides the [TaskLocalDataSource].
+///
+/// On web, Drift is not available, so this provider throws.
+/// The [taskRepositoryProvider] handles the web case by
+/// falling back to remote-only mode.
 final taskLocalDataSourceProvider = Provider<TaskLocalDataSource>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return TaskLocalDataSource(db);
@@ -41,17 +49,61 @@ final syncQueueProvider = Provider<SyncQueue>((ref) {
 });
 
 /// Provides the [SyncService].
+///
+/// On web, sync is not needed (remote-only mode).
 final syncServiceProvider = Provider<SyncService>((ref) {
-  final local = ref.watch(taskLocalDataSourceProvider);
   final remote = ref.watch(taskRemoteDataSourceProvider);
+
+  if (kIsWeb) {
+    // No-op sync service for web
+    return SyncService(localTasks: _NullLocalDataSource(), remoteTasks: remote);
+  }
+
+  final local = ref.watch(taskLocalDataSourceProvider);
   return SyncService(localTasks: local, remoteTasks: remote);
 });
 
+/// A null local data source that returns empty results.
+/// Used on web where Drift is not available.
+class _NullLocalDataSource implements TaskLocalDataSource {
+  @override
+  Future<Task?> getById(String id) async => null;
+
+  @override
+  Future<List<Task>> getAll(String userId) async => [];
+
+  @override
+  Future<List<Task>> getByStatus(String userId, TaskStatus status) async => [];
+
+  @override
+  Future<void> insert(Task task) async {}
+
+  @override
+  Future<void> update(Task task) async {}
+
+  @override
+  Future<void> softDelete(String id) async {}
+
+  @override
+  Future<void> purge(String id) async {}
+
+  @override
+  Future<List<Task>> getPendingSync(String userId) async => [];
+}
+
 /// Provides the [TaskRepositoryImpl].
+///
+/// On web, the local data source is unavailable (Drift uses FFI).
+/// In that case, a remote-only repository is used instead.
 final taskRepositoryProvider = Provider<TaskRepositoryImpl>((ref) {
-  final local = ref.watch(taskLocalDataSourceProvider);
   final remote = ref.watch(taskRemoteDataSourceProvider);
   final syncQueue = ref.watch(syncQueueProvider);
+
+  if (kIsWeb) {
+    return TaskRepositoryImpl.remoteOnly(remote: remote, syncQueue: syncQueue);
+  }
+
+  final local = ref.watch(taskLocalDataSourceProvider);
   return TaskRepositoryImpl(local: local, remote: remote, syncQueue: syncQueue);
 });
 

@@ -5,7 +5,9 @@
 library;
 
 import 'package:drift/drift.dart';
-import 'package:life_os/core/services/database_service_native.dart' as native;
+import 'package:life_os/core/services/database_service_stub.dart'
+    if (dart.library.io) 'package:life_os/core/services/database_service_native.dart'
+    as native;
 
 part 'app_database.g.dart';
 
