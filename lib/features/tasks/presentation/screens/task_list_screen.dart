@@ -28,6 +28,12 @@ class TaskListScreen extends ConsumerWidget {
     final upcomingTasks = ref.watch(upcomingTasksProvider);
     final completedTasks = ref.watch(completedTasksProvider);
 
+    debugPrint(
+      '[TaskListScreen] build: tasks=${taskState.tasks.length} '
+      'today=${todayTasks.length} upcoming=${upcomingTasks.length} '
+      'completed=${completedTasks.length} status=${taskState.status}',
+    );
+
     return Scaffold(
       appBar: AppBar(title: const Text('Tasks')),
       body: RefreshIndicator(
@@ -52,7 +58,6 @@ class TaskListScreen extends ConsumerWidget {
     List<Task> upcoming,
     List<Task> completed,
   ) {
-    // Only show full-screen loading on initial load with no data
     if (taskState.status == TaskListStatus.loading && taskState.tasks.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -140,19 +145,16 @@ class TaskListScreen extends ConsumerWidget {
           const TaskEmptyState(type: TaskEmptyType.today)
         else
           ...today.map((t) => _taskItem(context, ref, t)),
-
         TaskSection(title: 'Upcoming', count: upcoming.length),
         if (upcoming.isEmpty)
           const TaskEmptyState(type: TaskEmptyType.upcoming)
         else
           ...upcoming.map((t) => _taskItem(context, ref, t)),
-
         TaskSection(title: 'Completed', count: completed.length),
         if (completed.isEmpty)
           const TaskEmptyState(type: TaskEmptyType.completed)
         else
           ...completed.map((t) => _taskItem(context, ref, t)),
-
         const SizedBox(height: AppSpacing.massive),
       ],
     );
@@ -168,9 +170,6 @@ class TaskListScreen extends ConsumerWidget {
     );
   }
 
-  /// Opens the task editor sheet for creating a new task.
-  /// Called from the AppShell's FAB via GoRouter extra or
-  /// from the home screen's quick action.
   static Future<void> createTask(BuildContext context, WidgetRef ref) async {
     final authState = ref.read(authProvider);
     final userId = authState.userId;

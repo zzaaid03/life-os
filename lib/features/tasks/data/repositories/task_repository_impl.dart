@@ -8,6 +8,7 @@
 /// which reads and writes directly to Supabase.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:life_os/core/data/entity.dart';
 import 'package:life_os/core/sync/sync_service.dart';
 import 'package:life_os/features/tasks/data/datasources/task_local_data_source.dart';
@@ -41,15 +42,34 @@ class TaskRepositoryImpl implements TaskRepository {
   @override
   Future<Task?> getById(String id) async {
     final local = _local;
-    if (local != null) return local.getById(id);
+    if (local != null) {
+      debugPrint('[TaskRepo] getById($id) → local (Drift)');
+      return local.getById(id);
+    }
+    debugPrint('[TaskRepo] getById($id) → remote (Supabase)');
     return _remote.getById(id);
   }
 
   @override
   Future<List<Task>> getAll(String userId) async {
     final local = _local;
-    if (local != null) return local.getAll(userId);
-    return _remote.getAll(userId);
+    if (local != null) {
+      debugPrint('[TaskRepo] getAll($userId) → local (Drift)');
+      final tasks = await local.getAll(userId);
+      debugPrint('[TaskRepo] getAll local returned ${tasks.length} tasks');
+      return tasks;
+    }
+    debugPrint('[TaskRepo] getAll($userId) → remote (Supabase)');
+    final tasks = await _remote.getAll(userId);
+    debugPrint('[TaskRepo] getAll remote returned ${tasks.length} tasks');
+    for (final t in tasks) {
+      debugPrint(
+        '[TaskRepo]   id=${t.id} title="${t.title}" '
+        'status=${t.status} dueDate=${t.dueDate} '
+        'deletedAt=${t.deletedAt}',
+      );
+    }
+    return tasks;
   }
 
   @override
@@ -64,14 +84,16 @@ class TaskRepositoryImpl implements TaskRepository {
 
     final local = _local;
     if (local != null) {
+      debugPrint('[TaskRepo] create → local (Drift): id=${task.id}');
       final localTask = newTask.copyWith(syncStatus: SyncStatus.pendingCreate);
       await local.insert(localTask);
       _syncQueue.enqueue(task.userId);
       return localTask;
     }
 
-    // Web: write directly to remote
+    debugPrint('[TaskRepo] create → remote (Supabase): id=${task.id}');
     await _remote.upsert(newTask);
+    debugPrint('[TaskRepo] create remote succeeded: id=${newTask.id}');
     return newTask;
   }
 
@@ -85,12 +107,13 @@ class TaskRepositoryImpl implements TaskRepository {
 
     final local = _local;
     if (local != null) {
+      debugPrint('[TaskRepo] update → local (Drift): id=${task.id}');
       await local.update(updated);
       _syncQueue.enqueue(task.userId);
       return updated;
     }
 
-    // Web: write directly to remote
+    debugPrint('[TaskRepo] update → remote (Supabase): id=${task.id}');
     final remoteUpdated = updated.copyWith(syncStatus: SyncStatus.synced);
     await _remote.upsert(remoteUpdated);
     return remoteUpdated;
@@ -100,6 +123,7 @@ class TaskRepositoryImpl implements TaskRepository {
   Future<void> delete(String id) async {
     final local = _local;
     if (local != null) {
+      debugPrint('[TaskRepo] delete → local (Drift): id=$id');
       final existing = await local.getById(id);
       if (existing == null) return;
       await local.softDelete(id);
@@ -107,7 +131,7 @@ class TaskRepositoryImpl implements TaskRepository {
       return;
     }
 
-    // Web: soft-delete on remote
+    debugPrint('[TaskRepo] delete → remote (Supabase): id=$id');
     await _remote.delete(id);
   }
 
@@ -121,9 +145,6 @@ class TaskRepositoryImpl implements TaskRepository {
   }
 
   /// Synchronizes local and remote task stores for [userId].
-  ///
-  /// Delegates to the [SyncService] which pushes pending local
-  /// changes and pulls remote updates.
   Future<void> sync(String userId) async {
     final local = _local;
     if (local == null) return; // No sync needed on web

@@ -93,9 +93,11 @@ final taskRepositoryProvider = Provider<TaskRepositoryImpl>((ref) {
   final syncQueue = ref.watch(syncQueueProvider);
 
   if (kIsWeb) {
+    debugPrint('[taskRepositoryProvider] kIsWeb=true → remoteOnly');
     return TaskRepositoryImpl.remoteOnly(remote: remote, syncQueue: syncQueue);
   }
 
+  debugPrint('[taskRepositoryProvider] kIsWeb=false → local+remote');
   final local = ref.watch(taskLocalDataSourceProvider);
   return TaskRepositoryImpl(local: local, remote: remote, syncQueue: syncQueue);
 });
@@ -144,6 +146,10 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   /// Loads tasks for the given [userId].
   Future<void> loadTasks(String userId) async {
     _userId = userId;
+    debugPrint('[TaskListNotifier] loadTasks($userId) called');
+    debugPrint(
+      '[TaskListNotifier] state.tasks.length BEFORE load: ${state.tasks.length}',
+    );
 
     if (state.tasks.isEmpty) {
       state = const TaskListState(status: TaskListStatus.loading);
@@ -151,9 +157,22 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
 
     try {
       final tasks = await _repository.getAll(userId);
+      debugPrint('[TaskListNotifier] getAll returned ${tasks.length} tasks');
+      for (final t in tasks) {
+        debugPrint(
+          '[TaskListNotifier]   task: id=${t.id} title="${t.title}" '
+          'status=${t.status} dueDate=${t.dueDate} '
+          'deletedAt=${t.deletedAt} syncStatus=${t.syncStatus}',
+        );
+      }
       state = TaskListState(status: TaskListStatus.loaded, tasks: tasks);
+      debugPrint(
+        '[TaskListNotifier] state set: ${state.tasks.length} tasks, '
+        'status=${state.status}',
+      );
       _syncInBackground(userId);
     } catch (e) {
+      debugPrint('[TaskListNotifier] loadTasks EXCEPTION: $e');
       if (state.tasks.isNotEmpty) {
         state = state.copyWith(status: TaskListStatus.loaded);
       } else {
@@ -176,22 +195,46 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
         ? task.copyWith(id: const Uuid().v4(), userId: userId)
         : task.copyWith(userId: userId);
 
+    debugPrint('[TaskListNotifier] createTask called');
+    debugPrint(
+      '[TaskListNotifier]   toCreate: id=${toCreate.id} '
+      'title="${toCreate.title}" userId=$userId '
+      'status=${toCreate.status} dueDate=${toCreate.dueDate}',
+    );
+    debugPrint(
+      '[TaskListNotifier]   state.tasks.length BEFORE optimistic: '
+      '${state.tasks.length}',
+    );
+
     // Optimistic: add to state immediately
     state = TaskListState(
       status: TaskListStatus.loaded,
       tasks: [...state.tasks, toCreate],
+    );
+    debugPrint(
+      '[TaskListNotifier]   state.tasks.length AFTER optimistic: '
+      '${state.tasks.length}',
     );
 
     // Background write (fire and forget — don't block the caller)
     unawaited(
       _repository
           .create(toCreate)
-          .then((_) {
+          .then((created) {
+            debugPrint(
+              '[TaskListNotifier] repository.create succeeded: '
+              'id=${created.id} title="${created.title}"',
+            );
             _syncInBackground(userId);
           })
-          .catchError((e) {
+          .catchError((Object e) {
+            debugPrint('[TaskListNotifier] repository.create FAILED: $e');
             state = state.copyWith(
               tasks: state.tasks.where((t) => t.id != toCreate.id).toList(),
+            );
+            debugPrint(
+              '[TaskListNotifier]   reverted: '
+              'state.tasks.length=${state.tasks.length}',
             );
           }),
     );
@@ -204,6 +247,11 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       orElse: () => task,
     );
 
+    debugPrint(
+      '[TaskListNotifier] updateTask: id=${task.id} '
+      'title="${task.title}" status=${task.status}',
+    );
+
     // Optimistic: update state immediately
     state = TaskListState(
       status: TaskListStatus.loaded,
@@ -214,10 +262,15 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
     unawaited(
       _repository
           .update(task)
-          .then((_) {
+          .then((updated) {
+            debugPrint(
+              '[TaskListNotifier] repository.update succeeded: '
+              'id=${updated.id}',
+            );
             _syncInBackground(_userId ?? task.userId);
           })
-          .catchError((e) {
+          .catchError((Object e) {
+            debugPrint('[TaskListNotifier] repository.update FAILED: $e');
             state = state.copyWith(
               tasks: state.tasks
                   .map((t) => t.id == task.id ? oldTask : t)
@@ -231,6 +284,8 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   Future<void> deleteTask(String id) async {
     final oldTasks = state.tasks;
 
+    debugPrint('[TaskListNotifier] deleteTask: id=$id');
+
     // Optimistic: remove from state immediately
     state = TaskListState(
       status: TaskListStatus.loaded,
@@ -242,9 +297,14 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       _repository
           .delete(id)
           .then((_) {
+            debugPrint(
+              '[TaskListNotifier] repository.delete succeeded: '
+              'id=$id',
+            );
             _syncInBackground(_userId ?? '');
           })
-          .catchError((e) {
+          .catchError((Object e) {
+            debugPrint('[TaskListNotifier] repository.delete FAILED: $e');
             state = state.copyWith(tasks: oldTasks);
           }),
     );
@@ -257,6 +317,11 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   Future<void> toggleTaskComplete(String id) async {
     final task = state.tasks.firstWhere((t) => t.id == id);
     final isCompleted = task.status == TaskStatus.completed;
+    debugPrint(
+      '[TaskListNotifier] toggleTaskComplete: id=$id '
+      'currently completed=$isCompleted → '
+      'will become ${isCompleted ? 'pending' : 'completed'}',
+    );
     final updated = task.copyWith(
       status: isCompleted ? TaskStatus.pending : TaskStatus.completed,
       completedAt: isCompleted ? null : DateTime.now(),
@@ -275,7 +340,15 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   /// Triggers a background sync (non-blocking, silent).
   void _syncInBackground(String userId) {
     if (userId.isEmpty) return;
-    _syncService.syncTasks(userId).catchError((_) {});
+    debugPrint('[TaskListNotifier] _syncInBackground($userId)');
+    _syncService
+        .syncTasks(userId)
+        .then((_) {
+          debugPrint('[TaskListNotifier] sync completed');
+        })
+        .catchError((Object e) {
+          debugPrint('[TaskListNotifier] sync FAILED: $e');
+        });
   }
 }
 
@@ -292,6 +365,10 @@ final taskListProvider = StateNotifierProvider<TaskListNotifier, TaskListState>(
           (previous == null ||
               !previous.isAuthenticated ||
               previous.userId != next.userId)) {
+        debugPrint(
+          '[taskListProvider] auth state changed → loading tasks for '
+          'userId=${next.userId}',
+        );
         notifier.loadTasks(next.userId!);
       }
     });
@@ -312,8 +389,9 @@ bool _isDueToday(DateTime? dueDate) {
 /// Tasks due today (not completed/archived).
 /// Tasks with no due date are included as "today".
 final todayTasksProvider = Provider<List<Task>>((ref) {
-  final tasks = ref.watch(taskListProvider).tasks;
-  return tasks
+  final taskState = ref.watch(taskListProvider);
+  final tasks = taskState.tasks;
+  final filtered = tasks
       .where(
         (t) =>
             _isDueToday(t.dueDate) &&
@@ -321,6 +399,19 @@ final todayTasksProvider = Provider<List<Task>>((ref) {
             t.status != TaskStatus.archived,
       )
       .toList();
+
+  debugPrint(
+    '[todayTasksProvider] received ${tasks.length} tasks from '
+    'taskListProvider, returning ${filtered.length} after filtering',
+  );
+  for (final t in filtered) {
+    debugPrint(
+      '[todayTasksProvider]   id=${t.id} title="${t.title}" '
+      'status=${t.status} dueDate=${t.dueDate}',
+    );
+  }
+
+  return filtered;
 });
 
 /// Tasks due after today (not completed/archived).

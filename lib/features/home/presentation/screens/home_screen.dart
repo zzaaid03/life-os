@@ -43,26 +43,18 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.xxl),
           AnimatedGreeting(displayName: displayName),
           const SizedBox(height: AppSpacing.xxxl),
-
-          // Quick Actions
           const SectionHeader(title: 'Quick Actions'),
           const _QuickActionsGrid()
               .animate()
               .fadeIn(duration: 400.ms, delay: 300.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 300.ms),
-
           const SizedBox(height: AppSpacing.xxxl),
-
-          // Focus for today
           const SectionHeader(title: 'Focus for Today'),
           const _TodayTasksCard()
               .animate()
               .fadeIn(duration: 400.ms, delay: 400.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 400.ms),
-
           const SizedBox(height: AppSpacing.md),
-
-          // Habits
           DashboardCard(
                 icon: Icons.repeat_rounded,
                 title: 'Habits',
@@ -79,10 +71,7 @@ class HomeScreen extends ConsumerWidget {
               .animate()
               .fadeIn(duration: 400.ms, delay: 500.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 500.ms),
-
           const SizedBox(height: AppSpacing.md),
-
-          // Goal of the week
           DashboardCard(
                 icon: Icons.flag_outlined,
                 title: 'Goal of the Week',
@@ -99,10 +88,7 @@ class HomeScreen extends ConsumerWidget {
               .animate()
               .fadeIn(duration: 400.ms, delay: 600.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 600.ms),
-
           const SizedBox(height: AppSpacing.md),
-
-          // Journal
           DashboardCard(
                 icon: Icons.book_outlined,
                 title: 'Journal',
@@ -119,7 +105,6 @@ class HomeScreen extends ConsumerWidget {
               .animate()
               .fadeIn(duration: 400.ms, delay: 700.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 700.ms),
-
           const SizedBox(height: AppSpacing.massive),
         ],
       ),
@@ -144,6 +129,11 @@ class _TodayTasksCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final todayTasks = ref.watch(todayTasksProvider);
+
+    debugPrint(
+      '[HomeScreen._TodayTasksCard] build: '
+      'todayTasks.length=${todayTasks.length}',
+    );
 
     if (todayTasks.isEmpty) {
       return DashboardCard(
@@ -208,7 +198,6 @@ class _TodayTasksCard extends ConsumerWidget {
     );
   }
 
-  /// Opens the task editor sheet — same method used everywhere.
   Future<void> _showTaskEditor(BuildContext context, WidgetRef ref) async {
     final authState = ref.read(authProvider);
     final userId = authState.userId;
@@ -217,7 +206,6 @@ class _TodayTasksCard extends ConsumerWidget {
     final result = await TaskEditorSheet.show(context);
     if (result == null) return;
 
-    // createTask is optimistic — returns immediately after state update
     await ref
         .read(taskListProvider.notifier)
         .createTask(result.copyWith(userId: userId));
