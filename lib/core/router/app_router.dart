@@ -22,6 +22,8 @@ import 'package:life_os/features/profile/domain/providers/profile_provider.dart'
 import 'package:life_os/features/profile/presentation/screens/create_profile_screen.dart';
 import 'package:life_os/features/search/presentation/screens/search_screen.dart';
 import 'package:life_os/features/settings/presentation/screens/settings_screen.dart';
+import 'package:life_os/features/tasks/presentation/screens/task_detail_screen.dart';
+import 'package:life_os/features/tasks/presentation/screens/task_list_screen.dart';
 import 'package:life_os/features/timeline/presentation/screens/timeline_screen.dart';
 import 'package:life_os/shared/widgets/app_shell.dart';
 
@@ -48,6 +50,8 @@ abstract final class AppRoutes {
   static const String life = '/life';
   static const String search = '/search';
   static const String settings = '/settings';
+  static const String tasks = '/tasks';
+  static const String taskDetail = '/tasks/:id';
 }
 
 /// Creates and configures the GoRouter instance.
@@ -183,7 +187,20 @@ GoRouter createRouter({required WidgetRef ref}) {
             name: 'settings',
             builder: (context, state) => const SettingsScreen(),
           ),
+          GoRoute(
+            path: AppRoutes.tasks,
+            name: 'tasks',
+            builder: (context, state) => const TaskListScreen(),
+          ),
         ],
+      ),
+
+      // Task detail — standalone, no nav bar
+      GoRoute(
+        path: AppRoutes.taskDetail,
+        name: 'taskDetail',
+        builder: (context, state) =>
+            TaskDetailScreen(taskId: state.pathParameters['id']!),
       ),
     ],
 
