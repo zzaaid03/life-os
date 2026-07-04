@@ -11,6 +11,8 @@
 /// - On web, reads go to Supabase directly (no local cache)
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:life_os/core/services/app_database.dart';
 import 'package:life_os/core/services/supabase_service.dart';
@@ -140,13 +142,9 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   String? _userId;
 
   /// Loads tasks for the given [userId].
-  ///
-  /// Only shows loading spinner on initial load (when state is empty).
-  /// On refresh, keeps existing data visible while loading.
   Future<void> loadTasks(String userId) async {
     _userId = userId;
 
-    // Only show loading spinner if we have no data yet
     if (state.tasks.isEmpty) {
       state = const TaskListState(status: TaskListStatus.loading);
     }
@@ -154,10 +152,8 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
     try {
       final tasks = await _repository.getAll(userId);
       state = TaskListState(status: TaskListStatus.loaded, tasks: tasks);
-      // Background sync after load (non-blocking)
       _syncInBackground(userId);
     } catch (e) {
-      // If we already have tasks, keep them visible
       if (state.tasks.isNotEmpty) {
         state = state.copyWith(status: TaskListStatus.loaded);
       } else {
@@ -172,7 +168,8 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   /// Creates a new task with **optimistic UI update**.
   ///
   /// The task is added to the state immediately. The repository
-  /// write and sync happen in the background.
+  /// write happens in the background — this method returns
+  /// immediately after the state update.
   Future<void> createTask(Task task) async {
     final userId = _userId ?? task.userId;
     final toCreate = task.id.isEmpty
@@ -185,17 +182,19 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       tasks: [...state.tasks, toCreate],
     );
 
-    // Background write + sync (non-blocking)
-    try {
-      await _repository.create(toCreate);
-      _syncInBackground(userId);
-    } catch (e) {
-      // Revert on failure
-      state = state.copyWith(
-        tasks: state.tasks.where((t) => t.id != toCreate.id).toList(),
-        error: 'Failed to create task.',
-      );
-    }
+    // Background write (fire and forget — don't block the caller)
+    unawaited(
+      _repository
+          .create(toCreate)
+          .then((_) {
+            _syncInBackground(userId);
+          })
+          .catchError((e) {
+            state = state.copyWith(
+              tasks: state.tasks.where((t) => t.id != toCreate.id).toList(),
+            );
+          }),
+    );
   }
 
   /// Updates a task with **optimistic UI update**.
@@ -211,15 +210,21 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       tasks: state.tasks.map((t) => t.id == task.id ? task : t).toList(),
     );
 
-    try {
-      await _repository.update(task);
-      _syncInBackground(_userId ?? task.userId);
-    } catch (e) {
-      // Revert on failure
-      state = state.copyWith(
-        tasks: state.tasks.map((t) => t.id == task.id ? oldTask : t).toList(),
-      );
-    }
+    // Background write (fire and forget)
+    unawaited(
+      _repository
+          .update(task)
+          .then((_) {
+            _syncInBackground(_userId ?? task.userId);
+          })
+          .catchError((e) {
+            state = state.copyWith(
+              tasks: state.tasks
+                  .map((t) => t.id == task.id ? oldTask : t)
+                  .toList(),
+            );
+          }),
+    );
   }
 
   /// Soft-deletes a task with **optimistic UI update**.
@@ -232,24 +237,32 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       tasks: state.tasks.where((t) => t.id != id).toList(),
     );
 
-    try {
-      await _repository.delete(id);
-      _syncInBackground(_userId ?? '');
-    } catch (e) {
-      // Revert on failure
-      state = state.copyWith(tasks: oldTasks);
-    }
+    // Background write (fire and forget)
+    unawaited(
+      _repository
+          .delete(id)
+          .then((_) {
+            _syncInBackground(_userId ?? '');
+          })
+          .catchError((e) {
+            state = state.copyWith(tasks: oldTasks);
+          }),
+    );
   }
 
-  /// Marks a task as completed with **optimistic UI update**.
-  Future<void> completeTask(String id) async {
+  /// Toggles a task between completed and pending.
+  ///
+  /// If completed → becomes pending again (uncompletes).
+  /// If pending → becomes completed.
+  Future<void> toggleTaskComplete(String id) async {
     final task = state.tasks.firstWhere((t) => t.id == id);
-    final completed = task.copyWith(
-      status: TaskStatus.completed,
-      completedAt: DateTime.now(),
+    final isCompleted = task.status == TaskStatus.completed;
+    final updated = task.copyWith(
+      status: isCompleted ? TaskStatus.pending : TaskStatus.completed,
+      completedAt: isCompleted ? null : DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    await updateTask(completed);
+    await updateTask(updated);
   }
 
   /// Reloads tasks from the data source.
@@ -262,10 +275,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   /// Triggers a background sync (non-blocking, silent).
   void _syncInBackground(String userId) {
     if (userId.isEmpty) return;
-    // Fire and forget — don't block UI
-    _syncService.syncTasks(userId).catchError((_) {
-      // Silent failure — sync will retry on next mutation
-    });
+    _syncService.syncTasks(userId).catchError((_) {});
   }
 }
 
@@ -290,22 +300,23 @@ final taskListProvider = StateNotifierProvider<TaskListNotifier, TaskListState>(
   },
 );
 
-/// Whether a task is due today.
-bool _isDueToday(DateTime date) {
+/// Whether a task is due today (or has no due date — counts as today).
+bool _isDueToday(DateTime? dueDate) {
+  if (dueDate == null) return true; // No due date = today by default
   final now = DateTime.now();
-  return date.year == now.year &&
-      date.month == now.month &&
-      date.day == now.day;
+  return dueDate.year == now.year &&
+      dueDate.month == now.month &&
+      dueDate.day == now.day;
 }
 
 /// Tasks due today (not completed/archived).
+/// Tasks with no due date are included as "today".
 final todayTasksProvider = Provider<List<Task>>((ref) {
   final tasks = ref.watch(taskListProvider).tasks;
   return tasks
       .where(
         (t) =>
-            t.dueDate != null &&
-            _isDueToday(t.dueDate!) &&
+            _isDueToday(t.dueDate) &&
             t.status != TaskStatus.completed &&
             t.status != TaskStatus.archived,
       )

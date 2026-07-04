@@ -161,9 +161,9 @@ class TaskListScreen extends ConsumerWidget {
   Widget _taskItem(BuildContext context, WidgetRef ref, Task task) {
     return TaskCard(
       task: task,
-      onTap: () => context.go('/tasks/${task.id}'),
+      onTap: () => context.push('/tasks/${task.id}'),
       onComplete: () =>
-          ref.read(taskListProvider.notifier).completeTask(task.id),
+          ref.read(taskListProvider.notifier).toggleTaskComplete(task.id),
       onDelete: () => _confirmDelete(context, ref, task),
     );
   }

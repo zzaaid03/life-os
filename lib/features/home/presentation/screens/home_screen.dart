@@ -34,7 +34,6 @@ class HomeScreen extends ConsumerWidget {
     final profileState = ref.watch(profileProvider);
     final displayName =
         profileState.profile?.displayName ?? authState.displayName ?? 'there';
-    final todayTasks = ref.watch(todayTasksProvider);
 
     return SingleChildScrollView(
       padding: AppSpacing.screenPadding,
@@ -42,15 +41,12 @@ class HomeScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: AppSpacing.xxl),
-
-          // Greeting
           AnimatedGreeting(displayName: displayName),
-
           const SizedBox(height: AppSpacing.xxxl),
 
           // Quick Actions
           const SectionHeader(title: 'Quick Actions'),
-          _QuickActionsGrid()
+          const _QuickActionsGrid()
               .animate()
               .fadeIn(duration: 400.ms, delay: 300.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 300.ms),
@@ -59,8 +55,7 @@ class HomeScreen extends ConsumerWidget {
 
           // Focus for today
           const SectionHeader(title: 'Focus for Today'),
-
-          _TodayTasksCard(todayTasks: todayTasks)
+          const _TodayTasksCard()
               .animate()
               .fadeIn(duration: 400.ms, delay: 400.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 400.ms),
@@ -125,7 +120,6 @@ class HomeScreen extends ConsumerWidget {
               .fadeIn(duration: 400.ms, delay: 700.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 700.ms),
 
-          // Bottom spacing for FAB clearance
           const SizedBox(height: AppSpacing.massive),
         ],
       ),
@@ -143,13 +137,14 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+/// Today's tasks card — watches [todayTasksProvider] directly.
 class _TodayTasksCard extends ConsumerWidget {
-  const _TodayTasksCard({required this.todayTasks});
-
-  final List<Task> todayTasks;
+  const _TodayTasksCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final todayTasks = ref.watch(todayTasksProvider);
+
     if (todayTasks.isEmpty) {
       return DashboardCard(
         icon: Icons.auto_awesome_outlined,
@@ -161,7 +156,7 @@ class _TodayTasksCard extends ConsumerWidget {
           subtitle: 'Perfect day to plan something meaningful.',
           compact: true,
           actionLabel: 'Create first task',
-          onAction: () => _createTask(context, ref),
+          onAction: () => _showTaskEditor(context, ref),
         ),
       );
     }
@@ -169,9 +164,7 @@ class _TodayTasksCard extends ConsumerWidget {
     final completed = todayTasks
         .where((t) => t.status == TaskStatus.completed)
         .length;
-    final completionPct = todayTasks.isEmpty
-        ? 0.0
-        : completed / todayTasks.length;
+    final completionPct = completed / todayTasks.length;
 
     return DashboardCard(
       icon: Icons.auto_awesome_outlined,
@@ -201,7 +194,6 @@ class _TodayTasksCard extends ConsumerWidget {
               ),
             ),
           const SizedBox(height: AppSpacing.md),
-          // Completion progress
           ClipRRect(
             borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
@@ -216,7 +208,8 @@ class _TodayTasksCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _createTask(BuildContext context, WidgetRef ref) async {
+  /// Opens the task editor sheet — same method used everywhere.
+  Future<void> _showTaskEditor(BuildContext context, WidgetRef ref) async {
     final authState = ref.read(authProvider);
     final userId = authState.userId;
     if (userId == null) return;
@@ -224,6 +217,7 @@ class _TodayTasksCard extends ConsumerWidget {
     final result = await TaskEditorSheet.show(context);
     if (result == null) return;
 
+    // createTask is optimistic — returns immediately after state update
     await ref
         .read(taskListProvider.notifier)
         .createTask(result.copyWith(userId: userId));
@@ -277,6 +271,8 @@ class _TaskSummaryItem extends StatelessWidget {
 }
 
 class _QuickActionsGrid extends StatelessWidget {
+  const _QuickActionsGrid();
+
   @override
   Widget build(BuildContext context) {
     return Row(

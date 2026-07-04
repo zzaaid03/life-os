@@ -65,7 +65,7 @@ class _TimelineItem extends StatelessWidget {
     final completedDate = task.completedAt ?? task.updatedAt;
 
     return InkWell(
-      onTap: () => context.go('/tasks/${task.id}'),
+      onTap: () => context.push('/tasks/${task.id}'),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),

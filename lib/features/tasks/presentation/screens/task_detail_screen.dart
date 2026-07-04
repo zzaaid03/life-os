@@ -37,6 +37,11 @@ class TaskDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.pop(),
+          tooltip: 'Back',
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_rounded),
@@ -55,7 +60,6 @@ class TaskDetailScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title
             Text(
               task.title,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -66,8 +70,6 @@ class TaskDetailScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-
-            // Status + Priority
             Row(
               children: [
                 _StatusBadge(status: task.status),
@@ -76,8 +78,6 @@ class TaskDetailScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.xl),
-
-            // Description
             if (task.description != null && task.description!.isNotEmpty) ...[
               Text(
                 'Description',
@@ -94,8 +94,6 @@ class TaskDetailScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.xl),
             ],
-
-            // Due date
             _DetailRow(
               icon: Icons.calendar_today_rounded,
               label: 'Due Date',
@@ -104,8 +102,6 @@ class TaskDetailScreen extends ConsumerWidget {
                   : 'No date',
             ),
             const SizedBox(height: AppSpacing.md),
-
-            // Completed
             if (task.completedAt != null)
               _DetailRow(
                 icon: Icons.check_circle_outline_rounded,
@@ -113,8 +109,6 @@ class TaskDetailScreen extends ConsumerWidget {
                 value:
                     '${task.completedAt!.month}/${task.completedAt!.day}/${task.completedAt!.year}',
               ),
-
-            // Timestamps
             const SizedBox(height: AppSpacing.xl),
             _DetailRow(
               icon: Icons.schedule_rounded,
@@ -127,8 +121,6 @@ class TaskDetailScreen extends ConsumerWidget {
               label: 'Updated',
               value: _formatDateTime(task.updatedAt),
             ),
-
-            // Future placeholders
             const SizedBox(height: AppSpacing.xxxl),
             const _PlaceholderSection(
               icon: Icons.list_rounded,
@@ -146,15 +138,13 @@ class TaskDetailScreen extends ConsumerWidget {
               icon: Icons.auto_awesome_rounded,
               title: 'AI Assistant',
             ),
-
             const SizedBox(height: AppSpacing.massive),
-
-            // Complete / Uncomplete button
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () =>
-                    ref.read(taskListProvider.notifier).completeTask(task.id),
+                onPressed: () => ref
+                    .read(taskListProvider.notifier)
+                    .toggleTaskComplete(task.id),
                 icon: Icon(
                   isCompleted ? Icons.undo_rounded : Icons.check_rounded,
                 ),
@@ -191,7 +181,7 @@ class TaskDetailScreen extends ConsumerWidget {
             onPressed: () {
               Navigator.of(ctx).pop();
               ref.read(taskListProvider.notifier).deleteTask(task.id);
-              if (context.mounted) context.go('/tasks');
+              if (context.mounted) context.pop();
             },
             child: const Text('Delete'),
           ),
