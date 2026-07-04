@@ -1,8 +1,8 @@
 # ROADMAP.md
 
-## Current Version: 1.1.0 (Identity)
+## Current Version: 1.2.0 (Tasks)
 
-The foundation has been laid. The project structure, architecture, design system, authentication scaffolding, and routing are in place.
+The foundation, authentication, data layer, and app shell are complete. Tasks are the first fully functional feature.
 
 ---
 
@@ -39,9 +39,6 @@ The foundation has been laid. The project structure, architecture, design system
 - [x] Accessibility (semantic labels, tooltips, screen readers)
 - [x] UX documentation
 - [x] Zero analyzer warnings
-- [ ] Session persistence
-- [ ] Auth error handling and user feedback
-- [ ] Auth integration tests
 
 ---
 
@@ -80,7 +77,25 @@ The foundation has been laid. The project structure, architecture, design system
 
 ---
 
-## Milestone 5: Timeline Feature (v1.3.0)
+## Milestone 5: Task Management Engine ✅
+
+- [x] Offline-first task repository (Drift + Supabase)
+- [x] Local and remote data sources
+- [x] SyncService with push/pull/conflict resolution
+- [x] TaskListNotifier with Riverpod state management
+- [x] Task list screen with Today/Upcoming/Completed sections
+- [x] Task detail screen with edit/delete/complete
+- [x] Task editor bottom sheet with validation
+- [x] Reusable widgets (TaskCard, TaskCheckbox, TaskPriorityChip, etc.)
+- [x] Swipe actions (complete, delete)
+- [x] Dashboard integration with live task data
+- [x] Timeline integration with completed tasks
+- [x] Task model unit tests
+- [x] Zero analyzer warnings
+
+---
+
+## Milestone 6: Timeline Feature (v1.3.0)
 
 - [ ] Timeline UI with infinite scroll
 - [ ] Entry creation and editing
@@ -91,7 +106,7 @@ The foundation has been laid. The project structure, architecture, design system
 
 ---
 
-## Milestone 5: Life Dashboard (v1.4.0)
+## Milestone 7: Life Dashboard (v1.4.0)
 
 - [ ] Habit tracking UI
 - [ ] Goal setting and progress tracking
@@ -102,7 +117,7 @@ The foundation has been laid. The project structure, architecture, design system
 
 ---
 
-## Milestone 6: Search & Discovery (v1.5.0)
+## Milestone 8: Search & Discovery (v1.5.0)
 
 - [ ] Full-text search across all data
 - [ ] Advanced filters
@@ -112,7 +127,7 @@ The foundation has been laid. The project structure, architecture, design system
 
 ---
 
-## Milestone 7: Settings & Customization (v1.6.0)
+## Milestone 9: Settings & Customization (v1.6.0)
 
 - [ ] Theme switching (light/dark/system)
 - [ ] Notification preferences
@@ -123,35 +138,13 @@ The foundation has been laid. The project structure, architecture, design system
 
 ---
 
-## Milestone 8: Platform Expansion (v2.0.0)
+## Milestone 10: Platform Expansion (v2.0.0)
 
 - [ ] iOS release
 - [ ] Android release
 - [ ] Web release
 - [ ] Desktop support (macOS, Windows, Linux)
 - [ ] Cross-platform sync
-
----
-
-## Milestone 9: Advanced Features (v2.5.0)
-
-- [ ] AI-powered insights
-- [ ] Natural language entry parsing
-- [ ] Smart reminders
-- [ ] Integration with health platforms (Apple Health, Google Fit)
-- [ ] Calendar integration
-- [ ] API for third-party integrations
-
----
-
-## Milestone 10: Community & Ecosystem (v3.0.0)
-
-- [ ] Plugin system
-- [ ] Community themes
-- [ ] Public API
-- [ ] Developer documentation
-- [ ] Contribution workflow
-- [ ] Community governance model
 
 ---
 
