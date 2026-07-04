@@ -24,21 +24,18 @@ dependencies:
   flutter_dotenv: ^5.2.1
 
   # Local Database
-  drift: ^2.25.1
+  drift: ^2.34.0
   sqlite3_flutter_libs: ^0.5.30
 
   # UI
   google_fonts: ^6.2.1
   flutter_animate: ^4.5.2
 
-  # Code Generation Support
-  equatable: ^2.0.7
-  freezed_annotation: ^2.4.4
-  json_annotation: ^4.9.0
-
   # Utilities
+  equatable: ^2.0.7
   path_provider: ^2.1.5
   path: ^1.9.1
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:
@@ -49,9 +46,7 @@ dev_dependencies:
 
   # Code Generation
   build_runner: ^2.4.14
-  freezed: ^2.5.8
-  json_serializable: ^6.9.4
-  drift_dev: ^2.25.1
+  drift_dev: ^2.34.0
 
   # Testing
   mocktail: ^1.0.4
