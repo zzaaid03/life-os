@@ -1,7 +1,8 @@
 /// Task list screen.
 ///
 /// Displays tasks grouped into Today, Upcoming, and Completed sections.
-/// Supports pull-to-refresh, swipe actions, and task creation via FAB.
+/// The FAB is provided by the AppShell — this screen only handles
+/// content rendering and task interactions.
 library;
 
 import 'package:flutter/material.dart';
@@ -28,22 +29,7 @@ class TaskListScreen extends ConsumerWidget {
     final completedTasks = ref.watch(completedTasksProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tasks'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.sync_rounded),
-            tooltip: 'Sync',
-            onPressed: () => ref.read(taskListProvider.notifier).sync(),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _createTask(context, ref),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        child: const Icon(Icons.add_rounded),
-      ),
+      appBar: AppBar(title: const Text('Tasks')),
       body: RefreshIndicator(
         onRefresh: () => ref.read(taskListProvider.notifier).refresh(),
         child: _buildBody(
@@ -66,18 +52,32 @@ class TaskListScreen extends ConsumerWidget {
     List<Task> upcoming,
     List<Task> completed,
   ) {
-    if (taskState.status == TaskListStatus.loading) {
+    // Only show full-screen loading on initial load with no data
+    if (taskState.status == TaskListStatus.loading && taskState.tasks.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (taskState.status == TaskListStatus.error) {
+    if (taskState.status == TaskListStatus.error && taskState.tasks.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 48),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
             const SizedBox(height: AppSpacing.md),
-            Text(taskState.error ?? 'Something went wrong'),
+            Text(
+              taskState.error ?? 'Something went wrong',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
             OutlinedButton(
               onPressed: () => ref.read(taskListProvider.notifier).refresh(),
@@ -96,16 +96,21 @@ class TaskListScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.task_alt_rounded,
                   size: 56,
-                  color: AppColors.primary,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.15),
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Text(
                   'No tasks yet.',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
@@ -114,7 +119,7 @@ class TaskListScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(
                       context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.4),
+                    ).colorScheme.onSurface.withValues(alpha: 0.35),
                   ),
                 ),
               ],
@@ -130,21 +135,18 @@ class TaskListScreen extends ConsumerWidget {
         vertical: AppSpacing.sm,
       ),
       children: [
-        // Today
         TaskSection(title: 'Today', count: today.length),
         if (today.isEmpty)
           const TaskEmptyState(type: TaskEmptyType.today)
         else
           ...today.map((t) => _taskItem(context, ref, t)),
 
-        // Upcoming
         TaskSection(title: 'Upcoming', count: upcoming.length),
         if (upcoming.isEmpty)
           const TaskEmptyState(type: TaskEmptyType.upcoming)
         else
           ...upcoming.map((t) => _taskItem(context, ref, t)),
 
-        // Completed
         TaskSection(title: 'Completed', count: completed.length),
         if (completed.isEmpty)
           const TaskEmptyState(type: TaskEmptyType.completed)
@@ -166,7 +168,10 @@ class TaskListScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _createTask(BuildContext context, WidgetRef ref) async {
+  /// Opens the task editor sheet for creating a new task.
+  /// Called from the AppShell's FAB via GoRouter extra or
+  /// from the home screen's quick action.
+  static Future<void> createTask(BuildContext context, WidgetRef ref) async {
     final authState = ref.read(authProvider);
     final userId = authState.userId;
     if (userId == null) return;

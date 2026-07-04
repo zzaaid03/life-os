@@ -2,11 +2,13 @@
 ///
 /// Wires up the local and remote data sources, the offline-first
 /// repository, the sync service, and a [TaskListNotifier] that
-/// exposes task list state to the UI. Also provides filtered
-/// derived providers for today, upcoming, and completed tasks.
+/// exposes task list state to the UI.
 ///
-/// On web (where Drift is not supported), the local data source
-/// is replaced with a remote-only fallback.
+/// Key performance decisions:
+/// - State updates are **optimistic** — UI updates before sync completes
+/// - Sync runs in the **background** after every mutation
+/// - Loading state only shows on initial load (not on refresh)
+/// - On web, reads go to Supabase directly (no local cache)
 library;
 
 import 'package:flutter/foundation.dart';
@@ -27,11 +29,7 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   return AppDatabase();
 });
 
-/// Provides the [TaskLocalDataSource].
-///
-/// On web, Drift is not available, so this provider throws.
-/// The [taskRepositoryProvider] handles the web case by
-/// falling back to remote-only mode.
+/// Provides the [TaskLocalDataSource] (native only).
 final taskLocalDataSourceProvider = Provider<TaskLocalDataSource>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return TaskLocalDataSource(db);
@@ -43,19 +41,16 @@ final taskRemoteDataSourceProvider = Provider<TaskRemoteDataSource>((ref) {
   return TaskRemoteDataSource(client);
 });
 
-/// Provides the [SyncQueue] used to trigger background syncs.
+/// Provides the [SyncQueue].
 final syncQueueProvider = Provider<SyncQueue>((ref) {
   return const NoopSyncQueue();
 });
 
-/// Provides the [SyncService].
-///
-/// On web, sync is not needed (remote-only mode).
+/// Provides the [SyncService] (native only; no-op on web).
 final syncServiceProvider = Provider<SyncService>((ref) {
   final remote = ref.watch(taskRemoteDataSourceProvider);
 
   if (kIsWeb) {
-    // No-op sync service for web
     return SyncService(localTasks: _NullLocalDataSource(), remoteTasks: remote);
   }
 
@@ -63,8 +58,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   return SyncService(localTasks: local, remoteTasks: remote);
 });
 
-/// A null local data source that returns empty results.
-/// Used on web where Drift is not available.
+/// Null local data source for web.
 class _NullLocalDataSource implements TaskLocalDataSource {
   @override
   Future<Task?> getById(String id) async => null;
@@ -92,9 +86,6 @@ class _NullLocalDataSource implements TaskLocalDataSource {
 }
 
 /// Provides the [TaskRepositoryImpl].
-///
-/// On web, the local data source is unavailable (Drift uses FFI).
-/// In that case, a remote-only repository is used instead.
 final taskRepositoryProvider = Provider<TaskRepositoryImpl>((ref) {
   final remote = ref.watch(taskRemoteDataSourceProvider);
   final syncQueue = ref.watch(syncQueueProvider);
@@ -112,23 +103,16 @@ enum TaskListStatus { loading, loaded, error }
 
 /// The state managed by [TaskListNotifier].
 class TaskListState {
-  /// Creates a [TaskListState].
   const TaskListState({
     this.status = TaskListStatus.loading,
     this.tasks = const <Task>[],
     this.error,
   });
 
-  /// The current loading status.
   final TaskListStatus status;
-
-  /// The current list of tasks.
   final List<Task> tasks;
-
-  /// An error message, if loading failed.
   final String? error;
 
-  /// Creates a copy of this state with the given fields replaced.
   TaskListState copyWith({
     TaskListStatus? status,
     List<Task>? tasks,
@@ -142,9 +126,11 @@ class TaskListState {
   }
 }
 
-/// Manages the task list state and exposes CRUD operations.
+/// Manages the task list state with optimistic updates.
+///
+/// All mutations update the UI state **immediately** before
+/// the repository call completes. Sync runs in the background.
 class TaskListNotifier extends StateNotifier<TaskListState> {
-  /// Creates a [TaskListNotifier].
   TaskListNotifier(this._repository, this._syncService)
     : super(const TaskListState());
 
@@ -153,86 +139,133 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
 
   String? _userId;
 
-  /// Loads tasks for the given [userId] from local storage.
+  /// Loads tasks for the given [userId].
+  ///
+  /// Only shows loading spinner on initial load (when state is empty).
+  /// On refresh, keeps existing data visible while loading.
   Future<void> loadTasks(String userId) async {
     _userId = userId;
-    state = const TaskListState(status: TaskListStatus.loading);
+
+    // Only show loading spinner if we have no data yet
+    if (state.tasks.isEmpty) {
+      state = const TaskListState(status: TaskListStatus.loading);
+    }
+
     try {
       final tasks = await _repository.getAll(userId);
       state = TaskListState(status: TaskListStatus.loaded, tasks: tasks);
+      // Background sync after load (non-blocking)
+      _syncInBackground(userId);
     } catch (e) {
-      state = const TaskListState(
-        status: TaskListStatus.error,
-        error: 'Failed to load tasks. Please try again.',
-      );
+      // If we already have tasks, keep them visible
+      if (state.tasks.isNotEmpty) {
+        state = state.copyWith(status: TaskListStatus.loaded);
+      } else {
+        state = const TaskListState(
+          status: TaskListStatus.error,
+          error: 'Failed to load tasks.',
+        );
+      }
     }
   }
 
-  /// Creates a new task.
+  /// Creates a new task with **optimistic UI update**.
   ///
-  /// A fresh UUID is generated for the task if it does not already
-  /// have one. The task is written locally and a background sync is
-  /// triggered.
+  /// The task is added to the state immediately. The repository
+  /// write and sync happen in the background.
   Future<void> createTask(Task task) async {
     final userId = _userId ?? task.userId;
     final toCreate = task.id.isEmpty
         ? task.copyWith(id: const Uuid().v4(), userId: userId)
         : task.copyWith(userId: userId);
-    final created = await _repository.create(toCreate);
+
+    // Optimistic: add to state immediately
     state = TaskListState(
       status: TaskListStatus.loaded,
-      tasks: [...state.tasks, created],
+      tasks: [...state.tasks, toCreate],
     );
+
+    // Background write + sync (non-blocking)
+    try {
+      await _repository.create(toCreate);
+      _syncInBackground(userId);
+    } catch (e) {
+      // Revert on failure
+      state = state.copyWith(
+        tasks: state.tasks.where((t) => t.id != toCreate.id).toList(),
+        error: 'Failed to create task.',
+      );
+    }
   }
 
-  /// Updates an existing task in the local store.
+  /// Updates a task with **optimistic UI update**.
   Future<void> updateTask(Task task) async {
-    final updated = await _repository.update(task);
+    final oldTask = state.tasks.firstWhere(
+      (t) => t.id == task.id,
+      orElse: () => task,
+    );
+
+    // Optimistic: update state immediately
     state = TaskListState(
       status: TaskListStatus.loaded,
-      tasks: state.tasks.map((t) => t.id == updated.id ? updated : t).toList(),
+      tasks: state.tasks.map((t) => t.id == task.id ? task : t).toList(),
     );
+
+    try {
+      await _repository.update(task);
+      _syncInBackground(_userId ?? task.userId);
+    } catch (e) {
+      // Revert on failure
+      state = state.copyWith(
+        tasks: state.tasks.map((t) => t.id == task.id ? oldTask : t).toList(),
+      );
+    }
   }
 
-  /// Soft-deletes a task by [id].
+  /// Soft-deletes a task with **optimistic UI update**.
   Future<void> deleteTask(String id) async {
-    await _repository.delete(id);
+    final oldTasks = state.tasks;
+
+    // Optimistic: remove from state immediately
     state = TaskListState(
       status: TaskListStatus.loaded,
       tasks: state.tasks.where((t) => t.id != id).toList(),
     );
+
+    try {
+      await _repository.delete(id);
+      _syncInBackground(_userId ?? '');
+    } catch (e) {
+      // Revert on failure
+      state = state.copyWith(tasks: oldTasks);
+    }
   }
 
-  /// Marks a task as completed, setting [Task.completedAt] to now.
+  /// Marks a task as completed with **optimistic UI update**.
   Future<void> completeTask(String id) async {
     final task = state.tasks.firstWhere((t) => t.id == id);
     final completed = task.copyWith(
       status: TaskStatus.completed,
       completedAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
     await updateTask(completed);
   }
 
-  /// Reloads tasks from local storage for the current user.
+  /// Reloads tasks from the data source.
   Future<void> refresh() async {
     final userId = _userId;
     if (userId == null) return;
     await loadTasks(userId);
   }
 
-  /// Triggers a sync with the remote server for the current user.
-  Future<void> sync() async {
-    final userId = _userId;
-    if (userId == null) return;
-    try {
-      await _syncService.syncTasks(userId);
-      await refresh();
-    } catch (e) {
-      state = state.copyWith(
-        status: TaskListStatus.error,
-        error: 'Sync failed. Please try again.',
-      );
-    }
+  /// Triggers a background sync (non-blocking, silent).
+  void _syncInBackground(String userId) {
+    if (userId.isEmpty) return;
+    // Fire and forget — don't block UI
+    _syncService.syncTasks(userId).catchError((_) {
+      // Silent failure — sync will retry on next mutation
+    });
   }
 }
 
@@ -243,7 +276,6 @@ final taskListProvider = StateNotifierProvider<TaskListNotifier, TaskListState>(
     final syncService = ref.watch(syncServiceProvider);
     final notifier = TaskListNotifier(repository, syncService);
 
-    // Auto-load tasks when the user becomes authenticated.
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.isAuthenticated &&
           next.userId != null &&
@@ -258,7 +290,7 @@ final taskListProvider = StateNotifierProvider<TaskListNotifier, TaskListState>(
   },
 );
 
-/// Whether a task is due today (ignoring time-of-day).
+/// Whether a task is due today.
 bool _isDueToday(DateTime date) {
   final now = DateTime.now();
   return date.year == now.year &&
@@ -266,7 +298,7 @@ bool _isDueToday(DateTime date) {
       date.day == now.day;
 }
 
-/// Tasks that are due today and not yet completed or archived.
+/// Tasks due today (not completed/archived).
 final todayTasksProvider = Provider<List<Task>>((ref) {
   final tasks = ref.watch(taskListProvider).tasks;
   return tasks
@@ -280,7 +312,7 @@ final todayTasksProvider = Provider<List<Task>>((ref) {
       .toList();
 });
 
-/// Tasks that are due after today and not yet completed or archived.
+/// Tasks due after today (not completed/archived).
 final upcomingTasksProvider = Provider<List<Task>>((ref) {
   final tasks = ref.watch(taskListProvider).tasks;
   final today = DateTime(
@@ -299,7 +331,7 @@ final upcomingTasksProvider = Provider<List<Task>>((ref) {
       .toList();
 });
 
-/// Tasks that have been completed.
+/// Completed tasks.
 final completedTasksProvider = Provider<List<Task>>((ref) {
   final tasks = ref.watch(taskListProvider).tasks;
   return tasks.where((t) => t.status == TaskStatus.completed).toList();

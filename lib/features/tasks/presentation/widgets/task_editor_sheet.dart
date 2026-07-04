@@ -244,19 +244,56 @@ class _PrioritySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<TaskPriority>(
-      segments: const [
-        ButtonSegment(value: TaskPriority.none, label: Text('None')),
-        ButtonSegment(value: TaskPriority.low, label: Text('Low')),
-        ButtonSegment(value: TaskPriority.medium, label: Text('Medium')),
-        ButtonSegment(value: TaskPriority.high, label: Text('High')),
-      ],
-      selected: {value},
-      onSelectionChanged: (set) => onChanged(set.first),
-      style: SegmentedButton.styleFrom(
-        selectedForegroundColor: AppColors.primary,
-      ),
+    final theme = Theme.of(context);
+
+    return Wrap(
+      spacing: AppSpacing.sm,
+      children: TaskPriority.values.map((p) {
+        final isSelected = p == value;
+        final color = _priorityColor(p);
+
+        return FilterChip(
+          label: Text(_priorityLabel(p)),
+          selected: isSelected,
+          onSelected: (_) => onChanged(p),
+          selectedColor: color.withValues(alpha: 0.15),
+          labelStyle: theme.textTheme.labelMedium?.copyWith(
+            color: isSelected
+                ? color
+                : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          ),
+          side: BorderSide(
+            color: isSelected
+                ? color.withValues(alpha: 0.3)
+                : theme.colorScheme.outline.withValues(alpha: 0.15),
+          ),
+          showCheckmark: false,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+        );
+      }).toList(),
     );
+  }
+
+  String _priorityLabel(TaskPriority p) {
+    return switch (p) {
+      TaskPriority.none => 'None',
+      TaskPriority.low => 'Low',
+      TaskPriority.medium => 'Medium',
+      TaskPriority.high => 'High',
+    };
+  }
+
+  Color _priorityColor(TaskPriority p) {
+    return switch (p) {
+      TaskPriority.none => AppColors.primary,
+      TaskPriority.low => AppColors.info,
+      TaskPriority.medium => AppColors.warning,
+      TaskPriority.high => AppColors.error,
+    };
   }
 }
 

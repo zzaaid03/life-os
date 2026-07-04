@@ -105,4 +105,27 @@ abstract final class AppIcons {
 
   /// Notifications.
   static const IconData notifications = Icons.notifications_outlined;
+
+  // --- Tasks ---
+
+  /// Calendar / due date.
+  static const IconData calendar = Icons.calendar_today_rounded;
+
+  /// Clock / time.
+  static const IconData clock = Icons.schedule_rounded;
+
+  /// Task / checklist.
+  static const IconData task = Icons.task_alt_rounded;
+
+  /// Subtask / checklist item.
+  static const IconData subtask = Icons.checklist_rounded;
+
+  /// Attachment / paperclip.
+  static const IconData attachment = Icons.attach_file_rounded;
+
+  /// Comment / chat bubble.
+  static const IconData comment = Icons.chat_bubble_outline_rounded;
+
+  /// AI assistant / sparkle.
+  static const IconData aiAssistant = Icons.auto_awesome_rounded;
 }
