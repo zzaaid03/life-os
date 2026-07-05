@@ -122,20 +122,18 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// Today's tasks card — watches [todayTasksProvider] directly.
+/// Today's tasks card — watches [activeTasksProvider] directly.
+///
+/// Shows all active (non-completed, non-archived) tasks regardless
+/// of due date, so newly created tasks always appear on the dashboard.
 class _TodayTasksCard extends ConsumerWidget {
   const _TodayTasksCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final todayTasks = ref.watch(todayTasksProvider);
+    final activeTasks = ref.watch(activeTasksProvider);
 
-    debugPrint(
-      '[HomeScreen._TodayTasksCard] build: '
-      'todayTasks.length=${todayTasks.length}',
-    );
-
-    if (todayTasks.isEmpty) {
+    if (activeTasks.isEmpty) {
       return DashboardCard(
         icon: Icons.auto_awesome_outlined,
         title: "Today's Tasks",
@@ -151,16 +149,16 @@ class _TodayTasksCard extends ConsumerWidget {
       );
     }
 
-    final completed = todayTasks
+    final completed = activeTasks
         .where((t) => t.status == TaskStatus.completed)
         .length;
-    final completionPct = completed / todayTasks.length;
+    final completionPct = completed / activeTasks.length;
 
     return DashboardCard(
       icon: Icons.auto_awesome_outlined,
       title: "Today's Tasks",
       trailing: Text(
-        '${todayTasks.length}',
+        '${activeTasks.length}',
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
           color: AppColors.primary,
           fontWeight: FontWeight.w700,
@@ -170,12 +168,12 @@ class _TodayTasksCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...todayTasks.take(3).map((task) => _TaskSummaryItem(task: task)),
-          if (todayTasks.length > 3)
+          ...activeTasks.take(3).map((task) => _TaskSummaryItem(task: task)),
+          if (activeTasks.length > 3)
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
               child: Text(
-                '+${todayTasks.length - 3} more',
+                '+${activeTasks.length - 3} more',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(
                     context,

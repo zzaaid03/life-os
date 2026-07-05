@@ -7,6 +7,8 @@
 /// Key performance decisions:
 /// - State updates are **optimistic** — UI updates before sync completes
 /// - Sync runs in the **background** after every mutation
+/// - **After sync completes, state is reloaded** from the data source
+///   so pulled remote tasks appear in the UI automatically
 /// - Loading state only shows on initial load (not on refresh)
 /// - On web, reads go to Supabase directly (no local cache)
 library;
@@ -93,11 +95,9 @@ final taskRepositoryProvider = Provider<TaskRepositoryImpl>((ref) {
   final syncQueue = ref.watch(syncQueueProvider);
 
   if (kIsWeb) {
-    debugPrint('[taskRepositoryProvider] kIsWeb=true → remoteOnly');
     return TaskRepositoryImpl.remoteOnly(remote: remote, syncQueue: syncQueue);
   }
 
-  debugPrint('[taskRepositoryProvider] kIsWeb=false → local+remote');
   final local = ref.watch(taskLocalDataSourceProvider);
   return TaskRepositoryImpl(local: local, remote: remote, syncQueue: syncQueue);
 });
@@ -133,7 +133,9 @@ class TaskListState {
 /// Manages the task list state with optimistic updates.
 ///
 /// All mutations update the UI state **immediately** before
-/// the repository call completes. Sync runs in the background.
+/// the repository call completes. After background sync completes,
+/// state is **reloaded** from the data source so that pulled remote
+/// tasks appear in the UI automatically.
 class TaskListNotifier extends StateNotifier<TaskListState> {
   TaskListNotifier(this._repository, this._syncService)
     : super(const TaskListState());
@@ -146,10 +148,6 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   /// Loads tasks for the given [userId].
   Future<void> loadTasks(String userId) async {
     _userId = userId;
-    debugPrint('[TaskListNotifier] loadTasks($userId) called');
-    debugPrint(
-      '[TaskListNotifier] state.tasks.length BEFORE load: ${state.tasks.length}',
-    );
 
     if (state.tasks.isEmpty) {
       state = const TaskListState(status: TaskListStatus.loading);
@@ -157,22 +155,9 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
 
     try {
       final tasks = await _repository.getAll(userId);
-      debugPrint('[TaskListNotifier] getAll returned ${tasks.length} tasks');
-      for (final t in tasks) {
-        debugPrint(
-          '[TaskListNotifier]   task: id=${t.id} title="${t.title}" '
-          'status=${t.status} dueDate=${t.dueDate} '
-          'deletedAt=${t.deletedAt} syncStatus=${t.syncStatus}',
-        );
-      }
       state = TaskListState(status: TaskListStatus.loaded, tasks: tasks);
-      debugPrint(
-        '[TaskListNotifier] state set: ${state.tasks.length} tasks, '
-        'status=${state.status}',
-      );
-      _syncInBackground(userId);
+      unawaited(_syncAndReload(userId));
     } catch (e) {
-      debugPrint('[TaskListNotifier] loadTasks EXCEPTION: $e');
       if (state.tasks.isNotEmpty) {
         state = state.copyWith(status: TaskListStatus.loaded);
       } else {
@@ -187,54 +172,28 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   /// Creates a new task with **optimistic UI update**.
   ///
   /// The task is added to the state immediately. The repository
-  /// write happens in the background — this method returns
-  /// immediately after the state update.
+  /// write happens in the background. After sync completes, state
+  /// is reloaded to pick up any remote changes.
   Future<void> createTask(Task task) async {
     final userId = _userId ?? task.userId;
     final toCreate = task.id.isEmpty
         ? task.copyWith(id: const Uuid().v4(), userId: userId)
         : task.copyWith(userId: userId);
 
-    debugPrint('[TaskListNotifier] createTask called');
-    debugPrint(
-      '[TaskListNotifier]   toCreate: id=${toCreate.id} '
-      'title="${toCreate.title}" userId=$userId '
-      'status=${toCreate.status} dueDate=${toCreate.dueDate}',
-    );
-    debugPrint(
-      '[TaskListNotifier]   state.tasks.length BEFORE optimistic: '
-      '${state.tasks.length}',
-    );
-
     // Optimistic: add to state immediately
     state = TaskListState(
       status: TaskListStatus.loaded,
       tasks: [...state.tasks, toCreate],
     );
-    debugPrint(
-      '[TaskListNotifier]   state.tasks.length AFTER optimistic: '
-      '${state.tasks.length}',
-    );
 
-    // Background write (fire and forget — don't block the caller)
+    // Background write + sync + reload
     unawaited(
       _repository
           .create(toCreate)
-          .then((created) {
-            debugPrint(
-              '[TaskListNotifier] repository.create succeeded: '
-              'id=${created.id} title="${created.title}"',
-            );
-            _syncInBackground(userId);
-          })
+          .then((_) => _syncAndReload(userId))
           .catchError((Object e) {
-            debugPrint('[TaskListNotifier] repository.create FAILED: $e');
             state = state.copyWith(
               tasks: state.tasks.where((t) => t.id != toCreate.id).toList(),
-            );
-            debugPrint(
-              '[TaskListNotifier]   reverted: '
-              'state.tasks.length=${state.tasks.length}',
             );
           }),
     );
@@ -247,30 +206,18 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       orElse: () => task,
     );
 
-    debugPrint(
-      '[TaskListNotifier] updateTask: id=${task.id} '
-      'title="${task.title}" status=${task.status}',
-    );
-
     // Optimistic: update state immediately
     state = TaskListState(
       status: TaskListStatus.loaded,
       tasks: state.tasks.map((t) => t.id == task.id ? task : t).toList(),
     );
 
-    // Background write (fire and forget)
+    // Background write + sync + reload
     unawaited(
       _repository
           .update(task)
-          .then((updated) {
-            debugPrint(
-              '[TaskListNotifier] repository.update succeeded: '
-              'id=${updated.id}',
-            );
-            _syncInBackground(_userId ?? task.userId);
-          })
+          .then((_) => _syncAndReload(_userId ?? task.userId))
           .catchError((Object e) {
-            debugPrint('[TaskListNotifier] repository.update FAILED: $e');
             state = state.copyWith(
               tasks: state.tasks
                   .map((t) => t.id == task.id ? oldTask : t)
@@ -284,27 +231,18 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   Future<void> deleteTask(String id) async {
     final oldTasks = state.tasks;
 
-    debugPrint('[TaskListNotifier] deleteTask: id=$id');
-
     // Optimistic: remove from state immediately
     state = TaskListState(
       status: TaskListStatus.loaded,
       tasks: state.tasks.where((t) => t.id != id).toList(),
     );
 
-    // Background write (fire and forget)
+    // Background write + sync + reload
     unawaited(
       _repository
           .delete(id)
-          .then((_) {
-            debugPrint(
-              '[TaskListNotifier] repository.delete succeeded: '
-              'id=$id',
-            );
-            _syncInBackground(_userId ?? '');
-          })
+          .then((_) => _syncAndReload(_userId ?? ''))
           .catchError((Object e) {
-            debugPrint('[TaskListNotifier] repository.delete FAILED: $e');
             state = state.copyWith(tasks: oldTasks);
           }),
     );
@@ -317,11 +255,6 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   Future<void> toggleTaskComplete(String id) async {
     final task = state.tasks.firstWhere((t) => t.id == id);
     final isCompleted = task.status == TaskStatus.completed;
-    debugPrint(
-      '[TaskListNotifier] toggleTaskComplete: id=$id '
-      'currently completed=$isCompleted → '
-      'will become ${isCompleted ? 'pending' : 'completed'}',
-    );
     final updated = task.copyWith(
       status: isCompleted ? TaskStatus.pending : TaskStatus.completed,
       completedAt: isCompleted ? null : DateTime.now(),
@@ -337,18 +270,24 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
     await loadTasks(userId);
   }
 
-  /// Triggers a background sync (non-blocking, silent).
-  void _syncInBackground(String userId) {
+  /// Syncs with the remote server, then reloads state from the
+  /// data source so that pulled remote tasks appear in the UI.
+  ///
+  /// This is the architectural fix: after sync inserts new tasks
+  /// into the local database, the notifier must reload its state
+  /// to reflect those changes. Without this, the UI shows stale
+  /// data and never displays tasks pulled from Supabase.
+  Future<void> _syncAndReload(String userId) async {
     if (userId.isEmpty) return;
-    debugPrint('[TaskListNotifier] _syncInBackground($userId)');
-    _syncService
-        .syncTasks(userId)
-        .then((_) {
-          debugPrint('[TaskListNotifier] sync completed');
-        })
-        .catchError((Object e) {
-          debugPrint('[TaskListNotifier] sync FAILED: $e');
-        });
+    try {
+      await _syncService.syncTasks(userId);
+      // Reload state from the data source after sync completes.
+      // This picks up any tasks that were pulled from the remote.
+      final tasks = await _repository.getAll(userId);
+      state = TaskListState(status: TaskListStatus.loaded, tasks: tasks);
+    } catch (_) {
+      // Sync failures are silent — existing state remains valid.
+    }
   }
 }
 
@@ -365,10 +304,6 @@ final taskListProvider = StateNotifierProvider<TaskListNotifier, TaskListState>(
           (previous == null ||
               !previous.isAuthenticated ||
               previous.userId != next.userId)) {
-        debugPrint(
-          '[taskListProvider] auth state changed → loading tasks for '
-          'userId=${next.userId}',
-        );
         notifier.loadTasks(next.userId!);
       }
     });
@@ -379,7 +314,7 @@ final taskListProvider = StateNotifierProvider<TaskListNotifier, TaskListState>(
 
 /// Whether a task is due today (or has no due date — counts as today).
 bool _isDueToday(DateTime? dueDate) {
-  if (dueDate == null) return true; // No due date = today by default
+  if (dueDate == null) return true;
   final now = DateTime.now();
   return dueDate.year == now.year &&
       dueDate.month == now.month &&
@@ -389,9 +324,8 @@ bool _isDueToday(DateTime? dueDate) {
 /// Tasks due today (not completed/archived).
 /// Tasks with no due date are included as "today".
 final todayTasksProvider = Provider<List<Task>>((ref) {
-  final taskState = ref.watch(taskListProvider);
-  final tasks = taskState.tasks;
-  final filtered = tasks
+  final tasks = ref.watch(taskListProvider).tasks;
+  return tasks
       .where(
         (t) =>
             _isDueToday(t.dueDate) &&
@@ -399,19 +333,18 @@ final todayTasksProvider = Provider<List<Task>>((ref) {
             t.status != TaskStatus.archived,
       )
       .toList();
+});
 
-  debugPrint(
-    '[todayTasksProvider] received ${tasks.length} tasks from '
-    'taskListProvider, returning ${filtered.length} after filtering',
-  );
-  for (final t in filtered) {
-    debugPrint(
-      '[todayTasksProvider]   id=${t.id} title="${t.title}" '
-      'status=${t.status} dueDate=${t.dueDate}',
-    );
-  }
-
-  return filtered;
+/// All active tasks (not completed/archived) — used by the dashboard
+/// to show a summary regardless of due date.
+final activeTasksProvider = Provider<List<Task>>((ref) {
+  final tasks = ref.watch(taskListProvider).tasks;
+  return tasks
+      .where(
+        (t) =>
+            t.status != TaskStatus.completed && t.status != TaskStatus.archived,
+      )
+      .toList();
 });
 
 /// Tasks due after today (not completed/archived).

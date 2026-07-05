@@ -28,12 +28,6 @@ class TaskListScreen extends ConsumerWidget {
     final upcomingTasks = ref.watch(upcomingTasksProvider);
     final completedTasks = ref.watch(completedTasksProvider);
 
-    debugPrint(
-      '[TaskListScreen] build: tasks=${taskState.tasks.length} '
-      'today=${todayTasks.length} upcoming=${upcomingTasks.length} '
-      'completed=${completedTasks.length} status=${taskState.status}',
-    );
-
     return Scaffold(
       appBar: AppBar(title: const Text('Tasks')),
       body: RefreshIndicator(
