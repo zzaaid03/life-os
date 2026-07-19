@@ -118,6 +118,13 @@ class SupabaseAuthRepository implements AuthRepository {
     final response = await _client.auth.signInWithOAuth(
       OAuthProvider.google,
       redirectTo: redirectTo,
+      // Request read-only Gmail access in addition to the default
+      // profile/email scopes so the `extract-tasks` Edge Function can read
+      // the user's inbox server-side. `access_type: offline` + `prompt:
+      // consent` ask Google for a refresh token and force the consent
+      // screen, ensuring the extra scope is actually granted.
+      scopes: 'email profile https://www.googleapis.com/auth/gmail.readonly',
+      queryParams: const {'access_type': 'offline', 'prompt': 'consent'},
     );
 
     // OAuth flow redirects; state will be updated via authStateChanges.
@@ -126,6 +133,14 @@ class SupabaseAuthRepository implements AuthRepository {
     }
 
     return const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  @override
+  String? currentGoogleAccessToken() {
+    // `providerToken` is only present in-session right after a Google
+    // sign-in; it is not restored on session refresh / page reload, so
+    // this can legitimately return null even while authenticated.
+    return _client.auth.currentSession?.providerToken;
   }
 
   @override

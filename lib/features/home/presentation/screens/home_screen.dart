@@ -12,8 +12,10 @@ import 'package:go_router/go_router.dart';
 import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_icons.dart';
+import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
@@ -54,7 +56,19 @@ class HomeScreen extends ConsumerWidget {
               .animate()
               .fadeIn(duration: 400.ms, delay: 400.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 400.ms),
+          const SizedBox(height: AppSpacing.xxxl),
+          const SectionHeader(title: 'Inbox Assistant'),
+          const _InboxScanCard()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 450.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 450.ms),
           const SizedBox(height: AppSpacing.md),
+          const _JobApplicationsCard()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 500.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 500.ms),
+          const SizedBox(height: AppSpacing.xxxl),
+          const SectionHeader(title: 'More'),
           DashboardCard(
                 icon: Icons.repeat_rounded,
                 title: 'Habits',
@@ -312,6 +326,105 @@ class _TaskSummaryItem extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A prominent, primary-colored card that opens the AI inbox scan flow.
+class _InboxScanCard extends StatelessWidget {
+  const _InboxScanCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: InkWell(
+        onTap: () => context.push(AppRoutes.inboxScan),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppColors.white,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Scan my inbox',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Turn emails into tasks & job updates',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.white,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A dashboard card showing the tracked job-application count.
+class _JobApplicationsCard extends ConsumerWidget {
+  const _JobApplicationsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(jobApplicationCountProvider);
+
+    return DashboardCard(
+      icon: Icons.work_outline_rounded,
+      title: 'Job Applications',
+      trailing: count > 0
+          ? Text(
+              '$count',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : null,
+      onTap: () => context.push(AppRoutes.jobApplications),
+      child: EmptyStateWidget(
+        icon: Icons.badge_outlined,
+        title: count == 0
+            ? 'No applications tracked yet.'
+            : '$count application${count == 1 ? '' : 's'} tracked.',
+        subtitle: count == 0
+            ? 'Scan your inbox to start tracking.'
+            : 'Tap to view interviews, offers, and more.',
+        compact: true,
       ),
     );
   }

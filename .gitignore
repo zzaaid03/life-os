@@ -61,3 +61,6 @@ app.*.map.json
 
 # macOS
 .macos/
+
+# Supabase CLI local cache
+supabase/.temp/

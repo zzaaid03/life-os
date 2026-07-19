@@ -1,10 +1,14 @@
 // Supabase Edge Function: extract-tasks
 //
-// Receives a batch of emails (subject + snippet only — never full bodies),
-// asks Groq (free, open-source Llama 3.3 70B) to extract actionable tasks,
-// and returns them as structured JSON.
+// Reads the user's recent Gmail SERVER-SIDE (using a Google access token the app
+// passes in), then uses Groq (free, open-source Llama 3.3 70B, no-training policy)
+// to classify each email into actionable TASKS and JOB-APPLICATION updates.
 //
-// The GROQ_API_KEY lives here as a Supabase secret — never in the app.
+// Email bodies never touch the client and are never stored — only the derived
+// tasks/summaries are returned. GROQ_API_KEY lives here as a Supabase secret.
+//
+// Request:  POST { accessToken: string, maxResults?: number }
+// Response: { tasks: [...], jobUpdates: [...] }
 //
 // Deploy:  supabase functions deploy extract-tasks
 // Secret:  supabase secrets set GROQ_API_KEY=your_key
@@ -71,8 +75,68 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+// --- Gmail helpers (bodies stay server-side) ---
+
+interface GmailPart {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: GmailPart[];
+  headers?: { name: string; value: string }[];
+}
+
+function decodeBase64Url(data: string): string {
+  const b64 = data.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(b64);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function findPart(payload: GmailPart | undefined, mime: string): string | null {
+  if (!payload) return null;
+  if (payload.mimeType === mime && payload.body?.data) return payload.body.data;
+  for (const p of payload.parts ?? []) {
+    const d = findPart(p, mime);
+    if (d) return d;
+  }
+  return null;
+}
+
+function extractBody(payload: GmailPart | undefined): string {
+  const plain = findPart(payload, "text/plain");
+  if (plain) return decodeBase64Url(plain);
+  const html = findPart(payload, "text/html");
+  if (html) return decodeBase64Url(html).replace(/<[^>]+>/g, " ");
+  if (payload?.body?.data) return decodeBase64Url(payload.body.data);
+  return "";
+}
+
+async function fetchRecentEmails(accessToken: string, maxResults: number) {
+  const gmail = (path: string) =>
+    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+  const listRes = await gmail(`messages?maxResults=${maxResults}&labelIds=INBOX`);
+  if (!listRes.ok) {
+    throw new Error(`Gmail list ${listRes.status}: ${await listRes.text()}`);
+  }
+  const { messages = [] } = await listRes.json();
+
+  return await Promise.all(
+    messages.map(async ({ id }: { id: string }) => {
+      const r = await gmail(`messages/${id}?format=full`);
+      const m = await r.json();
+      const headers = m.payload?.headers ?? [];
+      const h = (n: string) =>
+        headers.find((x: { name: string }) => x.name.toLowerCase() === n.toLowerCase())
+          ?.value ?? "";
+      const body = extractBody(m.payload).replace(/\s+/g, " ").trim().slice(0, 1500);
+      return { id, from: h("From"), subject: h("Subject"), body };
+    }),
+  );
+}
+
 Deno.serve(async (req: Request) => {
-  // Browser preflight (Flutter web calls this from a different origin).
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -83,9 +147,20 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => null);
-    const emails = body?.emails;
-    if (!Array.isArray(emails)) {
-      return jsonResponse({ error: "Body must be { emails: [...] }" }, 400);
+    const accessToken: string | undefined = body?.accessToken;
+    const maxResults = Math.min(Math.max(Number(body?.maxResults) || 10, 1), 20);
+    if (!accessToken) {
+      return jsonResponse({ error: "Body must include { accessToken }" }, 400);
+    }
+
+    let emails;
+    try {
+      emails = await fetchRecentEmails(accessToken, maxResults);
+    } catch (e) {
+      return jsonResponse({ error: "Gmail fetch failed", detail: String(e) }, 502);
+    }
+    if (emails.length === 0) {
+      return jsonResponse({ tasks: [], jobUpdates: [] });
     }
 
     const groqRes = await fetch(
@@ -109,8 +184,7 @@ Deno.serve(async (req: Request) => {
     );
 
     if (!groqRes.ok) {
-      const detail = await groqRes.text();
-      return jsonResponse({ error: "Groq API error", detail }, 502);
+      return jsonResponse({ error: "Groq API error", detail: await groqRes.text() }, 502);
     }
 
     const data = await groqRes.json();

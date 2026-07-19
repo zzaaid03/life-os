@@ -14,6 +14,8 @@ import 'package:life_os/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/splash_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/welcome_screen.dart';
 import 'package:life_os/features/home/presentation/screens/home_screen.dart';
+import 'package:life_os/features/inbox/presentation/screens/inbox_scan_screen.dart';
+import 'package:life_os/features/jobs/presentation/screens/job_applications_screen.dart';
 import 'package:life_os/features/life/presentation/screens/life_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/calendar_permission_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/files_permission_screen.dart';
@@ -52,6 +54,10 @@ abstract final class AppRoutes {
   static const String settings = '/settings';
   static const String tasks = '/tasks';
   static const String taskDetail = '/tasks/:id';
+
+  // AI inbox assistant
+  static const String inboxScan = '/inbox-scan';
+  static const String jobApplications = '/job-applications';
 }
 
 /// Creates and configures the GoRouter instance.
@@ -201,6 +207,18 @@ GoRouter createRouter({required WidgetRef ref}) {
         name: 'taskDetail',
         builder: (context, state) =>
             TaskDetailScreen(taskId: state.pathParameters['id']!),
+      ),
+
+      // AI inbox assistant — standalone, no nav bar
+      GoRoute(
+        path: AppRoutes.inboxScan,
+        name: 'inboxScan',
+        builder: (context, state) => const InboxScanScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.jobApplications,
+        name: 'jobApplications',
+        builder: (context, state) => const JobApplicationsScreen(),
       ),
     ],
 

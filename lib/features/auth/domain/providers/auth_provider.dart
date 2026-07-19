@@ -102,6 +102,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _repository.updateDisplayName(displayName);
     state = state.copyWith(displayName: displayName);
   }
+
+  /// The Google OAuth access token for the current session, or null.
+  ///
+  /// Returns null after a page reload even when authenticated (see
+  /// [AuthRepository.currentGoogleAccessToken]); callers should treat null
+  /// as "Gmail not connected" and re-run [signInWithGoogle].
+  String? currentGoogleAccessToken() =>
+      _repository.currentGoogleAccessToken();
 }
 
 /// The global authentication provider.
@@ -114,4 +122,14 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
     repository = ref.watch(authRepositoryProvider);
   }
   return AuthNotifier(repository);
+});
+
+/// Convenience provider for the current Google access token.
+///
+/// Recomputes whenever auth state changes. The value may still be null even
+/// when authenticated — `providerToken` is not restored across reloads — so
+/// consumers must handle null by prompting a Gmail reconnect.
+final googleAccessTokenProvider = Provider<String?>((ref) {
+  ref.watch(authProvider);
+  return ref.read(authProvider.notifier).currentGoogleAccessToken();
 });
