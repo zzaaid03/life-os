@@ -122,43 +122,46 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// Today's tasks card — watches [activeTasksProvider] directly.
+/// Today's tasks card — watches [todayTasksProvider].
 ///
-/// Shows all active (non-completed, non-archived) tasks regardless
-/// of due date, so newly created tasks always appear on the dashboard.
+/// Shows tasks due today (or overdue, or with no due date) that are
+/// still outstanding. This mirrors exactly what the Tasks list shows
+/// under its "Today" section, so the dashboard and task list never
+/// disagree about what counts as "today".
 class _TodayTasksCard extends ConsumerWidget {
   const _TodayTasksCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeTasks = ref.watch(activeTasksProvider);
+    final todayTasks = ref.watch(todayTasksProvider);
 
-    if (activeTasks.isEmpty) {
+    if (todayTasks.isEmpty) {
       return DashboardCard(
         icon: Icons.auto_awesome_outlined,
         title: "Today's Tasks",
         onTap: () => context.go(AppRoutes.tasks),
-        child: EmptyStateWidget(
-          icon: Icons.task_alt_rounded,
-          title: 'No tasks scheduled.',
-          subtitle: 'Perfect day to plan something meaningful.',
-          compact: true,
-          actionLabel: 'Create first task',
-          onAction: () => _showTaskEditor(context, ref),
-        ),
+        child: _buildTodayEmptyState(context, ref),
       );
     }
 
-    final completed = activeTasks
+    // Completion ratio must include today's tasks that are already
+    // completed, so it uses a separate all-inclusive provider rather
+    // than `todayTasks` (which excludes completed tasks by design).
+    final todayIncludingCompleted = ref.watch(
+      todayTasksIncludingCompletedProvider,
+    );
+    final completed = todayIncludingCompleted
         .where((t) => t.status == TaskStatus.completed)
         .length;
-    final completionPct = completed / activeTasks.length;
+    final completionPct = todayIncludingCompleted.isEmpty
+        ? 0.0
+        : completed / todayIncludingCompleted.length;
 
     return DashboardCard(
       icon: Icons.auto_awesome_outlined,
       title: "Today's Tasks",
       trailing: Text(
-        '${activeTasks.length}',
+        '${todayTasks.length}',
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
           color: AppColors.primary,
           fontWeight: FontWeight.w700,
@@ -168,12 +171,12 @@ class _TodayTasksCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...activeTasks.take(3).map((task) => _TaskSummaryItem(task: task)),
-          if (activeTasks.length > 3)
+          ...todayTasks.take(3).map((task) => _TaskSummaryItem(task: task)),
+          if (todayTasks.length > 3)
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
               child: Text(
-                '+${activeTasks.length - 3} more',
+                '+${todayTasks.length - 3} more',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(
                     context,
@@ -193,6 +196,64 @@ class _TodayTasksCard extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Builds the empty-state content for when there are no outstanding
+  /// tasks due today.
+  ///
+  /// There are three distinct situations that all land here, and each
+  /// deserves different copy so the dashboard never tells an existing
+  /// user "no tasks scheduled" when they actually have tasks:
+  ///
+  /// 1. A brand-new user with no tasks at all — invite them to create one.
+  /// 2. A user who has completed everything due today — celebrate it.
+  /// 3. A user with tasks, but none due today — reassure them they're
+  ///    caught up (and mention what's coming up, if anything).
+  Widget _buildTodayEmptyState(BuildContext context, WidgetRef ref) {
+    final allTasks = ref.watch(taskListProvider).tasks;
+    // Because this is only reached when `todayTasksProvider` is empty,
+    // every task in `todayInclCompleted` is necessarily completed.
+    final todayInclCompleted = ref.watch(todayTasksIncludingCompletedProvider);
+    final upcoming = ref.watch(upcomingTasksProvider);
+
+    if (allTasks.isEmpty) {
+      return EmptyStateWidget(
+        icon: Icons.task_alt_rounded,
+        title: 'No tasks scheduled.',
+        subtitle: 'Perfect day to plan something meaningful.',
+        compact: true,
+        actionLabel: 'Create first task',
+        onAction: () => _showTaskEditor(context, ref),
+      );
+    }
+
+    if (todayInclCompleted.isNotEmpty) {
+      final subtitle = upcoming.isEmpty
+          ? "You've completed everything due today."
+          : "You've completed everything due today. "
+                '${upcoming.length} coming up.';
+      return EmptyStateWidget(
+        icon: Icons.celebration_rounded,
+        title: 'All done for today \u{1F389}',
+        subtitle: subtitle,
+        compact: true,
+        actionLabel: 'View tasks',
+        onAction: () => context.go(AppRoutes.tasks),
+      );
+    }
+
+    final subtitle = upcoming.isEmpty
+        ? "You're all caught up."
+        : 'You have ${upcoming.length} upcoming '
+              '${upcoming.length == 1 ? 'task' : 'tasks'}.';
+    return EmptyStateWidget(
+      icon: Icons.event_available_rounded,
+      title: 'Nothing due today',
+      subtitle: subtitle,
+      compact: true,
+      actionLabel: 'View all tasks',
+      onAction: () => context.go(AppRoutes.tasks),
     );
   }
 

@@ -1,6 +1,6 @@
-/// Task editor bottom sheet.
+/// Task editor dialog.
 ///
-/// A premium modal bottom sheet for creating and editing tasks.
+/// A premium centered dialog card for creating and editing tasks.
 /// Fields: title, description, priority, due date.
 library;
 
@@ -10,10 +10,10 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 
-/// A bottom sheet for creating or editing a task.
+/// A centered dialog card for creating or editing a task.
 ///
 /// Pass an existing [Task] to edit, or null to create a new one.
-/// Returns the edited/created [Task] via the sheet's return value,
+/// Returns the edited/created [Task] via the dialog's return value,
 /// or null if cancelled.
 class TaskEditorSheet extends StatefulWidget {
   /// Creates a [TaskEditorSheet].
@@ -29,17 +29,14 @@ class TaskEditorSheet extends StatefulWidget {
   /// Default priority for new tasks.
   final TaskPriority defaultPriority;
 
-  /// Shows the sheet as a modal bottom sheet.
+  /// Shows the editor as a centered dialog.
   static Future<Task?> show(
     BuildContext context, {
     Task? task,
     TaskPriority defaultPriority = TaskPriority.none,
   }) {
-    return showModalBottomSheet<Task>(
+    return showDialog<Task>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
       builder: (context) =>
           TaskEditorSheet(task: task, defaultPriority: defaultPriority),
     );
@@ -122,113 +119,108 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final screenHeight = MediaQuery.of(context).size.height;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(2),
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 460,
+          maxHeight: screenHeight * 0.9,
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Title
+                Text(
+                  widget.task != null ? 'Edit Task' : 'New Task',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xl),
 
-              // Title
-              Text(
-                widget.task != null ? 'Edit Task' : 'New Task',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
+                // Title field
+                TextField(
+                  controller: _titleController,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    hintText: 'What needs to be done?',
+                  ),
+                  onChanged: (_) => setState(() {}),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.lg),
 
-              // Title field
-              TextField(
-                controller: _titleController,
-                autofocus: true,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  hintText: 'What needs to be done?',
+                // Description field
+                TextField(
+                  controller: _descriptionController,
+                  maxLines: 3,
+                  textInputAction: TextInputAction.newline,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Add details (optional)',
+                  ),
                 ),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.lg),
 
-              // Description field
-              TextField(
-                controller: _descriptionController,
-                maxLines: 3,
-                textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  hintText: 'Add details (optional)',
+                // Priority selector
+                Text(
+                  'Priority',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              // Priority selector
-              Text(
-                'Priority',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                const SizedBox(height: AppSpacing.sm),
+                _PrioritySelector(
+                  value: _priority,
+                  onChanged: (p) => setState(() => _priority = p),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              _PrioritySelector(
-                value: _priority,
-                onChanged: (p) => setState(() => _priority = p),
-              ),
-              const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.lg),
 
-              // Due date
-              Text(
-                'Due Date',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                // Due date
+                Text(
+                  'Due Date',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              _DueDateButton(
-                dueDate: _dueDate,
-                onTap: _pickDate,
-                onClear: () => setState(() => _dueDate = null),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.sm),
+                _DueDateButton(
+                  dueDate: _dueDate,
+                  onTap: _pickDate,
+                  onClear: () => setState(() => _dueDate = null),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
 
-              // Actions
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                // Actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _isValid && !_isSaving ? _save : null,
-                      child: Text(widget.task != null ? 'Save' : 'Create'),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _isValid && !_isSaving ? _save : null,
+                        child: Text(widget.task != null ? 'Save' : 'Create'),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-            ],
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+              ],
+            ),
           ),
         ),
       ),

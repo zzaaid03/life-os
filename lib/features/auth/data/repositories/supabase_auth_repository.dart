@@ -27,6 +27,18 @@ class SupabaseAuthRepository implements AuthRepository {
 
   final SupabaseClient _client;
 
+  /// Extracts the best available display name from auth user metadata.
+  ///
+  /// Email/password sign-up stores the name under `display_name`.
+  /// Google (and most OAuth providers) instead populate `full_name`
+  /// or `name`. Checking all three ensures every sign-in method ends
+  /// up with a real name instead of falling back to the email prefix.
+  String? _extractDisplayName(Map<String, dynamic>? metadata) {
+    return metadata?['display_name'] as String? ??
+        metadata?['full_name'] as String? ??
+        metadata?['name'] as String?;
+  }
+
   @override
   Future<AuthState> getCurrentAuthState() async {
     final session = _client.auth.currentSession;
@@ -40,7 +52,7 @@ class SupabaseAuthRepository implements AuthRepository {
       status: AuthStatus.authenticated,
       userId: user.id,
       email: user.email,
-      displayName: user.userMetadata?['display_name'] as String?,
+      displayName: _extractDisplayName(user.userMetadata),
     );
   }
 
@@ -63,7 +75,7 @@ class SupabaseAuthRepository implements AuthRepository {
       status: AuthStatus.authenticated,
       userId: user.id,
       email: user.email,
-      displayName: user.userMetadata?['display_name'] as String?,
+      displayName: _extractDisplayName(user.userMetadata),
     );
   }
 
@@ -127,6 +139,13 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> updateDisplayName(String displayName) async {
+    await _client.auth.updateUser(
+      UserAttributes(data: {'display_name': displayName}),
+    );
+  }
+
+  @override
   Stream<AuthState> get authStateChanges {
     return _client.auth.onAuthStateChange.map((event) {
       final session = event.session;
@@ -140,7 +159,7 @@ class SupabaseAuthRepository implements AuthRepository {
         status: AuthStatus.authenticated,
         userId: user.id,
         email: user.email,
-        displayName: user.userMetadata?['display_name'] as String?,
+        displayName: _extractDisplayName(user.userMetadata),
       );
     });
   }

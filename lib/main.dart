@@ -65,6 +65,19 @@ class _LifeOSAppState extends ConsumerState<LifeOSApp> {
         ref.read(profileProvider.notifier).loadProfile(next.userId!);
       }
     });
+
+    // Cold-start fix: `listenManual` only fires on a state *transition*.
+    // If the session was already restored (e.g. Google OAuth) by the
+    // time this widget is first built, there's no transition to listen
+    // for, so the profile would never load. Deferred via
+    // `Future.microtask` since this runs during `initState`.
+    final currentAuth = ref.read(authProvider);
+    if (currentAuth.isAuthenticated && currentAuth.userId != null) {
+      Future.microtask(
+        () =>
+            ref.read(profileProvider.notifier).loadProfile(currentAuth.userId!),
+      );
+    }
   }
 
   @override

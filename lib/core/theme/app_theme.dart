@@ -33,12 +33,16 @@ abstract final class AppTheme {
   }
 
   /// Dark theme — deep, calm, premium.
+  ///
+  /// Uses [AppColors.primaryOnDark] rather than the light theme's
+  /// [AppColors.primary] — the brightened variant is needed to stay
+  /// legible against the dark surface colors.
   static ThemeData get dark {
     final colorScheme = ColorScheme.dark(
-      primary: AppColors.primary,
+      primary: AppColors.primaryOnDark,
       onPrimary: AppColors.white,
       primaryContainer: AppColors.primaryDark,
-      secondary: AppColors.primary,
+      secondary: AppColors.primaryOnDark,
       onSecondary: AppColors.white,
       surface: AppColors.surfaceDark,
       onSurface: AppColors.textPrimaryDark,

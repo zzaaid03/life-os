@@ -52,7 +52,19 @@ class AppShell extends ConsumerWidget {
           child: const Icon(Icons.add_rounded, size: 32),
         ),
       ),
-      bottomNavigationBar: FloatingNavBar(currentLocation: location),
+      // `heightFactor: 1.0` is essential here: the `bottomNavigationBar`
+      // slot gives its child loose height constraints up to the full
+      // available height. A plain `Center` would expand to fill that
+      // height, pushing the nav bar into the middle of the screen and
+      // collapsing the body. `heightFactor: 1.0` makes this `Center`
+      // size itself to exactly its child's height instead.
+      bottomNavigationBar: Center(
+        heightFactor: 1.0,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _kMaxContentWidth),
+          child: FloatingNavBar(currentLocation: location),
+        ),
+      ),
     );
   }
 

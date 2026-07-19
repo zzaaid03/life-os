@@ -145,8 +145,18 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
 
   String? _userId;
 
+  /// The userId of an in-flight [loadTasks] call, if any.
+  ///
+  /// Guards against redundant concurrent loads for the same user —
+  /// this can happen at cold start, where both the auth-state listener
+  /// and the "already authenticated" initial check in [taskListProvider]
+  /// may race to call [loadTasks] for the same user.
+  String? _loadingUserId;
+
   /// Loads tasks for the given [userId].
   Future<void> loadTasks(String userId) async {
+    if (_loadingUserId == userId) return;
+    _loadingUserId = userId;
     _userId = userId;
 
     if (state.tasks.isEmpty) {
@@ -165,6 +175,10 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
           status: TaskListStatus.error,
           error: 'Failed to load tasks.',
         );
+      }
+    } finally {
+      if (_loadingUserId == userId) {
+        _loadingUserId = null;
       }
     }
   }
@@ -308,58 +322,76 @@ final taskListProvider = StateNotifierProvider<TaskListNotifier, TaskListState>(
       }
     });
 
+    // Cold-start fix: `ref.listen` only fires on a state *transition*.
+    // If the session was already restored (e.g. Google OAuth) by the
+    // time this provider is first created, there's no transition to
+    // listen for, so the notifier would stay stuck at its initial
+    // `loading` state forever. Deferred via `Future.microtask` so we
+    // don't mutate notifier state synchronously during construction.
+    final currentAuth = ref.read(authProvider);
+    if (currentAuth.isAuthenticated && currentAuth.userId != null) {
+      Future.microtask(() => notifier.loadTasks(currentAuth.userId!));
+    }
+
     return notifier;
   },
 );
 
-/// Whether a task is due today (or has no due date — counts as today).
-bool _isDueToday(DateTime? dueDate) {
-  if (dueDate == null) return true;
-  final now = DateTime.now();
-  return dueDate.year == now.year &&
-      dueDate.month == now.month &&
-      dueDate.day == now.day;
+/// Truncates a [DateTime] to just its calendar date (midnight).
+DateTime _dateOnly(DateTime dateTime) {
+  return DateTime(dateTime.year, dateTime.month, dateTime.day);
 }
 
-/// Tasks due today (not completed/archived).
+/// Whether a task is due today, overdue, or has no due date.
+///
+/// A task with no due date is always considered "today" so it never
+/// gets lost. A task is only "upcoming" once its due date is strictly
+/// after today — see [upcomingTasksProvider].
+bool _isDueTodayOrOverdue(DateTime? dueDate) {
+  if (dueDate == null) return true;
+  final today = _dateOnly(DateTime.now());
+  return !_dateOnly(dueDate).isAfter(today);
+}
+
+/// Tasks due today or overdue (not completed/archived).
 /// Tasks with no due date are included as "today".
 final todayTasksProvider = Provider<List<Task>>((ref) {
   final tasks = ref.watch(taskListProvider).tasks;
   return tasks
       .where(
         (t) =>
-            _isDueToday(t.dueDate) &&
+            _isDueTodayOrOverdue(t.dueDate) &&
             t.status != TaskStatus.completed &&
             t.status != TaskStatus.archived,
       )
       .toList();
 });
 
-/// All active tasks (not completed/archived) — used by the dashboard
-/// to show a summary regardless of due date.
-final activeTasksProvider = Provider<List<Task>>((ref) {
+/// All tasks due today or overdue, **including completed ones**.
+///
+/// [todayTasksProvider] excludes completed tasks since it feeds the
+/// list of things still to do. This provider exists purely to compute
+/// an accurate "today" completion ratio for the dashboard, without
+/// duplicating the completed/incomplete split into two providers.
+final todayTasksIncludingCompletedProvider = Provider<List<Task>>((ref) {
   final tasks = ref.watch(taskListProvider).tasks;
   return tasks
       .where(
         (t) =>
-            t.status != TaskStatus.completed && t.status != TaskStatus.archived,
+            _isDueTodayOrOverdue(t.dueDate) && t.status != TaskStatus.archived,
       )
       .toList();
 });
 
-/// Tasks due after today (not completed/archived).
+/// Tasks due strictly after today (not completed/archived).
 final upcomingTasksProvider = Provider<List<Task>>((ref) {
   final tasks = ref.watch(taskListProvider).tasks;
-  final today = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-    DateTime.now().day,
-  );
+  final today = _dateOnly(DateTime.now());
   return tasks
       .where(
         (t) =>
             t.dueDate != null &&
-            t.dueDate!.isAfter(today) &&
+            _dateOnly(t.dueDate!).isAfter(today) &&
             t.status != TaskStatus.completed &&
             t.status != TaskStatus.archived,
       )

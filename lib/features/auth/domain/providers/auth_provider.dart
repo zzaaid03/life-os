@@ -92,6 +92,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> sendPasswordResetEmail({required String email}) async {
     await _repository.sendPasswordResetEmail(email: email);
   }
+
+  /// Updates the display name in the user's auth metadata.
+  ///
+  /// Updates local state immediately so the UI (e.g. the dashboard
+  /// greeting) reflects the change without waiting for a session
+  /// refresh or re-authentication.
+  Future<void> updateDisplayName(String displayName) async {
+    await _repository.updateDisplayName(displayName);
+    state = state.copyWith(displayName: displayName);
+  }
 }
 
 /// The global authentication provider.

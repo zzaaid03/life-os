@@ -37,6 +37,7 @@ class FloatingNavBar extends StatelessWidget {
         vertical: AppSpacing.md,
       ),
       child: Container(
+        width: double.infinity,
         height: 64,
         decoration: BoxDecoration(
           color: isDark

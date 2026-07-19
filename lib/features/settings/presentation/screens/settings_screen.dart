@@ -1,4 +1,4 @@
-/// Settings screen — application preferences and configuration.
+/// Settings screen - application preferences and configuration.
 library;
 
 import 'package:flutter/material.dart';
@@ -45,6 +45,7 @@ class SettingsScreen extends ConsumerWidget {
                 icon: Icons.person_outline_rounded,
                 title: displayName,
                 subtitle: email.isNotEmpty ? email : null,
+                onTap: () => _editDisplayName(context, ref, displayName),
               ),
             ],
           ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
@@ -133,6 +134,110 @@ class SettingsScreen extends ConsumerWidget {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  /// Opens a dialog to edit the user's display name.
+  ///
+  /// Updates both the `profiles` table (via [profileProvider]) and the
+  /// auth user metadata (via [authProvider]), so the change is reflected
+  /// consistently everywhere the name is read from - including for
+  /// existing users whose name currently falls back to their email prefix.
+  Future<void> _editDisplayName(
+    BuildContext context,
+    WidgetRef ref,
+    String currentName,
+  ) async {
+    final controller = TextEditingController(text: currentName);
+    final formKey = GlobalKey<FormState>();
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        void submit() {
+          if (formKey.currentState!.validate()) {
+            Navigator.of(dialogContext).pop(controller.text.trim());
+          }
+        }
+
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Your name',
+                    style: Theme.of(dialogContext).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  TextFormField(
+                    controller: controller,
+                    autofocus: true,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                    validator: (value) {
+                      final trimmed = value?.trim() ?? '';
+                      if (trimmed.isEmpty) return 'Enter your name';
+                      if (trimmed.length < 2) return 'Name is too short';
+                      return null;
+                    },
+                    onFieldSubmitted: (_) => submit(),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: submit,
+                          child: const Text('Save'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (newName == null || newName.isEmpty || newName == currentName) return;
+
+    final userId = ref.read(authProvider).userId;
+    if (userId == null || !context.mounted) return;
+
+    try {
+      await ref
+          .read(profileProvider.notifier)
+          .updateDisplayName(userId, newName);
+      await ref.read(authProvider.notifier).updateDisplayName(newName);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to update name. Please try again.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 }
 

@@ -33,6 +33,9 @@ abstract class AuthRepository {
   /// Sends a password reset email.
   Future<void> sendPasswordResetEmail({required String email});
 
+  /// Updates the display name stored in the user's auth metadata.
+  Future<void> updateDisplayName(String displayName);
+
   /// Stream of authentication state changes.
   Stream<AuthState> get authStateChanges;
 }

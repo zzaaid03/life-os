@@ -22,6 +22,7 @@ class SignUpScreen extends ConsumerStatefulWidget {
 }
 
 class _SignUpScreenState extends ConsumerState<SignUpScreen> {
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -32,6 +33,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -52,6 +54,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           .signUpWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _passwordController.text,
+            displayName: _nameController.text.trim(),
           );
     } on AuthException catch (e) {
       _showError(_mapError(e));
@@ -117,6 +120,25 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   ).animate().fadeIn(duration: 200.ms),
                   const SizedBox(height: AppSpacing.lg),
                 ],
+                TextFormField(
+                  controller: _nameController,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    prefixIcon: Icon(AppIcons.person),
+                  ),
+                  validator: (value) {
+                    final trimmed = value?.trim() ?? '';
+                    if (trimmed.isEmpty) {
+                      return 'Enter your name';
+                    }
+                    if (trimmed.length < 2) {
+                      return 'Name is too short';
+                    }
+                    return null;
+                  },
+                ).animate().fadeIn(duration: 400.ms, delay: 150.ms),
+                const SizedBox(height: AppSpacing.lg),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
