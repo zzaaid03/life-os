@@ -49,6 +49,7 @@ class HabitListState {
   const HabitListState({
     this.status = HabitListStatus.loading,
     this.habits = const <HabitView>[],
+    this.recentEntries = const <HabitEntry>[],
     this.error,
   });
 
@@ -57,6 +58,10 @@ class HabitListState {
 
   /// The habits with their derived daily state.
   final List<HabitView> habits;
+
+  /// Recent check-off entries (last ~90 days, newest first) — consumed by
+  /// the Timeline to render check-off events.
+  final List<HabitEntry> recentEntries;
 
   /// An error message, if loading failed.
   final String? error;
@@ -105,12 +110,17 @@ class HabitListNotifier extends StateNotifier<HabitListState> {
         );
       }).toList();
 
-      state = HabitListState(status: HabitListStatus.loaded, habits: views);
+      state = HabitListState(
+        status: HabitListStatus.loaded,
+        habits: views,
+        recentEntries: entries,
+      );
     } catch (e) {
       if (state.habits.isNotEmpty) {
         state = HabitListState(
           status: HabitListStatus.loaded,
           habits: state.habits,
+          recentEntries: state.recentEntries,
         );
       } else {
         state = const HabitListState(
