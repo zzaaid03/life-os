@@ -1,17 +1,22 @@
 /// Job applications screen.
 ///
-/// Lists the user's tracked job applications (populated by inbox scans),
-/// each with a colored status chip and summary. Supports pull-to-refresh
-/// and shows a friendly empty state when nothing is tracked yet.
+/// Lists the user's tracked job applications (populated by inbox scans or
+/// created manually), each with a colored status chip and summary.
+/// Supports create (+), tap-to-edit, swipe-to-delete, pull-to-refresh,
+/// and a friendly empty state.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
+import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/jobs/presentation/job_display.dart';
+import 'package:life_os/features/jobs/presentation/widgets/job_editor_dialog.dart';
 import 'package:life_os/features/jobs/presentation/widgets/job_status_chip.dart';
 
 /// Screen listing the user's tracked job applications.
@@ -19,20 +24,99 @@ class JobApplicationsScreen extends ConsumerWidget {
   /// Creates a [JobApplicationsScreen].
   const JobApplicationsScreen({super.key});
 
+  Future<void> _create(BuildContext context, WidgetRef ref) async {
+    final userId = ref.read(authProvider).userId;
+    if (userId == null) return;
+
+    final result = await JobEditorDialog.show(context);
+    if (result == null) return;
+
+    try {
+      await ref
+          .read(jobApplicationRepositoryProvider)
+          .create(
+            userId: userId,
+            company: result.company,
+            role: result.role,
+            status: result.status,
+            summary: result.summary,
+            location: result.location,
+          );
+      await ref.read(jobListProvider.notifier).refresh();
+    } catch (_) {
+      if (context.mounted) _showError(context, 'Could not create the entry.');
+    }
+  }
+
+  Future<void> _edit(
+    BuildContext context,
+    WidgetRef ref,
+    JobApplication job,
+  ) async {
+    final result = await JobEditorDialog.show(context, existing: job);
+    if (result == null) return;
+
+    try {
+      await ref
+          .read(jobApplicationRepositoryProvider)
+          .update(
+            job.id,
+            company: result.company,
+            role: result.role,
+            status: result.status,
+            summary: result.summary,
+            location: result.location,
+          );
+      await ref.read(jobListProvider.notifier).refresh();
+    } catch (_) {
+      if (context.mounted) _showError(context, 'Could not save the changes.');
+    }
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    JobApplication job,
+  ) async {
+    try {
+      await ref.read(jobApplicationRepositoryProvider).delete(job.id);
+      await ref.read(jobListProvider.notifier).refresh();
+    } catch (_) {
+      if (context.mounted) _showError(context, 'Could not delete the entry.');
+      // Reload so a failed optimistic dismiss reappears.
+      await ref.read(jobListProvider.notifier).refresh();
+    }
+  }
+
+  void _showError(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(jobListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Job Applications')),
+      appBar: AppBar(
+        title: const Text('Job Applications'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_rounded),
+            tooltip: 'Add application',
+            onPressed: () => _create(context, ref),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(jobListProvider.notifier).refresh(),
-        child: _buildBody(context, state),
+        child: _buildBody(context, ref, state),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, JobListState state) {
+  Widget _buildBody(BuildContext context, WidgetRef ref, JobListState state) {
     if (state.status == JobListStatus.loading && state.jobs.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -49,7 +133,7 @@ class JobApplicationsScreen extends ConsumerWidget {
       return const _MessageList(
         icon: Icons.work_outline_rounded,
         title: 'No applications tracked yet',
-        subtitle: 'Scan your inbox to start.',
+        subtitle: 'Scan your inbox to start, or add one with +.',
       );
     }
 
@@ -60,15 +144,61 @@ class JobApplicationsScreen extends ConsumerWidget {
       ),
       itemCount: state.jobs.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-      itemBuilder: (context, index) => _JobCard(job: state.jobs[index]),
+      itemBuilder: (context, index) {
+        final job = state.jobs[index];
+        return Dismissible(
+          key: ValueKey(job.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: const Icon(Icons.delete_outline_rounded,
+                color: AppColors.error),
+          ),
+          confirmDismiss: (_) async {
+            return await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete application?'),
+                    content: Text(
+                      '"${jobDisplayTitle(company: job.company, role: job.role, status: job.status)}" will be removed.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                ) ??
+                false;
+          },
+          onDismissed: (_) => _delete(context, ref, job),
+          child: _JobCard(job: job, onTap: () => _edit(context, ref, job)),
+        );
+      },
     );
   }
 }
 
 class _JobCard extends StatelessWidget {
-  const _JobCard({required this.job});
+  const _JobCard({required this.job, this.onTap});
 
   final JobApplication job;
+
+  /// Called when the card is tapped (opens the editor).
+  final VoidCallback? onTap;
 
   /// The bold headline for the card — company, else role, else a
   /// status-based fallback so a company-less row never renders blank.
@@ -82,16 +212,28 @@ class _JobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+    return Material(
+      color: theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.08),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.08),
+            ),
+          ),
+          child: _buildContent(theme),
         ),
       ),
-      child: Column(
+    );
+  }
+
+  Widget _buildContent(ThemeData theme) {
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -141,7 +283,6 @@ class _JobCard extends StatelessWidget {
             ),
           ],
         ],
-      ),
     );
   }
 }

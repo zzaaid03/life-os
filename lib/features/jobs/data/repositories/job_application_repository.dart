@@ -102,6 +102,56 @@ class JobApplicationRepository {
     }
   }
 
+  /// Creates a job application manually. Returns the inserted row.
+  Future<JobApplication> create({
+    required String userId,
+    required String company,
+    required String role,
+    required String status,
+    String? summary,
+    String? location,
+  }) async {
+    final response = await _client
+        .from(_table)
+        .insert({
+          'user_id': userId,
+          'company': company,
+          'role': role,
+          'status': status,
+          'summary': summary,
+          'location': location,
+        })
+        .select()
+        .single();
+    return JobApplication.fromJson(response);
+  }
+
+  /// Updates an existing job application's editable fields.
+  Future<void> update(
+    String id, {
+    required String company,
+    required String role,
+    required String status,
+    String? summary,
+    String? location,
+  }) async {
+    await _client
+        .from(_table)
+        .update({
+          'company': company,
+          'role': role,
+          'status': status,
+          'summary': summary,
+          'location': location,
+        })
+        .eq('id', id);
+  }
+
+  /// Permanently deletes a job application.
+  Future<void> delete(String id) async {
+    await _client.from(_table).delete().eq('id', id);
+  }
+
   /// Fetches all job applications for [userId], most recently updated first.
   Future<List<JobApplication>> getAll(String userId) async {
     final response = await _client
