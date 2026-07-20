@@ -17,7 +17,9 @@ import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_theme.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/inbox/data/google_credentials_repository.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
   try {
@@ -42,6 +44,34 @@ Future<void> _initializeAndRun() async {
 
   await SupabaseService.initialize();
 
+  // On web, the OAuth redirect is consumed during `Supabase.initialize()`, so
+  // the freshly-restored session is the ONLY place `providerRefreshToken` is
+  // available — it's gone by the time the `googleCredentialsCaptureProvider`
+  // listener subscribes in `LifeOSApp.initState`. Persist it here, right away,
+  // so the `extract-tasks` function can mint Gmail tokens later. The provider
+  // listener still runs as a backup for native / in-session sign-ins.
+  final session = Supabase.instance.client.auth.currentSession;
+  final providerRefreshToken = session?.providerRefreshToken;
+  final userId = session?.user.id;
+  debugPrint(
+    '[gmail] post-init refreshToken present: '
+    '${providerRefreshToken != null && providerRefreshToken.isNotEmpty}, '
+    'user: $userId',
+  );
+  if (providerRefreshToken != null &&
+      providerRefreshToken.isNotEmpty &&
+      userId != null) {
+    try {
+      await Supabase.instance.client.from('google_credentials').upsert(
+        {'user_id': userId, 'refresh_token': providerRefreshToken},
+        onConflict: 'user_id',
+      );
+      debugPrint('[gmail] refresh token saved for $userId');
+    } catch (e) {
+      debugPrint('[gmail] failed to save refresh token: $e');
+    }
+  }
+
   runApp(const ProviderScope(child: LifeOSApp()));
 }
 
@@ -57,6 +87,11 @@ class _LifeOSAppState extends ConsumerState<LifeOSApp> {
   @override
   void initState() {
     super.initState();
+    // Activate the Google refresh-token capture listener for the whole app
+    // session. Reading the provider starts its raw `onAuthStateChange`
+    // subscription so any Google sign-in persists its refresh token.
+    ref.read(googleCredentialsCaptureProvider);
+
     // Load profile when auth state becomes authenticated
     ref.listenManual(authProvider, (previous, next) {
       if (next.isAuthenticated &&

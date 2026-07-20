@@ -120,11 +120,15 @@ class SupabaseAuthRepository implements AuthRepository {
       redirectTo: redirectTo,
       // Request read-only Gmail access in addition to the default
       // profile/email scopes so the `extract-tasks` Edge Function can read
-      // the user's inbox server-side. `access_type: offline` + `prompt:
-      // consent` ask Google for a refresh token and force the consent
-      // screen, ensuring the extra scope is actually granted.
+      // the user's inbox server-side. `access_type: offline` asks Google for
+      // a refresh token; `prompt: 'select_account consent'` always shows the
+      // account chooser AND forces the consent screen, so Google returns a
+      // fresh refresh token on every sign-in (needed to persist access).
       scopes: 'email profile https://www.googleapis.com/auth/gmail.readonly',
-      queryParams: const {'access_type': 'offline', 'prompt': 'consent'},
+      queryParams: const {
+        'access_type': 'offline',
+        'prompt': 'select_account consent',
+      },
     );
 
     // OAuth flow redirects; state will be updated via authStateChanges.

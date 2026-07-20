@@ -11,6 +11,7 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
+import 'package:life_os/features/jobs/presentation/job_display.dart';
 import 'package:life_os/features/jobs/presentation/widgets/job_status_chip.dart';
 
 /// Screen listing the user's tracked job applications.
@@ -69,6 +70,14 @@ class _JobCard extends StatelessWidget {
 
   final JobApplication job;
 
+  /// The bold headline for the card — company, else role, else a
+  /// status-based fallback so a company-less row never renders blank.
+  String get _title {
+    if (job.company.trim().isNotEmpty) return job.company.trim();
+    if (job.role.trim().isNotEmpty) return job.role.trim();
+    return jobStatusHeadline(job.status);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -92,13 +101,18 @@ class _JobCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Title is never blank: fall back to the role, then a
+                    // status-based headline, when the company is unknown.
                     Text(
-                      job.company,
+                      _title,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (job.role.isNotEmpty) ...[
+                    // Only show the role as a subtitle when it isn't already
+                    // serving as the title (i.e. a company is present).
+                    if (job.company.trim().isNotEmpty &&
+                        job.role.trim().isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         job.role,

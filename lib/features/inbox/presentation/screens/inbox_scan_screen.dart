@@ -17,6 +17,7 @@ import 'package:life_os/features/inbox/domain/inbox_consent_provider.dart';
 import 'package:life_os/features/inbox/presentation/widgets/inbox_consent_dialog.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
+import 'package:life_os/features/jobs/presentation/job_display.dart';
 import 'package:life_os/features/jobs/presentation/widgets/job_status_chip.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
@@ -37,6 +38,9 @@ class InboxScanScreen extends ConsumerStatefulWidget {
 class _InboxScanScreenState extends ConsumerState<InboxScanScreen> {
   _ScanPhase _phase = _ScanPhase.idle;
   String? _errorMessage;
+
+  /// The Gmail address the last scan read, as reported by the function.
+  String? _scannedAccount;
 
   // Suggested tasks are local + mutable so Add/Dismiss can remove cards.
   final List<SuggestedTask> _suggestedTasks = [];
@@ -81,12 +85,13 @@ class _InboxScanScreenState extends ConsumerState<InboxScanScreen> {
           ..clear()
           ..addAll(result.tasks);
         _jobUpdates = result.jobUpdates;
+        _scannedAccount = result.scannedAccount;
         _phase = _ScanPhase.done;
       });
     } on GmailNotConnectedException {
       if (!mounted) return;
       setState(() => _phase = _ScanPhase.idle);
-      await _promptReconnect();
+      await _promptConnectGmail();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -97,15 +102,19 @@ class _InboxScanScreenState extends ConsumerState<InboxScanScreen> {
     }
   }
 
-  /// Prompts the user to reconnect Gmail when the access token is missing.
-  Future<void> _promptReconnect() async {
-    final reconnect = await showDialog<bool>(
+  /// Prompts the user to connect Gmail when no refresh token is stored yet.
+  ///
+  /// Running the Google sign-in flow persists a fresh refresh token (see
+  /// [googleCredentialsCaptureProvider]) that the Edge Function then uses to
+  /// read the inbox on subsequent scans.
+  Future<void> _promptConnectGmail() async {
+    final connect = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reconnect Gmail'),
+        title: const Text('Connect Gmail'),
         content: const Text(
-          'Your Gmail connection has expired. Sign in with Google again to '
-          'scan your inbox.',
+          'Connect your Google account so Life OS can scan your inbox. '
+          'You\'ll choose an account and grant read-only Gmail access.',
         ),
         actions: [
           TextButton(
@@ -114,23 +123,31 @@ class _InboxScanScreenState extends ConsumerState<InboxScanScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Reconnect'),
+            child: const Text('Connect Gmail'),
           ),
         ],
       ),
     );
 
-    if (reconnect != true) return;
+    if (connect != true) return;
 
     try {
-      // On web this redirects out to Google and back; on native it opens the
-      // OAuth flow. After returning, the provider token is available again.
+      // On web this redirects out to Google and back (the page reloads, so
+      // the user returns and taps Scan again); on native the OAuth flow
+      // completes in-place and the refresh token is stored automatically.
       await ref.read(authProvider.notifier).signInWithGoogle();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gmail connected. Tap "Scan my inbox" to continue.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not reconnect Gmail. Please try again.'),
+          content: Text('Could not connect Gmail. Please try again.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -233,6 +250,10 @@ class _InboxScanScreenState extends ConsumerState<InboxScanScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
+        if (_phase == _ScanPhase.done && _scannedAccount != null) ...[
+          _ScannedAccountLine(account: _scannedAccount!),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         if (_phase == _ScanPhase.error) _buildError(context),
         if (_phase == _ScanPhase.done) ..._buildResults(context),
       ],
@@ -318,6 +339,34 @@ class _InboxScanScreenState extends ConsumerState<InboxScanScreen> {
       ],
       const SizedBox(height: AppSpacing.massive),
     ];
+  }
+}
+
+/// A small line showing which Gmail account was scanned.
+class _ScannedAccountLine extends StatelessWidget {
+  const _ScannedAccountLine({required this.account});
+
+  final String account;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurface.withValues(alpha: 0.5);
+
+    return Row(
+      children: [
+        Icon(Icons.mark_email_read_outlined, size: 16, color: color),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            'Scanned: $account',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(color: color),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -477,9 +526,11 @@ class _JobUpdateCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  update.role.isEmpty
-                      ? update.company
-                      : '${update.company} · ${update.role}',
+                  jobDisplayTitle(
+                    company: update.company,
+                    role: update.role,
+                    status: update.status,
+                  ),
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),

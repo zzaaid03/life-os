@@ -1,19 +1,28 @@
 // Supabase Edge Function: extract-tasks
 //
-// Reads the user's recent Gmail SERVER-SIDE (using a Google access token the app
-// passes in), then uses Groq (free, open-source Llama 3.3 70B, no-training policy)
-// to classify each email into actionable TASKS and JOB-APPLICATION updates.
+// Reads the user's recent Gmail SERVER-SIDE and classifies each email into
+// actionable TASKS and JOB-APPLICATION updates using Groq (Llama 3.3 70B).
 //
-// Email bodies never touch the client and are never stored — only the derived
-// tasks/summaries are returned. GROQ_API_KEY lives here as a Supabase secret.
+// Two ways to get a Gmail access token:
+//   1. App path (production): the caller is an authenticated Supabase user and
+//      does NOT pass a token. We look up their stored Google refresh token and
+//      mint a fresh access token server-side. Survives reloads; no re-auth.
+//   2. Test path: caller passes { accessToken } directly (used by our terminal
+//      test scripts). Bypasses the stored-credential lookup.
 //
-// Request:  POST { accessToken: string, maxResults?: number }
-// Response: { tasks: [...], jobUpdates: [...] }
+// Email bodies never touch the client and are never stored — only derived
+// tasks/summaries are returned.
 //
-// Deploy:  supabase functions deploy extract-tasks
-// Secret:  supabase secrets set GROQ_API_KEY=your_key
+// Secrets: GROQ_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+//          (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected).
+
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
+const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,6 +84,28 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+// --- Google token: mint a fresh access token from a stored refresh token ---
+async function accessTokenFromRefresh(refreshToken: string): Promise<string> {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    throw new Error("GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not configured");
+  }
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Google token refresh ${res.status}: ${await res.text()}`);
+  }
+  const data = await res.json();
+  return data.access_token as string;
+}
+
 // --- Gmail helpers (bodies stay server-side) ---
 
 interface GmailPart {
@@ -116,13 +147,20 @@ async function fetchRecentEmails(accessToken: string, maxResults: number) {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
+  // Which Google account does this token actually belong to?
+  let account = "";
+  const profileRes = await gmail("profile");
+  if (profileRes.ok) {
+    account = (await profileRes.json()).emailAddress ?? "";
+  }
+
   const listRes = await gmail(`messages?maxResults=${maxResults}&labelIds=INBOX`);
   if (!listRes.ok) {
     throw new Error(`Gmail list ${listRes.status}: ${await listRes.text()}`);
   }
   const { messages = [] } = await listRes.json();
 
-  return await Promise.all(
+  const emails = await Promise.all(
     messages.map(async ({ id }: { id: string }) => {
       const r = await gmail(`messages/${id}?format=full`);
       const m = await r.json();
@@ -134,6 +172,37 @@ async function fetchRecentEmails(accessToken: string, maxResults: number) {
       return { id, from: h("From"), subject: h("Subject"), body };
     }),
   );
+  return { account, emails };
+}
+
+// Resolve a Gmail access token for this request (test path OR stored-refresh path).
+async function resolveAccessToken(
+  req: Request,
+  bodyToken: string | undefined,
+): Promise<{ token?: string; error?: Response }> {
+  // Test path: token passed directly.
+  if (bodyToken) return { token: bodyToken };
+
+  // App path: identify the user from their Supabase JWT, load stored refresh token.
+  const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const { data: userData, error: userErr } = await admin.auth.getUser(jwt);
+  if (userErr || !userData?.user) {
+    return { error: jsonResponse({ error: "unauthorized" }, 401) };
+  }
+  const { data: cred } = await admin
+    .from("google_credentials")
+    .select("refresh_token")
+    .eq("user_id", userData.user.id)
+    .maybeSingle();
+  if (!cred?.refresh_token) {
+    return { error: jsonResponse({ error: "gmail_not_connected" }, 200) };
+  }
+  try {
+    return { token: await accessTokenFromRefresh(cred.refresh_token) };
+  } catch (e) {
+    return { error: jsonResponse({ error: "token_refresh_failed", detail: String(e) }, 502) };
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -147,20 +216,26 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => null);
-    const accessToken: string | undefined = body?.accessToken;
     const maxResults = Math.min(Math.max(Number(body?.maxResults) || 10, 1), 20);
-    if (!accessToken) {
-      return jsonResponse({ error: "Body must include { accessToken }" }, 400);
-    }
+    const debug = body?.debug === true;
 
+    const { token: accessToken, error: tokenError } = await resolveAccessToken(
+      req,
+      body?.accessToken,
+    );
+    if (tokenError) return tokenError;
+
+    let account = "";
     let emails;
     try {
-      emails = await fetchRecentEmails(accessToken, maxResults);
+      const result = await fetchRecentEmails(accessToken!, maxResults);
+      account = result.account;
+      emails = result.emails;
     } catch (e) {
       return jsonResponse({ error: "Gmail fetch failed", detail: String(e) }, 502);
     }
     if (emails.length === 0) {
-      return jsonResponse({ tasks: [], jobUpdates: [] });
+      return jsonResponse({ tasks: [], jobUpdates: [], scannedAccount: account });
     }
 
     const groqRes = await fetch(
@@ -200,6 +275,15 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({
       tasks: parsed.tasks ?? [],
       jobUpdates: parsed.jobUpdates ?? [],
+      scannedAccount: account,
+      ...(debug
+        ? {
+            _debug: {
+              fetchedSubjects: emails.map((e: { subject: string }) => e.subject),
+              rawModel: content,
+            },
+          }
+        : {}),
     });
   } catch (e) {
     return jsonResponse({ error: String(e) }, 500);
