@@ -18,6 +18,7 @@ import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/goals/domain/providers/goal_provider.dart';
 import 'package:life_os/features/habits/domain/providers/habit_provider.dart';
+import 'package:life_os/features/home/domain/daily_brief_provider.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/notes/domain/providers/note_provider.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
@@ -47,6 +48,11 @@ class HomeScreen extends ConsumerWidget {
         children: [
           const SizedBox(height: AppSpacing.xxl),
           AnimatedGreeting(displayName: displayName),
+          const SizedBox(height: AppSpacing.xl),
+          const _DailyBriefCard()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 200.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 200.ms),
           const SizedBox(height: AppSpacing.xxxl),
           const SectionHeader(title: 'Quick Actions'),
           const _QuickActionsGrid()
@@ -88,6 +94,74 @@ class HomeScreen extends ConsumerWidget {
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 700.ms),
           const SizedBox(height: AppSpacing.massive),
         ],
+      ),
+    );
+  }
+}
+
+/// AI "Daily Brief" card — a warm 2–3 sentence summary of the user's day.
+///
+/// Fetches lazily on first build, offers a refresh button, and quietly
+/// collapses to an invitation line if the AI call fails.
+class _DailyBriefCard extends ConsumerStatefulWidget {
+  const _DailyBriefCard();
+
+  @override
+  ConsumerState<_DailyBriefCard> createState() => _DailyBriefCardState();
+}
+
+class _DailyBriefCardState extends ConsumerState<_DailyBriefCard> {
+  @override
+  void initState() {
+    super.initState();
+    // Kick off the first fetch after build; no-op if already loaded.
+    Future.microtask(
+      () => ref.read(dailyBriefProvider.notifier).loadIfNeeded(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final state = ref.watch(dailyBriefProvider);
+
+    final String body = switch (state.status) {
+      DailyBriefStatus.loaded => state.brief!,
+      DailyBriefStatus.error =>
+        'Your brief isn\'t available right now — tap refresh to try again.',
+      _ => 'Summing up your day…',
+    };
+
+    return DashboardCard(
+      icon: Icons.wb_sunny_outlined,
+      title: 'Daily Brief',
+      trailing: state.status == DailyBriefStatus.loading
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              tooltip: 'Refresh brief',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              onPressed: () =>
+                  ref.read(dailyBriefProvider.notifier).refresh(),
+            ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: Text(
+          body,
+          key: ValueKey(body),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(
+              alpha: state.status == DailyBriefStatus.loaded ? 0.8 : 0.45,
+            ),
+            height: 1.5,
+          ),
+        ),
       ),
     );
   }
