@@ -9,7 +9,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 
@@ -145,8 +144,10 @@ class EmptyStateWidget extends StatelessWidget {
           FilledButton.tonal(
             onPressed: onAction,
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primaryLight,
-              foregroundColor: AppColors.primary,
+              backgroundColor: theme.colorScheme.primary.withValues(
+                alpha: 0.12,
+              ),
+              foregroundColor: theme.colorScheme.primary,
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.sm,

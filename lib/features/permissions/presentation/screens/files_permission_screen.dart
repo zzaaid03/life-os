@@ -62,12 +62,12 @@ class FilesPermissionScreen extends StatelessWidget {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppRadius.xl),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.folder_outlined,
-                  color: AppColors.primary,
+                  color: theme.colorScheme.primary,
                   size: 36,
                 ),
               ).animate().scale(duration: 500.ms).fadeIn(duration: 500.ms),
@@ -80,7 +80,7 @@ class FilesPermissionScreen extends StatelessWidget {
               ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Life OS can attach photos and files to your journal entries. Your files stay on your device until you choose to sync.',
+                'Life OS can attach photos and files to your notes and tasks. Your files stay on your device until you choose to sync.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),

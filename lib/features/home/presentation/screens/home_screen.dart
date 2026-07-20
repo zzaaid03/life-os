@@ -1,7 +1,7 @@
 /// Home screen — the main dashboard.
 ///
 /// Displays a personalized greeting, quick actions grid,
-/// and dashboard cards for Tasks, Habits, Goals, and Journal.
+/// and dashboard cards for Tasks, the Inbox Assistant, Habits, and Goals.
 /// The Tasks card shows live data from the task provider.
 library;
 
@@ -102,23 +102,6 @@ class HomeScreen extends ConsumerWidget {
               .animate()
               .fadeIn(duration: 400.ms, delay: 600.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 600.ms),
-          const SizedBox(height: AppSpacing.md),
-          DashboardCard(
-                icon: Icons.book_outlined,
-                title: 'Journal',
-                onTap: () => _showComingSoon(context, 'Journal'),
-                child: EmptyStateWidget(
-                  icon: Icons.edit_note_rounded,
-                  title: 'No journal entry today.',
-                  subtitle: "Capture today's thoughts.",
-                  compact: true,
-                  actionLabel: 'Write',
-                  onAction: () => _showComingSoon(context, 'Journal'),
-                ),
-              )
-              .animate()
-              .fadeIn(duration: 400.ms, delay: 700.ms)
-              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 700.ms),
           const SizedBox(height: AppSpacing.massive),
         ],
       ),
@@ -177,7 +160,7 @@ class _TodayTasksCard extends ConsumerWidget {
       trailing: Text(
         '${todayTasks.length}',
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: AppColors.primary,
+          color: Theme.of(context).colorScheme.primary,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -204,8 +187,12 @@ class _TodayTasksCard extends ConsumerWidget {
             child: LinearProgressIndicator(
               value: completionPct,
               minHeight: 4,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-              valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
+              valueColor: AlwaysStoppedAnimation(
+                Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         ],
@@ -339,8 +326,10 @@ class _InboxScanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final onPrimary = theme.colorScheme.onPrimary;
+
     return Material(
-      color: AppColors.primary,
+      color: theme.colorScheme.primary,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: InkWell(
         onTap: () => context.push(AppRoutes.inboxScan),
@@ -353,13 +342,10 @@ class _InboxScanCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.18),
+                  color: onPrimary.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: AppColors.white,
-                ),
+                child: Icon(Icons.auto_awesome_rounded, color: onPrimary),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -369,7 +355,7 @@ class _InboxScanCard extends StatelessWidget {
                     Text(
                       'Scan my inbox',
                       style: theme.textTheme.titleSmall?.copyWith(
-                        color: AppColors.white,
+                        color: onPrimary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -377,16 +363,13 @@ class _InboxScanCard extends StatelessWidget {
                     Text(
                       'Turn emails into tasks & job updates',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.white.withValues(alpha: 0.85),
+                        color: onPrimary.withValues(alpha: 0.85),
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.white,
-              ),
+              Icon(Icons.chevron_right_rounded, color: onPrimary),
             ],
           ),
         ),
@@ -410,7 +393,7 @@ class _JobApplicationsCard extends ConsumerWidget {
           ? Text(
               '$count',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppColors.primary,
+                color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w700,
               ),
             )
@@ -423,7 +406,7 @@ class _JobApplicationsCard extends ConsumerWidget {
             : '$count application${count == 1 ? '' : 's'} tracked.',
         subtitle: count == 0
             ? 'Scan your inbox to start tracking.'
-            : 'Tap to view interviews, offers, and more.',
+            : 'Tap to view interviews, acceptances, and more.',
         compact: true,
       ),
     );

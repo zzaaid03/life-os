@@ -205,7 +205,10 @@ class _StatusBadge extends StatelessWidget {
       TaskStatus.pending => ('Pending', AppColors.warning),
       TaskStatus.inProgress => ('In Progress', AppColors.info),
       TaskStatus.completed => ('Completed', AppColors.success),
-      TaskStatus.archived => ('Archived', AppColors.textSecondaryLight),
+      TaskStatus.archived => (
+        'Archived',
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+      ),
     };
 
     return Container(

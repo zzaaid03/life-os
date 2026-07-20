@@ -32,7 +32,8 @@ String jobStatusHeadline(String status) {
   return switch (status.toLowerCase()) {
     'rejected' => 'Rejected',
     'interview' => 'Interview',
-    'offer' => 'Offer',
+    'accepted' => 'Accepted',
+    'viewed' => 'Application viewed',
     _ => 'Application update',
   };
 }

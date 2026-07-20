@@ -90,7 +90,7 @@ class JobUpdate {
     return JobUpdate(
       company: (json['company'] as String? ?? '').trim(),
       role: (json['role'] as String? ?? '').trim(),
-      status: (json['status'] as String? ?? 'other').trim().toLowerCase(),
+      status: (json['status'] as String? ?? 'applied').trim().toLowerCase(),
       summary: (json['summary'] as String? ?? '').trim(),
       sourceEmailId: json['sourceEmailId'] as String?,
     );
@@ -102,7 +102,7 @@ class JobUpdate {
   /// The role applied for.
   final String role;
 
-  /// Status: applied | viewed | rejected | interview | offer | deadline | other.
+  /// Status: applied | viewed | interview | rejected | accepted.
   final String status;
 
   /// One-sentence human summary of the outcome.

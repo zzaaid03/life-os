@@ -5,7 +5,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 
@@ -47,12 +46,12 @@ class InboxConsentDialog extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.mark_email_read_outlined,
-                    color: AppColors.primary,
+                    color: theme.colorScheme.primary,
                     size: 28,
                   ),
                 ),

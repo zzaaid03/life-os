@@ -242,7 +242,7 @@ class _PrioritySelector extends StatelessWidget {
       spacing: AppSpacing.sm,
       children: TaskPriority.values.map((p) {
         final isSelected = p == value;
-        final color = _priorityColor(p);
+        final color = _priorityColor(p, theme);
 
         return FilterChip(
           label: Text(_priorityLabel(p)),
@@ -279,9 +279,9 @@ class _PrioritySelector extends StatelessWidget {
     };
   }
 
-  Color _priorityColor(TaskPriority p) {
+  Color _priorityColor(TaskPriority p, ThemeData theme) {
     return switch (p) {
-      TaskPriority.none => AppColors.primary,
+      TaskPriority.none => theme.colorScheme.primary,
       TaskPriority.low => AppColors.info,
       TaskPriority.medium => AppColors.warning,
       TaskPriority.high => AppColors.error,

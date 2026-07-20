@@ -232,12 +232,12 @@ class _InboxScanScreenState extends ConsumerState<InboxScanScreen> {
           child: FilledButton.icon(
             onPressed: _phase == _ScanPhase.scanning ? null : _onScanPressed,
             icon: _phase == _ScanPhase.scanning
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppColors.white,
+                      color: theme.colorScheme.onPrimary,
                     ),
                   )
                 : const Icon(Icons.auto_awesome_rounded),
@@ -391,7 +391,7 @@ class _SectionTitle extends StatelessWidget {
         Text(
           '$count',
           style: theme.textTheme.labelLarge?.copyWith(
-            color: AppColors.primary,
+            color: theme.colorScheme.primary,
             fontWeight: FontWeight.w700,
           ),
         ),

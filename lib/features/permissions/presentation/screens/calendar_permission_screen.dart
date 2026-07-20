@@ -62,12 +62,12 @@ class CalendarPermissionScreen extends StatelessWidget {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppRadius.xl),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.calendar_today_rounded,
-                  color: AppColors.primary,
+                  color: theme.colorScheme.primary,
                   size: 36,
                 ),
               ).animate().scale(duration: 500.ms).fadeIn(duration: 500.ms),
@@ -80,7 +80,7 @@ class CalendarPermissionScreen extends StatelessWidget {
               ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Connect your calendar to see your events alongside your habits, goals, and journal. Everything in one timeline.',
+                'Connect your calendar to see your events alongside your habits, goals, and tasks. Everything in one timeline.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),

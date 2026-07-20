@@ -4,7 +4,6 @@ import 'package:life_os/features/attachments/data/models/attachment.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/habits/data/models/habit.dart';
 import 'package:life_os/features/habits/data/models/habit_entry.dart';
-import 'package:life_os/features/journal/data/models/journal_entry.dart';
 import 'package:life_os/features/notes/data/models/note.dart';
 import 'package:life_os/features/tags/data/models/tag.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
@@ -205,29 +204,6 @@ void main() {
       expect(restored.id, equals(entry.id));
       expect(restored.habitId, equals('h1'));
       expect(restored.count, equals(2));
-    });
-  });
-
-  group('JournalEntry model', () {
-    test('serializes to and from JSON', () {
-      final entry = JournalEntry(
-        id: 'j1',
-        userId: 'u1',
-        content: 'Had a great day!',
-        mood: 'great',
-        entryDate: now,
-        isFavorite: true,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final json = entry.toJson();
-      final restored = JournalEntry.fromJson(json);
-
-      expect(restored.id, equals(entry.id));
-      expect(restored.content, equals(entry.content));
-      expect(restored.mood, equals('great'));
-      expect(restored.isFavorite, isTrue);
     });
   });
 

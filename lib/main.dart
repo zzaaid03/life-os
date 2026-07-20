@@ -16,6 +16,7 @@ import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_theme.dart';
+import 'package:life_os/core/theme/theme_mode_provider.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/inbox/data/google_credentials_repository.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
@@ -118,13 +119,14 @@ class _LifeOSAppState extends ConsumerState<LifeOSApp> {
   @override
   Widget build(BuildContext context) {
     final router = createRouter(ref: ref);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'Life OS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       routerConfig: router,
       locale: const Locale('en'),
       supportedLocales: const [Locale('en')],

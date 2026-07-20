@@ -65,7 +65,7 @@ class Attachment extends Equatable implements Entity {
   @override
   final String userId;
 
-  /// The type of the parent entity ('task', 'note', 'journal_entry', 'goal').
+  /// The type of the parent entity ('task', 'note', 'goal').
   final String entityType;
 
   /// The ID of the parent entity.

@@ -29,7 +29,7 @@ class JobApplication extends Equatable {
       company: json['company'] as String? ?? '',
       role: json['role'] as String? ?? '',
       location: json['location'] as String?,
-      status: json['status'] as String? ?? 'other',
+      status: json['status'] as String? ?? 'applied',
       summary: json['summary'] as String?,
       sourceEmailId: json['source_email_id'] as String?,
       appliedAt: json['applied_at'] != null
@@ -52,7 +52,7 @@ class JobApplication extends Equatable {
   /// Optional location.
   final String? location;
 
-  /// Status: applied | viewed | rejected | interview | offer | deadline | other.
+  /// Status: applied | viewed | interview | rejected | accepted.
   final String status;
 
   /// One-sentence human summary of the latest outcome.

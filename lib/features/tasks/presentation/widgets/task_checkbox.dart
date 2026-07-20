@@ -5,7 +5,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:life_os/core/theme/app_colors.dart';
 
 /// A premium animated checkbox for task completion.
 class TaskCheckbox extends StatelessWidget {
@@ -20,6 +19,8 @@ class TaskCheckbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Semantics(
       label: value ? 'Mark as incomplete' : 'Mark as complete',
       button: true,
@@ -34,24 +35,22 @@ class TaskCheckbox extends StatelessWidget {
           height: 24,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: value ? AppColors.primary : Colors.transparent,
+            color: value ? colorScheme.primary : Colors.transparent,
             border: Border.all(
               color: value
-                  ? AppColors.primary
-                  : Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.2),
+                  ? colorScheme.primary
+                  : colorScheme.onSurface.withValues(alpha: 0.2),
               width: 2,
             ),
           ),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 150),
             child: value
-                ? const Icon(
+                ? Icon(
                     Icons.check_rounded,
                     size: 16,
-                    color: AppColors.white,
-                    key: ValueKey('check'),
+                    color: colorScheme.onPrimary,
+                    key: const ValueKey('check'),
                   )
                 : const SizedBox.shrink(key: ValueKey('empty')),
           ),

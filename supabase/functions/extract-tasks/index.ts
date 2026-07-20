@@ -61,15 +61,17 @@ Only create a TASK from a job email if there is a concrete action with a deadlin
 Emails may be in English or German — read the BODY, not just the subject, to decide
 status. Subjects like "Your update from X" are neutral; the real outcome is in the body.
 Each job update: {company, role, status, summary, sourceEmailId}.
-- status, determined from the body content:
+- status MUST be exactly one of: applied | viewed | interview | rejected | accepted.
+  Determined from the body content:
   - rejected: declines or says they will not proceed ("unfortunately", "we will not be
     moving forward", "leider", "nicht weiter", "eine Absage")
   - interview: invited to interview or to schedule a call
-  - offer: a job offer
+  - accepted: a job offer or an acceptance (any "offer" counts as accepted)
   - viewed: the application was viewed/noticed by the hiring team (no decision yet)
   - applied: an application confirmation/received with no decision yet
-  - deadline: a posting/role about to expire
-  - other: anything else job-related
+  If the email is job-related but doesn't clearly fit any of the above
+  (e.g. a posting about to expire, a recruiter nudge), use applied.
+  NEVER emit any other status word.
 - summary: one concise, human sentence reflecting the ACTUAL outcome
   (e.g. "RoboService rejected your application for the Data Science working-student role.")
 

@@ -12,7 +12,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 
 /// A greeting that adapts to the time of day with a fade-in animation.
@@ -43,7 +42,7 @@ class AnimatedGreeting extends StatelessWidget {
           displayName,
           style: theme.textTheme.displaySmall?.copyWith(
             fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+            color: theme.colorScheme.primary,
           ),
         ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
         const SizedBox(height: AppSpacing.sm),

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:life_os/core/router/app_router.dart';
-import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 
@@ -27,12 +26,12 @@ class OnboardingScreen extends StatelessWidget {
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(AppRadius.xxl),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.auto_awesome_rounded,
-                      color: AppColors.primary,
+                      color: theme.colorScheme.primary,
                       size: 56,
                     ),
                   )
@@ -63,7 +62,7 @@ class OnboardingScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Text(
                 'Your life, beautifully organized.\n'
-                'Track habits, journal thoughts, and achieve your goals.',
+                'Track habits, capture notes, and achieve your goals.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),

@@ -3,7 +3,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/shared/widgets/empty_state_widget.dart';
@@ -60,9 +59,12 @@ class _SearchScreenState extends State<SearchScreen> {
                   color: theme.colorScheme.outline.withValues(alpha: 0.3),
                 ),
               ),
-              focusedBorder: const OutlineInputBorder(
+              focusedBorder: OutlineInputBorder(
                 borderRadius: AppRadius.input,
-                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary,
+                  width: 1.5,
+                ),
               ),
             ),
           ).animate().fadeIn(duration: 400.ms),
@@ -71,8 +73,7 @@ class _SearchScreenState extends State<SearchScreen> {
             child: EmptyStateWidget(
               icon: Icons.search_rounded,
               title: 'Search your life.',
-              subtitle:
-                  'Find tasks, notes, habits, goals, and journal entries.',
+              subtitle: 'Find tasks, notes, habits, and goals.',
             ),
           ).animate().fadeIn(duration: 400.ms, delay: 300.ms),
         ],

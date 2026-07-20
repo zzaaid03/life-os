@@ -36,7 +36,7 @@ class TaskDueDateBadge extends StatelessWidget {
     final due = DateTime(dueDate!.year, dueDate!.month, dueDate!.day);
     final diff = due.difference(today).inDays;
 
-    final (label, color) = _format(diff, isCompleted);
+    final (label, color) = _format(context, diff, isCompleted);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -54,23 +54,26 @@ class TaskDueDateBadge extends StatelessWidget {
     );
   }
 
-  (String, Color) _format(int diffDays, bool completed) {
+  (String, Color) _format(BuildContext context, int diffDays, bool completed) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final muted = colorScheme.onSurface.withValues(alpha: 0.45);
+
     if (completed) {
-      return (_dateLabel(diffDays), AppColors.textSecondaryLight);
+      return (_dateLabel(diffDays), muted);
     }
     if (diffDays < 0) {
       return ('Overdue', AppColors.error);
     }
     if (diffDays == 0) {
-      return ('Today', AppColors.primary);
+      return ('Today', colorScheme.primary);
     }
     if (diffDays == 1) {
-      return ('Tomorrow', AppColors.primary);
+      return ('Tomorrow', colorScheme.primary);
     }
     if (diffDays < 7) {
-      return (_dayName(dueDate!), AppColors.primary);
+      return (_dayName(dueDate!), colorScheme.primary);
     }
-    return (_dateLabel(diffDays), AppColors.textSecondaryLight);
+    return (_dateLabel(diffDays), muted);
   }
 
   String _dateLabel(int diffDays) {

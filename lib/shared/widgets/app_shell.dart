@@ -10,7 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:life_os/core/router/app_router.dart';
-import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
@@ -45,8 +44,8 @@ class AppShell extends ConsumerWidget {
         padding: const EdgeInsets.only(top: AppSpacing.xxxl),
         child: FloatingActionButton.large(
           onPressed: () => _handleFAB(context, ref, location),
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.white,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
           elevation: 4,
           shape: const CircleBorder(),
           child: const Icon(Icons.add_rounded, size: 32),

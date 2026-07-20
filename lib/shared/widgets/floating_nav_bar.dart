@@ -159,7 +159,7 @@ class _NavItem extends StatelessWidget {
                       isActive ? filledIcon : icon,
                       size: 24,
                       color: isActive
-                          ? AppColors.primary
+                          ? theme.colorScheme.primary
                           : theme.colorScheme.onSurface.withValues(alpha: 0.35),
                     ),
                     if (isActive) ...[
@@ -167,7 +167,7 @@ class _NavItem extends StatelessWidget {
                       Text(
                         label,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppColors.primary,
+                          color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

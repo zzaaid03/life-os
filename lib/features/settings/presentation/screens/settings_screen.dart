@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/theme/theme_mode_provider.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 
@@ -59,8 +60,10 @@ class SettingsScreen extends ConsumerWidget {
               _SettingsTile(
                 icon: Icons.dark_mode_outlined,
                 title: 'Appearance',
-                subtitle: 'System',
-                onTap: () => _showComingSoon(context, 'Appearance'),
+                subtitle: ThemeModeController.label(
+                  ref.watch(themeModeProvider),
+                ),
+                onTap: () => _pickThemeMode(context, ref),
               ),
               _SettingsTile(
                 icon: Icons.notifications_outlined,
@@ -125,6 +128,45 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Opens a dialog to choose the theme mode (System / Light / Dark).
+  Future<void> _pickThemeMode(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(themeModeProvider);
+
+    final selected = await showDialog<ThemeMode>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Appearance'),
+        children: [
+          for (final mode in ThemeMode.values)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(mode),
+              child: Row(
+                children: [
+                  Icon(
+                    mode == current
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_off_rounded,
+                    size: 20,
+                    color: mode == current
+                        ? Theme.of(dialogContext).colorScheme.primary
+                        : Theme.of(
+                            dialogContext,
+                          ).colorScheme.onSurface.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(ThemeModeController.label(mode)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (selected != null) {
+      await ref.read(themeModeProvider.notifier).setMode(selected);
+    }
   }
 
   void _showComingSoon(BuildContext context, String feature) {
