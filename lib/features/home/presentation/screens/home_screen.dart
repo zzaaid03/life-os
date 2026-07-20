@@ -15,13 +15,16 @@ import 'package:life_os/core/theme/app_icons.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/goals/data/models/goal.dart';
+import 'package:life_os/features/goals/domain/providers/goal_provider.dart';
+import 'package:life_os/features/habits/domain/providers/habit_provider.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
+import 'package:life_os/features/notes/domain/providers/note_provider.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
 import 'package:life_os/shared/widgets/animated_greeting.dart';
-import 'package:life_os/shared/widgets/coming_soon_dialog.dart';
 import 'package:life_os/shared/widgets/dashboard_card.dart';
 import 'package:life_os/shared/widgets/empty_state_widget.dart';
 import 'package:life_os/shared/widgets/quick_action_button.dart';
@@ -68,53 +71,193 @@ class HomeScreen extends ConsumerWidget {
               .fadeIn(duration: 400.ms, delay: 500.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 500.ms),
           const SizedBox(height: AppSpacing.xxxl),
-          const SectionHeader(title: 'More'),
-          DashboardCard(
-                icon: Icons.repeat_rounded,
-                title: 'Habits',
-                onTap: () => _showComingSoon(context, 'Habits'),
-                child: EmptyStateWidget(
-                  icon: Icons.favorite_outline_rounded,
-                  title: 'No habits yet.',
-                  subtitle: "You're one habit away from changing your life.",
-                  compact: true,
-                  actionLabel: 'Build a habit',
-                  onAction: () => _showComingSoon(context, 'Habits'),
-                ),
-              )
+          const SectionHeader(title: 'Life'),
+          const _HabitsCard()
               .animate()
               .fadeIn(duration: 400.ms, delay: 500.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 500.ms),
           const SizedBox(height: AppSpacing.md),
-          DashboardCard(
-                icon: Icons.flag_outlined,
-                title: 'Goal of the Week',
-                onTap: () => _showComingSoon(context, 'Goals'),
-                child: EmptyStateWidget(
-                  icon: Icons.track_changes_rounded,
-                  title: 'No goal set.',
-                  subtitle: 'Start by creating one. Small steps, big change.',
-                  compact: true,
-                  actionLabel: 'Set a goal',
-                  onAction: () => _showComingSoon(context, 'Goals'),
-                ),
-              )
+          const _GoalsCard()
               .animate()
               .fadeIn(duration: 400.ms, delay: 600.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 600.ms),
+          const SizedBox(height: AppSpacing.md),
+          const _NotesCard()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 700.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 700.ms),
           const SizedBox(height: AppSpacing.massive),
         ],
       ),
     );
   }
+}
 
-  void _showComingSoon(BuildContext context, String feature) {
-    ComingSoonDialog.show(
-      context,
-      title: feature,
-      message:
-          '$feature are coming soon. This is where you\'ll manage '
-          'your $feature.',
+/// Dashboard card summarizing today's habit progress.
+class _HabitsCard extends ConsumerWidget {
+  const _HabitsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(habitListProvider);
+    final habits = state.habits;
+    final done = habits.where((h) => h.doneToday).length;
+    final bestStreak = habits.isEmpty
+        ? 0
+        : habits.map((h) => h.streak).reduce((a, b) => a > b ? a : b);
+
+    return DashboardCard(
+      icon: Icons.repeat_rounded,
+      title: 'Habits',
+      trailing: habits.isNotEmpty
+          ? Text(
+              '$done/${habits.length} today',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : null,
+      onTap: () => context.push(AppRoutes.habits),
+      child: habits.isEmpty
+          ? EmptyStateWidget(
+              icon: Icons.favorite_outline_rounded,
+              title: 'No habits yet.',
+              subtitle: "You're one habit away from changing your life.",
+              compact: true,
+              actionLabel: 'Build a habit',
+              onAction: () => context.push(AppRoutes.habits),
+            )
+          : EmptyStateWidget(
+              icon: done == habits.length
+                  ? Icons.celebration_rounded
+                  : Icons.favorite_rounded,
+              title: done == habits.length
+                  ? 'All habits done today!'
+                  : '$done of ${habits.length} done today.',
+              subtitle: bestStreak > 0
+                  ? 'Best streak: $bestStreak day${bestStreak == 1 ? '' : 's'} \u{1F525}'
+                  : 'Check one off to start a streak.',
+              compact: true,
+            ),
+    );
+  }
+}
+
+/// Dashboard card summarizing goal progress.
+class _GoalsCard extends ConsumerWidget {
+  const _GoalsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(goalListProvider);
+    final active = state.goals
+        .where((g) => g.status == GoalStatus.active)
+        .toList();
+
+    return DashboardCard(
+      icon: Icons.flag_outlined,
+      title: 'Goals',
+      trailing: active.isNotEmpty
+          ? Text(
+              '${active.length}',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : null,
+      onTap: () => context.push(AppRoutes.goals),
+      child: active.isEmpty
+          ? EmptyStateWidget(
+              icon: Icons.track_changes_rounded,
+              title: 'No goal set.',
+              subtitle: 'Start by creating one. Small steps, big change.',
+              compact: true,
+              actionLabel: 'Set a goal',
+              onAction: () => context.push(AppRoutes.goals),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final goal in active.take(2)) ...[
+                  Text(
+                    goal.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: goal.progress,
+                      minHeight: 4,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.1),
+                      valueColor: AlwaysStoppedAnimation(
+                        Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+                if (active.length > 2)
+                  Text(
+                    '+${active.length - 2} more',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Dashboard card summarizing notes.
+class _NotesCard extends ConsumerWidget {
+  const _NotesCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(noteListProvider);
+    final notes = state.notes;
+
+    return DashboardCard(
+      icon: Icons.sticky_note_2_outlined,
+      title: 'Notes',
+      trailing: notes.isNotEmpty
+          ? Text(
+              '${notes.length}',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : null,
+      onTap: () => context.push(AppRoutes.notes),
+      child: notes.isEmpty
+          ? EmptyStateWidget(
+              icon: Icons.edit_note_rounded,
+              title: 'No notes yet.',
+              subtitle: 'Capture a thought before it slips away.',
+              compact: true,
+              actionLabel: 'Write',
+              onAction: () => context.push(AppRoutes.notes),
+            )
+          : EmptyStateWidget(
+              icon: Icons.sticky_note_2_rounded,
+              title: notes.first.title,
+              subtitle:
+                  '${notes.length} note${notes.length == 1 ? '' : 's'} — tap to view all.',
+              compact: true,
+            ),
     );
   }
 }
@@ -432,11 +575,7 @@ class _QuickActionsGrid extends StatelessWidget {
           child: QuickActionButton(
             icon: Icons.edit_note_rounded,
             label: 'New Note',
-            onPressed: () => ComingSoonDialog.show(
-              context,
-              title: 'New Note',
-              message: 'Note creation is coming soon.',
-            ),
+            onPressed: () => context.push(AppRoutes.notes),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
@@ -444,11 +583,7 @@ class _QuickActionsGrid extends StatelessWidget {
           child: QuickActionButton(
             icon: Icons.repeat_rounded,
             label: 'New Habit',
-            onPressed: () => ComingSoonDialog.show(
-              context,
-              title: 'New Habit',
-              message: 'Habit creation is coming soon.',
-            ),
+            onPressed: () => context.push(AppRoutes.habits),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
@@ -456,11 +591,7 @@ class _QuickActionsGrid extends StatelessWidget {
           child: QuickActionButton(
             icon: Icons.flag_outlined,
             label: 'New Goal',
-            onPressed: () => ComingSoonDialog.show(
-              context,
-              title: 'New Goal',
-              message: 'Goal creation is coming soon.',
-            ),
+            onPressed: () => context.push(AppRoutes.goals),
           ),
         ),
       ],

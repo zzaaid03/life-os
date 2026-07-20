@@ -13,10 +13,13 @@ import 'package:life_os/features/auth/presentation/screens/login_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/splash_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/welcome_screen.dart';
+import 'package:life_os/features/goals/presentation/screens/goals_screen.dart';
+import 'package:life_os/features/habits/presentation/screens/habits_screen.dart';
 import 'package:life_os/features/home/presentation/screens/home_screen.dart';
 import 'package:life_os/features/inbox/presentation/screens/inbox_scan_screen.dart';
 import 'package:life_os/features/jobs/presentation/screens/job_applications_screen.dart';
 import 'package:life_os/features/life/presentation/screens/life_screen.dart';
+import 'package:life_os/features/notes/presentation/screens/notes_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/calendar_permission_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/files_permission_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/notification_permission_screen.dart';
@@ -58,6 +61,11 @@ abstract final class AppRoutes {
   // AI inbox assistant
   static const String inboxScan = '/inbox-scan';
   static const String jobApplications = '/job-applications';
+
+  // Life features
+  static const String notes = '/notes';
+  static const String habits = '/habits';
+  static const String goals = '/goals';
 }
 
 /// Creates and configures the GoRouter instance.
@@ -219,6 +227,23 @@ GoRouter createRouter({required WidgetRef ref}) {
         path: AppRoutes.jobApplications,
         name: 'jobApplications',
         builder: (context, state) => const JobApplicationsScreen(),
+      ),
+
+      // Life features — standalone, no nav bar
+      GoRoute(
+        path: AppRoutes.notes,
+        name: 'notes',
+        builder: (context, state) => const NotesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.habits,
+        name: 'habits',
+        builder: (context, state) => const HabitsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.goals,
+        name: 'goals',
+        builder: (context, state) => const GoalsScreen(),
       ),
     ],
 
