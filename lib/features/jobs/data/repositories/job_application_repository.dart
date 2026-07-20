@@ -21,30 +21,85 @@ class JobApplicationRepository {
   /// The Supabase table name.
   static const String _table = 'job_applications';
 
-  /// Upserts a batch of scan-derived [JobUpdate]s for [userId].
+  /// Upserts a batch of scan-derived [JobUpdate]s for [userId] without ever
+  /// creating duplicates.
   ///
-  /// Conflicts on `(user_id, company, role)` update the existing row's
-  /// status/summary/source rather than inserting a duplicate. Timestamps are
-  /// left to the database defaults. Updates missing a company or role are
-  /// skipped, since the unique constraint requires both.
+  /// Identity rules (mirroring migration 010's partial unique indexes):
+  /// - update WITH a company → identified by `(user_id, company, role)`;
+  ///   a later email about the same application updates status/summary.
+  /// - update WITHOUT a company → identified by `(user_id, source_email_id)`
+  ///   so re-scanning the same email updates the same row.
+  /// - no company AND no email id → inserted as-is (nothing to key on).
+  ///
+  /// Writes are explicit select-then-insert/update because PostgREST's
+  /// upsert cannot target partial unique indexes.
   Future<void> upsertFromScan(List<JobUpdate> updates, String userId) async {
-    final rows = updates
-        .where((u) => u.company.isNotEmpty && u.role.isNotEmpty)
-        .map(
-          (u) => {
+    for (final update in updates) {
+      final values = {
+        'status': update.status,
+        'summary': update.summary,
+        'source_email_id': update.sourceEmailId,
+      };
+
+      if (update.company.isNotEmpty) {
+        final existing = await _client
+            .from(_table)
+            .select('id')
+            .eq('user_id', userId)
+            .eq('company', update.company)
+            .eq('role', update.role)
+            .maybeSingle();
+
+        if (existing != null) {
+          await _client
+              .from(_table)
+              .update(values)
+              .eq('id', existing['id'] as String);
+        } else {
+          await _client.from(_table).insert({
             'user_id': userId,
-            'company': u.company,
-            'role': u.role,
-            'status': u.status,
-            'summary': u.summary,
-            'source_email_id': u.sourceEmailId,
-          },
-        )
-        .toList();
+            'company': update.company,
+            'role': update.role,
+            ...values,
+          });
+        }
+        continue;
+      }
 
-    if (rows.isEmpty) return;
+      final emailId = update.sourceEmailId;
+      if (emailId != null && emailId.isNotEmpty) {
+        final existing = await _client
+            .from(_table)
+            .select('id')
+            .eq('user_id', userId)
+            .eq('company', '')
+            .eq('source_email_id', emailId)
+            .maybeSingle();
 
-    await _client.from(_table).upsert(rows, onConflict: 'user_id,company,role');
+        if (existing != null) {
+          await _client
+              .from(_table)
+              .update(values)
+              .eq('id', existing['id'] as String);
+        } else {
+          await _client.from(_table).insert({
+            'user_id': userId,
+            'company': '',
+            'role': update.role,
+            ...values,
+          });
+        }
+        continue;
+      }
+
+      // No identity available — persist it anyway so the update isn't lost.
+      await _client.from(_table).insert({
+        'user_id': userId,
+        'company': '',
+        'role': update.role,
+        ...values,
+      });
+    }
   }
 
   /// Fetches all job applications for [userId], most recently updated first.
