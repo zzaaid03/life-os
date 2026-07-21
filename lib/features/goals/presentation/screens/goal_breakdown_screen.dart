@@ -205,10 +205,10 @@ class _GoalBreakdownScreenState extends ConsumerState<GoalBreakdownScreen> {
 
       for (final item in _reviewItems ?? const <_ReviewItem>[]) {
         await ref
-            .read(taskListProvider.notifier)
-            .createTask(
+            .read(taskRepositoryProvider)
+            .create(
               Task(
-                id: '',
+                id: const Uuid().v4(),
                 userId: userId,
                 title: item.title,
                 description: item.description,
@@ -222,6 +222,7 @@ class _GoalBreakdownScreenState extends ConsumerState<GoalBreakdownScreen> {
       }
 
       await ref.read(goalListProvider.notifier).refresh();
+      await ref.read(taskListProvider.notifier).refresh();
 
       if (!mounted) return;
       Navigator.of(context).pop();
