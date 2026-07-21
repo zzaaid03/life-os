@@ -14,17 +14,16 @@ install, no Docker). Runs on Chrome for dev (`flutter run -d chrome`).
 WORKING: AI inbox scan (Gmail read SERVER-SIDE via a stored refresh token → Groq → tasks +
 job-application updates), job tracker with manual add/edit/delete, tasks, unified timeline, AI Daily
 Brief card, dark mode + theme toggle, 5-status job vocab (applied/viewed/interview/rejected/accepted).
-Journal removed. Notes/Habits/Goals exist but Notes+Habits are slated for removal.
+Journal removed. Notes+Habits removed (79e38a1). Goals exists (next: becomes "AI Goal Breakdown").
 BACKEND: Edge Functions deployed: `extract-tasks`, `daily-brief`. Secrets set: GROQ_API_KEY,
 GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET. Migrations 001–011 applied. Per-user Gmail = stored refresh
 token (`google_credentials`) minted server-side — survives reloads, no reconnect. Google OAuth app is
 in TESTING mode (test users only: jarrarzaid3@, zaidgpt3@).
 
 ## Roadmap
-1. **Pre-mobile refinement** (prompt drafted): remove Notes+Habits; turn Goals into "AI Goal Breakdown"
-   (goal → Groq → tasks; new `goal-breakdown` function); fix Daily Brief to cite REAL numbers (currently
-   generic); verify scan dedup + timeline; full QA/clean-code pass. Consider splitting into per-phase
-   worker rounds rather than one big batch.
+1. **Pre-mobile refinement** (running as split worker rounds): ✅ Notes+Habits removed. TODO: turn Goals
+   into "AI Goal Breakdown" (goal → Groq → tasks; new `goal-breakdown` function); fix Daily Brief to be
+   specific + drop removed-feature refs; full QA/clean-code pass.
 2. **Mobile app version** (Android/iOS).
 3. **Public launch**: Google OAuth verification (needed to leave Testing mode).
 
@@ -39,8 +38,8 @@ in TESTING mode (test users only: jarrarzaid3@, zaidgpt3@).
 - VERIFY worker/agent reports independently: `git status`, `flutter analyze`, read the diff.
 
 ## Pending manual step
-Run the job_applications duplicate-cleanup SQL (removing OLD pre-dedup duplicates) in the Supabase
-SQL Editor — the planner has it.
+(none open — job_applications duplicate-cleanup was run 2026-07-21; future dupes are blocked by the
+partial unique indexes from migration 010.)
 
 ## For WORKER agents (Zed CC) — read this before every task
 You execute ONE well-scoped task from a planner-written prompt, then report. You make NO product
