@@ -58,6 +58,8 @@ decisions. Standing rules (so prompts can stay short — these always apply even
 - Re-read "Hard-won gotchas" above; they still apply.
 
 ## Worker prompt template (planner reuse)
+> **You are a WORKER agent** (Sonnet, in Zed) — execute this ONE task exactly, make no product
+> decisions, then report. This prompt is self-contained; do not assume any prior context.
 > **Task:** <one deliverable, imperative>. **Working dir:** `C:\Users\Zaid\Desktop\life-os`.
 > **Do:** <specific files/changes, with known touchpoints>.
 > **Do NOT touch:** <explicit out-of-scope list, always incl. `supabase/` unless intended>.
