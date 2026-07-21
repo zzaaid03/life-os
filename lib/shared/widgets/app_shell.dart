@@ -10,11 +10,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:life_os/core/router/app_router.dart';
+import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
-import 'package:life_os/shared/widgets/coming_soon_dialog.dart';
 import 'package:life_os/shared/widgets/floating_nav_bar.dart';
 
 /// The maximum content width for tablet/desktop layouts.
@@ -67,26 +67,24 @@ class AppShell extends ConsumerWidget {
     );
   }
 
-  /// Context-aware FAB action.
-  ///
-  /// On the Tasks screen, opens the task editor.
-  /// On other screens, shows a coming soon dialog.
+  /// Opens the "Add" chooser (Add Task / Add Goal), regardless of screen.
   void _handleFAB(BuildContext context, WidgetRef ref, String location) {
-    if (location == AppRoutes.tasks) {
-      _createTask(context, ref);
-    } else if (location == AppRoutes.home) {
-      _createTask(context, ref);
-    } else {
-      showDialog<void>(
-        context: context,
-        builder: (context) => const ComingSoonDialog(
-          title: 'Quick Create',
-          message:
-              'Quick create is coming soon. You\'ll be able to add '
-              'tasks and goals from here.',
-        ),
-      );
-    }
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => _AddChooserSheet(
+        onAddTask: () {
+          Navigator.of(sheetContext).pop();
+          _createTask(context, ref);
+        },
+        onAddGoal: () {
+          Navigator.of(sheetContext).pop();
+          // TODO: re-point to AI Goal Breakdown when it exists
+          context.go(AppRoutes.goals);
+        },
+      ),
+    );
   }
 
   Future<void> _createTask(BuildContext context, WidgetRef ref) async {
@@ -100,5 +98,152 @@ class AppShell extends ConsumerWidget {
     await ref
         .read(taskListProvider.notifier)
         .createTask(result.copyWith(userId: userId));
+  }
+}
+
+/// Premium animated chooser sheet offering "Add Task" / "Add Goal" actions.
+class _AddChooserSheet extends StatefulWidget {
+  const _AddChooserSheet({required this.onAddTask, required this.onAddGoal});
+
+  final VoidCallback onAddTask;
+  final VoidCallback onAddGoal;
+
+  @override
+  State<_AddChooserSheet> createState() => _AddChooserSheetState();
+}
+
+class _AddChooserSheetState extends State<_AddChooserSheet>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+    final curved = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _fade = curved;
+    _scale = Tween<double>(begin: 0.94, end: 1.0).animate(curved);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return FadeTransition(
+      opacity: _fade,
+      child: ScaleTransition(
+        scale: _scale,
+        alignment: Alignment.bottomCenter,
+        child: SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: const BorderRadius.all(Radius.circular(AppRadius.xl)),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                    borderRadius: const BorderRadius.all(Radius.circular(AppRadius.circular)),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ChooserTile(
+                        icon: Icons.check_circle_outline,
+                        label: 'Add Task',
+                        onTap: widget.onAddTask,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      child: _ChooserTile(
+                        icon: Icons.flag_outlined,
+                        label: 'Add Goal',
+                        onTap: widget.onAddGoal,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A single large, tappable tile within the [_AddChooserSheet].
+class _ChooserTile extends StatelessWidget {
+  const _ChooserTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: colorScheme.primaryContainer,
+      borderRadius: const BorderRadius.all(Radius.circular(AppRadius.lg)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: const BorderRadius.all(Radius.circular(AppRadius.lg)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.xl,
+            horizontal: AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 32, color: colorScheme.onPrimaryContainer),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
