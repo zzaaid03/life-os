@@ -73,6 +73,11 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
   - `goalId` param on `TaskEditorSheet` (`:27,149`) IS consumed in the create branch but NO call site
     passes it, and the edit branch drops it. `goal_breakdown_screen.dart:150` is where it belongs.
   - **Show the signed-in account in the UI** — would have prevented the entire OAuth scare above.
+  - **No visible delete affordance.** Goal delete is swipe-only (`DismissDirection.endToStart` in
+    `goals_screen.dart:122`). Zaid — who built it — could not find it on desktop Chrome, which is the
+    primary dev/prod surface today. Add an explicit delete action in the goal edit sheet (already
+    opened by `onTap` at `goals_screen.dart:139`) and keep the swipe for mobile. Tasks use the same
+    swipe-only pattern, so check whether they need the same treatment.
 - **TELL IBRAHIM:** his brief specified `rsync ... :~/lifeos/<env>/`, which FAILS — `rrsync` chroots to
   `/home/ibrahim/lifeos` and resolves paths relative to it, so `~` is taken literally and it tries
   `/home/ibrahim/lifeos/~/lifeos/<env>`. Correct destination is just `<env>/`.
