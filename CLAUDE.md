@@ -20,6 +20,26 @@ GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET. Migrations 001–011 applied. Per-user G
 token (`google_credentials`) minted server-side — survives reloads, no reconnect. Google OAuth app is
 in TESTING mode (test users only: jarrarzaid3@, zaidgpt3@).
 
+## Session handoff (2026-07-21)
+- **DONE (committed + pushed):** Notes+Habits removed (`79e38a1`); Daily Brief rewritten to be specific
+  + Habits-free (`6c91fdd`); workflow rules hardened (`8a4e707`, `60ce395`). Job-app duplicate cleanup
+  verified done + future dupes blocked by migration 010 indexes.
+- **IN FLIGHT (uncommitted, UNVERIFIED):** "Due date mandatory for every task" — a worker edited
+  `lib/features/tasks/presentation/widgets/task_editor_sheet.dart` +
+  `lib/features/inbox/presentation/screens/inbox_scan_screen.dart` (both show as ` M` in git). NOT yet
+  reviewed, NOT `flutter analyze`d, NOT committed. Successor MUST verify the diffs + run analyze before
+  committing. Intended behavior: due date required in the shared editor (covers home `+`, task list,
+  detail edit) AND the inbox-scan "Add" now routes through that editor (prefilled title/desc, requires date).
+- **PENDING manual steps (Zaid owes):** (1) deploy the new Daily Brief —
+  `npx supabase functions deploy daily-brief --project-ref ganbmkphtzdvxxnmprku` — then refresh the card
+  in-app to confirm it reads specific/personal (unconfirmed whether deployed yet). (2) nothing else open.
+- **NEXT:** verify+commit the due-date work → send the same worker **Prompt 2** = the `(+)` nav button
+  becomes an "Add Task / Add Goal" chooser with a premium transition (its Goal action points to the
+  current goals screen for now; re-point when AI Goal Breakdown exists). Then **Round A** = design +
+  build AI Goal Breakdown.
+- **DECISIONS:** due dates are now mandatory on tasks (we intentionally do NOT parse the AI's
+  natural-language hint — the user picks). FAB Goal branch deliberately deferred to avoid rework.
+
 ## Roadmap
 1. **Pre-mobile refinement** (running as split worker rounds): ✅ Notes+Habits removed. TODO: turn Goals
    into "AI Goal Breakdown" (goal → Groq → tasks; new `goal-breakdown` function); fix Daily Brief to be
