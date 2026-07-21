@@ -10,35 +10,63 @@ using Groq, model `llama-3.3-70b-versatile`). Feature-first architecture — mir
 for new features. Supabase project ref: `ganbmkphtzdvxxnmprku`. CLI via `npx supabase` (no global
 install, no Docker). Runs on Chrome for dev (`flutter run -d chrome`).
 
-## Current state (2026-07-20) — origin/main @ 9f390e2
+## Current state (2026-07-21) — origin/main @ c86a574 — LIVE IN PRODUCTION
 WORKING: AI inbox scan (Gmail read SERVER-SIDE via a stored refresh token → Groq → tasks +
 job-application updates), job tracker with manual add/edit/delete, tasks, unified timeline, AI Daily
-Brief card, dark mode + theme toggle, 5-status job vocab (applied/viewed/interview/rejected/accepted).
-Journal removed. Notes+Habits removed (79e38a1). Goals exists (next: becomes "AI Goal Breakdown").
-BACKEND: Edge Functions deployed: `extract-tasks`, `daily-brief`. Secrets set: GROQ_API_KEY,
-GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET. Migrations 001–011 applied. Per-user Gmail = stored refresh
-token (`google_credentials`) minted server-side — survives reloads, no reconnect. Google OAuth app is
-in TESTING mode (test users only: jarrarzaid3@, zaidgpt3@).
+Brief card, dark mode + theme toggle, 5-status job vocab (applied/viewed/interview/rejected/accepted),
+AI Goal Breakdown (goal → Groq → reviewable tasks → saved linked via `tasks.goal_id`, derived progress).
+Journal removed. Notes+Habits removed (79e38a1).
+BACKEND: Edge Functions deployed: `extract-tasks`, `daily-brief`, `goal-breakdown`. Secrets set:
+GROQ_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET. Migrations 001–012 applied. Per-user Gmail =
+stored refresh token (`google_credentials`) minted server-side. Google OAuth app is still in TESTING
+mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
 
-## Session handoff (2026-07-21)
-- **DONE (committed + pushed):** Notes+Habits removed (`79e38a1`); Daily Brief rewritten to be specific
-  + Habits-free (`6c91fdd`); workflow rules hardened (`8a4e707`, `60ce395`). Job-app duplicate cleanup
-  verified done + future dupes blocked by migration 010 indexes.
-- **IN FLIGHT (uncommitted, UNVERIFIED):** "Due date mandatory for every task" — a worker edited
-  `lib/features/tasks/presentation/widgets/task_editor_sheet.dart` +
-  `lib/features/inbox/presentation/screens/inbox_scan_screen.dart` (both show as ` M` in git). NOT yet
-  reviewed, NOT `flutter analyze`d, NOT committed. Successor MUST verify the diffs + run analyze before
-  committing. Intended behavior: due date required in the shared editor (covers home `+`, task list,
-  detail edit) AND the inbox-scan "Add" now routes through that editor (prefilled title/desc, requires date).
-- **PENDING manual steps (Zaid owes):** (1) deploy the new Daily Brief —
-  `npx supabase functions deploy daily-brief --project-ref ganbmkphtzdvxxnmprku` — then refresh the card
-  in-app to confirm it reads specific/personal (unconfirmed whether deployed yet). (2) nothing else open.
-- **NEXT:** verify+commit the due-date work → send the same worker **Prompt 2** = the `(+)` nav button
-  becomes an "Add Task / Add Goal" chooser with a premium transition (its Goal action points to the
-  current goals screen for now; re-point when AI Goal Breakdown exists). Then **Round A** = design +
-  build AI Goal Breakdown.
-- **DECISIONS:** due dates are now mandatory on tasks (we intentionally do NOT parse the AI's
-  natural-language hint — the user picks). FAB Goal branch deliberately deferred to avoid rework.
+## Hosting / deploy (live since 2026-07-21)
+- **Production:** https://lifeos.deadthrone.dev   **Staging:** https://staging.lifeos.deadthrone.dev
+- VPS is Ibrahim's (167.233.39.1). **Caddy serves the bundle off disk** from `~/lifeos/stable/` and
+  `~/lifeos/staging/`. There is NO Docker, nginx, compose, or container — that plan was abandoned.
+  Deploying = writing files; a build is live the moment rsync finishes. Ibrahim owns TLS/certs.
+- **CI:** `.github/workflows/deploy.yml`. Push to `main` → stable; push to `staging` → staging; plus
+  manual `workflow_dispatch`. Builds via `scripts/build-web.sh <env>` then a single
+  `rsync -av --delete build/web/ ibrahim@167.233.39.1:<env>/`. ~2.5 min end to end.
+- **The deploy key is restricted server-side** with `command="rrsync /home/ibrahim/lifeos",restrict`.
+  It CANNOT open a shell or run remote commands. Never add an ssh/mkdir/restart step, and never pass
+  exotic rsync flags like `--rsync-path` — the wrapper refuses them.
+- GitHub Actions secrets: `VPS_DEPLOY_KEY`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`,
+  `GOOGLE_CLIENT_ID`. Environments differ ONLY by `--dart-define=APP_ENV` (staging shows a banner).
+  Both point at the SAME Supabase project — deliberate, not an oversight.
+
+## Session handoff (2026-07-21, evening)
+- **DONE (committed + pushed, LIVE on both envs @ `c86a574`):** AI Goal Breakdown full slice
+  (migration 012 `tasks.goal_id`, `goal-breakdown` Edge Function, input→generate→review→save flow,
+  derived goal progress); GitHub Actions CI deploy; `.env.example` public-asset warning; STAGING
+  banner; abandoned Docker/nginx config deleted; `staging` branch created.
+- **⚠️ KNOWN BUGS SHIPPED — fix these next (found by review, NOT yet fixed):**
+  1. **Drift drops `goal_id` on native.** `task_local_data_source.dart` `_taskToCompanion` has no
+     `goalId:` entry and `_taskFromEntry` omits `'goal_id'`, and the Drift `Tasks` table in
+     `lib/core/services/app_database.dart` has no such column. Native writes local-first, so the
+     value is discarded and later synced to Supabase as NULL. **Web is unaffected** (web uses
+     `TaskRepositoryImpl.remoteOnly`) — which is why it passed testing and shipped.
+  2. **`schemaVersion` still 1** with an empty `onUpgrade` stub. Adding the column above REQUIRES
+     bumping to 2 + `m.addColumn(tasks, tasks.goalId)`. This is the repo's first real Drift migration.
+  3. **Silent partial failure on save** (`goal_breakdown_screen.dart`). `TaskListNotifier.createTask`
+     is optimistic and `unawaited(...)`s the write, so the screen's try/catch can only ever catch a
+     GOAL failure. If tasks fail to persist, the user sees success and gets an orphaned goal.
+     **This one DOES affect web/production.**
+  - Lower priority: timezone off-by-one on `targetDate`; AI tasks carry UTC `DateTime`s while all
+    others are local; home dashboard still shows raw `goal.progress` not derived; `goalId` param on
+    `TaskEditorSheet` is dead code; archived tasks inflate the progress denominator.
+- **OPEN DECISION (unanswered):** migration 012 uses `goal_id ... ON DELETE CASCADE`, so deleting a
+  goal deletes all its tasks. Planner recommended `ON DELETE SET NULL` (tasks survive, unlinked).
+  Needs Zaid's answer; changing it now means a small migration 013.
+- **PENDING manual steps:** none open. (Migration 012 applied, `goal-breakdown` deployed, all 4 GitHub
+  secrets installed, Supabase redirect allowlist + Google console updated for the `.dev` domains.)
+- **TELL IBRAHIM:** his brief specified `rsync ... :~/lifeos/<env>/`, which FAILS — `rrsync` chroots to
+  `/home/ibrahim/lifeos` and resolves paths relative to it, so `~` is taken literally and it tries
+  `/home/ibrahim/lifeos/~/lifeos/<env>`. Correct destination is just `<env>/`.
+- **NEXT:** fix the 3 known bugs above on the `staging` branch, verify on staging, then merge to `main`.
+- **DECISIONS:** due dates mandatory on tasks. Staging + stable deliberately share ONE Supabase project
+  (Zaid's call — do not re-litigate); therefore NEVER trial a migration on staging.
 
 ## Roadmap
 1. **Pre-mobile refinement** (running as split worker rounds): ✅ Notes+Habits removed. TODO: turn Goals
@@ -54,6 +82,19 @@ in TESTING mode (test users only: jarrarzaid3@, zaidgpt3@).
   capture it there, not in later listeners.
 - Make every migration idempotent (`DROP POLICY IF EXISTS`, `IF NOT EXISTS`) — SQL gets re-run.
 - The AI (Groq) sometimes returns job updates with no company; keep/persist them keyed by source_email_id.
+- **`.env` is a PUBLIC WEB ASSET, not a secret store.** `pubspec.yaml` declares it as a Flutter asset,
+  so it ships verbatim in the bundle and is downloadable at `/assets/.env`. Being gitignored makes it
+  LOOK safe — it is the opposite. Only browser-public values (`SUPABASE_URL`,
+  `SUPABASE_PUBLISHABLE_KEY`, `GOOGLE_CLIENT_ID`) may live there. Server secrets (GROQ_API_KEY,
+  service_role) go in Supabase Edge Function secrets. Need a 4th key? Stop and ask.
+- `.env` is gitignored but REQUIRED to build, so any clean clone / CI job must materialize it first.
+- Pin the CI Flutter version to one whose bundled Dart satisfies `pubspec`'s `sdk:` constraint —
+  Flutter 3.44.0 ships Dart 3.12.0 and fails `^3.12.2`; 3.44.7 works.
+- The VPS deploy key is `rrsync`-restricted and chroots to `/home/ibrahim/lifeos`: rsync destinations
+  are RELATIVE to that root (`staging/`, not `~/lifeos/staging/`, which becomes a literal `~` path).
+- Web and native take DIFFERENT persistence paths: web = `TaskRepositoryImpl.remoteOnly` (straight to
+  Supabase), native = Drift local-first then sync. **A new Task column must be added to the Drift table
+  AND `_taskToCompanion`/`_taskFromEntry`, or it silently vanishes on native while working fine on web.**
 - Always confirm you're in `C:\Users\Zaid\Desktop\life-os` (a stale clone exists at Documents\github\life-os).
 - VERIFY worker/agent reports independently: `git status`, `flutter analyze`, read the diff.
 
