@@ -21,6 +21,8 @@ class TaskEditorSheet extends StatefulWidget {
     super.key,
     this.task,
     this.defaultPriority = TaskPriority.none,
+    this.initialTitle,
+    this.initialDescription,
   });
 
   /// The task to edit, or null for a new task.
@@ -29,16 +31,28 @@ class TaskEditorSheet extends StatefulWidget {
   /// Default priority for new tasks.
   final TaskPriority defaultPriority;
 
+  /// Prefilled title for create mode (ignored when editing).
+  final String? initialTitle;
+
+  /// Prefilled description for create mode (ignored when editing).
+  final String? initialDescription;
+
   /// Shows the editor as a centered dialog.
   static Future<Task?> show(
     BuildContext context, {
     Task? task,
     TaskPriority defaultPriority = TaskPriority.none,
+    String? initialTitle,
+    String? initialDescription,
   }) {
     return showDialog<Task>(
       context: context,
-      builder: (context) =>
-          TaskEditorSheet(task: task, defaultPriority: defaultPriority),
+      builder: (context) => TaskEditorSheet(
+        task: task,
+        defaultPriority: defaultPriority,
+        initialTitle: initialTitle,
+        initialDescription: initialDescription,
+      ),
     );
   }
 
@@ -52,13 +66,16 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   late TaskPriority _priority;
   DateTime? _dueDate;
   bool _isSaving = false;
+  bool _showDueDateError = false;
 
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.task?.title ?? '');
+    _titleController = TextEditingController(
+      text: widget.task?.title ?? widget.initialTitle ?? '',
+    );
     _descriptionController = TextEditingController(
-      text: widget.task?.description ?? '',
+      text: widget.task?.description ?? widget.initialDescription ?? '',
     );
     _priority = widget.task?.priority ?? widget.defaultPriority;
     _dueDate = widget.task?.dueDate;
@@ -71,7 +88,8 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     super.dispose();
   }
 
-  bool get _isValid => _titleController.text.trim().isNotEmpty;
+  bool get _isValid =>
+      _titleController.text.trim().isNotEmpty && _dueDate != null;
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -81,11 +99,18 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
     );
     if (picked != null && mounted) {
-      setState(() => _dueDate = picked);
+      setState(() {
+        _dueDate = picked;
+        _showDueDateError = false;
+      });
     }
   }
 
   void _save() {
+    if (_dueDate == null) {
+      setState(() => _showDueDateError = true);
+      return;
+    }
     if (!_isValid || _isSaving) return;
 
     setState(() => _isSaving = true);
@@ -186,17 +211,34 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                 const SizedBox(height: AppSpacing.lg),
 
                 // Due date
-                Text(
-                  'Due Date',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Due Date',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      '(required)',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: _showDueDateError
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.onSurface.withValues(
+                                alpha: 0.4,
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 _DueDateButton(
                   dueDate: _dueDate,
                   onTap: _pickDate,
-                  onClear: () => setState(() => _dueDate = null),
+                  hasError: _showDueDateError,
                 ),
                 const SizedBox(height: AppSpacing.xxl),
 
@@ -211,9 +253,18 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
-                      child: FilledButton(
-                        onPressed: _isValid && !_isSaving ? _save : null,
-                        child: Text(widget.task != null ? 'Save' : 'Create'),
+                      child: Opacity(
+                        opacity: _isValid ? 1.0 : 0.5,
+                        child: FilledButton(
+                          onPressed:
+                              _titleController.text.trim().isNotEmpty &&
+                                  !_isSaving
+                              ? _save
+                              : null,
+                          child: Text(
+                            widget.task != null ? 'Save' : 'Create',
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -293,16 +344,19 @@ class _DueDateButton extends StatelessWidget {
   const _DueDateButton({
     required this.dueDate,
     required this.onTap,
-    required this.onClear,
+    this.hasError = false,
   });
 
   final DateTime? dueDate;
   final VoidCallback onTap;
-  final VoidCallback onClear;
+  final bool hasError;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final borderColor = hasError
+        ? theme.colorScheme.error
+        : theme.colorScheme.outline.withValues(alpha: 0.3);
 
     return InkWell(
       onTap: onTap,
@@ -313,9 +367,7 @@ class _DueDateButton extends StatelessWidget {
           vertical: AppSpacing.md,
         ),
         decoration: BoxDecoration(
-          border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.3),
-          ),
+          border: Border.all(color: borderColor, width: hasError ? 1.5 : 1),
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Row(
@@ -323,25 +375,21 @@ class _DueDateButton extends StatelessWidget {
             Icon(
               Icons.calendar_today_rounded,
               size: 20,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              color: hasError
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Text(
                 dueDate != null
                     ? '${dueDate!.month}/${dueDate!.day}/${dueDate!.year}'
-                    : 'No date',
-                style: theme.textTheme.bodyMedium,
+                    : 'Select a due date',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: hasError ? theme.colorScheme.error : null,
+                ),
               ),
             ),
-            if (dueDate != null)
-              IconButton(
-                icon: const Icon(Icons.close_rounded, size: 18),
-                onPressed: onClear,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'Clear date',
-              ),
           ],
         ),
       ),

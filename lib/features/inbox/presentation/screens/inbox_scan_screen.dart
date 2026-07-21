@@ -21,6 +21,7 @@ import 'package:life_os/features/jobs/presentation/job_display.dart';
 import 'package:life_os/features/jobs/presentation/widgets/job_status_chip.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
+import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_priority_chip.dart';
 
 /// Screen driving the AI inbox scan flow.
@@ -93,34 +94,27 @@ class InboxScanScreen extends ConsumerWidget {
     }
   }
 
-  /// Adds a suggested task to the real task system and removes its card.
+  /// Opens the task editor prefilled from a suggestion, requiring the user
+  /// to set a due date, then adds the confirmed task and removes its card.
   Future<void> _addTask(
     BuildContext context,
     WidgetRef ref,
     SuggestedTask suggestion,
   ) async {
-    final userId = ref.read(authProvider).userId;
-    if (userId == null) return;
-
     // Per product decision: don't parse the natural-language hint into a
-    // real date. Create with no due date and fold the hint into the
-    // description.
+    // real date. Surface it in the description and let the user pick.
     final hint = suggestion.dueDateHint?.trim() ?? '';
     final description = hint.isEmpty ? null : 'Suggested due: $hint';
-    final now = DateTime.now();
 
-    final task = Task(
-      id: '',
-      userId: userId,
-      title: suggestion.title,
-      description: description,
-      priority: mapSuggestedPriority(suggestion.priority),
-      status: TaskStatus.pending,
-      createdAt: now,
-      updatedAt: now,
+    final result = await TaskEditorSheet.show(
+      context,
+      initialTitle: suggestion.title,
+      initialDescription: description,
+      defaultPriority: mapSuggestedPriority(suggestion.priority),
     );
+    if (result == null) return;
 
-    await ref.read(taskListProvider.notifier).createTask(task);
+    await ref.read(taskListProvider.notifier).createTask(result);
     ref.read(inboxScanProvider.notifier).removeTask(suggestion);
 
     if (!context.mounted) return;
