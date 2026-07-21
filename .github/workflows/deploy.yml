@@ -97,4 +97,9 @@ jobs:
           chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy via rsync
-        run: rsync -av --delete build/web/ ibrahim@167.233.39.1:~/lifeos/${{ steps.env.outputs.name }}/
+        # The deploy key is restricted server-side with
+        # command="rrsync /home/ibrahim/lifeos", which chroots to that
+        # directory and resolves every requested path relative to it. So the
+        # destination is just the env name — sending ~/lifeos/<env>/ makes
+        # rrsync build /home/ibrahim/lifeos/~/lifeos/<env> and fail.
+        run: rsync -av --delete build/web/ ibrahim@167.233.39.1:${{ steps.env.outputs.name }}/
