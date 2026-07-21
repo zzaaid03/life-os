@@ -105,6 +105,7 @@ class TaskLocalDataSource {
       'priority': entry.priority,
       'status': entry.status,
       'parent_task_id': entry.parentTaskId,
+      'goal_id': entry.goalId,
       'sort_order': entry.sortOrder,
       'synced_at': entry.syncedAt?.toIso8601String(),
       'created_at': entry.createdAt.toIso8601String(),
@@ -136,6 +137,7 @@ class TaskLocalDataSource {
       priority: Value(json['priority'] as int),
       status: Value(json['status'] as String),
       parentTaskId: Value(json['parent_task_id'] as String?),
+      goalId: Value(json['goal_id'] as String?),
       sortOrder: Value((json['sort_order'] as num).toDouble()),
       syncedAt: Value(
         (json['synced_at'] as String?) != null

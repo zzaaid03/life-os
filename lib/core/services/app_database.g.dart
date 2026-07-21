@@ -101,6 +101,15 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskEntry> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _goalIdMeta = const VerificationMeta('goalId');
+  @override
+  late final GeneratedColumn<String> goalId = GeneratedColumn<String>(
+    'goal_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -192,6 +201,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskEntry> {
     priority,
     status,
     parentTaskId,
+    goalId,
     sortOrder,
     syncedAt,
     createdAt,
@@ -276,6 +286,12 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskEntry> {
           data['parent_task_id']!,
           _parentTaskIdMeta,
         ),
+      );
+    }
+    if (data.containsKey('goal_id')) {
+      context.handle(
+        _goalIdMeta,
+        goalId.isAcceptableOrUnknown(data['goal_id']!, _goalIdMeta),
       );
     }
     if (data.containsKey('sort_order')) {
@@ -369,6 +385,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskEntry> {
         DriftSqlType.string,
         data['${effectivePrefix}parent_task_id'],
       ),
+      goalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}goal_id'],
+      ),
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}sort_order'],
@@ -416,6 +436,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
   final int priority;
   final String status;
   final String? parentTaskId;
+  final String? goalId;
   final double sortOrder;
   final DateTime? syncedAt;
   final DateTime createdAt;
@@ -433,6 +454,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     required this.priority,
     required this.status,
     this.parentTaskId,
+    this.goalId,
     required this.sortOrder,
     this.syncedAt,
     required this.createdAt,
@@ -460,6 +482,9 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || parentTaskId != null) {
       map['parent_task_id'] = Variable<String>(parentTaskId);
+    }
+    if (!nullToAbsent || goalId != null) {
+      map['goal_id'] = Variable<String>(goalId);
     }
     map['sort_order'] = Variable<double>(sortOrder);
     if (!nullToAbsent || syncedAt != null) {
@@ -494,6 +519,9 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
       parentTaskId: parentTaskId == null && nullToAbsent
           ? const Value.absent()
           : Value(parentTaskId),
+      goalId: goalId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(goalId),
       sortOrder: Value(sortOrder),
       syncedAt: syncedAt == null && nullToAbsent
           ? const Value.absent()
@@ -523,6 +551,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
       priority: serializer.fromJson<int>(json['priority']),
       status: serializer.fromJson<String>(json['status']),
       parentTaskId: serializer.fromJson<String?>(json['parentTaskId']),
+      goalId: serializer.fromJson<String?>(json['goalId']),
       sortOrder: serializer.fromJson<double>(json['sortOrder']),
       syncedAt: serializer.fromJson<DateTime?>(json['syncedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -545,6 +574,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
       'priority': serializer.toJson<int>(priority),
       'status': serializer.toJson<String>(status),
       'parentTaskId': serializer.toJson<String?>(parentTaskId),
+      'goalId': serializer.toJson<String?>(goalId),
       'sortOrder': serializer.toJson<double>(sortOrder),
       'syncedAt': serializer.toJson<DateTime?>(syncedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -565,6 +595,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     int? priority,
     String? status,
     Value<String?> parentTaskId = const Value.absent(),
+    Value<String?> goalId = const Value.absent(),
     double? sortOrder,
     Value<DateTime?> syncedAt = const Value.absent(),
     DateTime? createdAt,
@@ -582,6 +613,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     priority: priority ?? this.priority,
     status: status ?? this.status,
     parentTaskId: parentTaskId.present ? parentTaskId.value : this.parentTaskId,
+    goalId: goalId.present ? goalId.value : this.goalId,
     sortOrder: sortOrder ?? this.sortOrder,
     syncedAt: syncedAt.present ? syncedAt.value : this.syncedAt,
     createdAt: createdAt ?? this.createdAt,
@@ -607,6 +639,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
       parentTaskId: data.parentTaskId.present
           ? data.parentTaskId.value
           : this.parentTaskId,
+      goalId: data.goalId.present ? data.goalId.value : this.goalId,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -631,6 +664,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
           ..write('priority: $priority, ')
           ..write('status: $status, ')
           ..write('parentTaskId: $parentTaskId, ')
+          ..write('goalId: $goalId, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('syncedAt: $syncedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -653,6 +687,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     priority,
     status,
     parentTaskId,
+    goalId,
     sortOrder,
     syncedAt,
     createdAt,
@@ -674,6 +709,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
           other.priority == this.priority &&
           other.status == this.status &&
           other.parentTaskId == this.parentTaskId &&
+          other.goalId == this.goalId &&
           other.sortOrder == this.sortOrder &&
           other.syncedAt == this.syncedAt &&
           other.createdAt == this.createdAt &&
@@ -693,6 +729,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
   final Value<int> priority;
   final Value<String> status;
   final Value<String?> parentTaskId;
+  final Value<String?> goalId;
   final Value<double> sortOrder;
   final Value<DateTime?> syncedAt;
   final Value<DateTime> createdAt;
@@ -711,6 +748,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     this.priority = const Value.absent(),
     this.status = const Value.absent(),
     this.parentTaskId = const Value.absent(),
+    this.goalId = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.syncedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -730,6 +768,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     this.priority = const Value.absent(),
     this.status = const Value.absent(),
     this.parentTaskId = const Value.absent(),
+    this.goalId = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.syncedAt = const Value.absent(),
     required DateTime createdAt,
@@ -753,6 +792,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     Expression<int>? priority,
     Expression<String>? status,
     Expression<String>? parentTaskId,
+    Expression<String>? goalId,
     Expression<double>? sortOrder,
     Expression<DateTime>? syncedAt,
     Expression<DateTime>? createdAt,
@@ -772,6 +812,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
       if (priority != null) 'priority': priority,
       if (status != null) 'status': status,
       if (parentTaskId != null) 'parent_task_id': parentTaskId,
+      if (goalId != null) 'goal_id': goalId,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (syncedAt != null) 'synced_at': syncedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -793,6 +834,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     Value<int>? priority,
     Value<String>? status,
     Value<String?>? parentTaskId,
+    Value<String?>? goalId,
     Value<double>? sortOrder,
     Value<DateTime?>? syncedAt,
     Value<DateTime>? createdAt,
@@ -812,6 +854,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
       priority: priority ?? this.priority,
       status: status ?? this.status,
       parentTaskId: parentTaskId ?? this.parentTaskId,
+      goalId: goalId ?? this.goalId,
       sortOrder: sortOrder ?? this.sortOrder,
       syncedAt: syncedAt ?? this.syncedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -853,6 +896,9 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     if (parentTaskId.present) {
       map['parent_task_id'] = Variable<String>(parentTaskId.value);
     }
+    if (goalId.present) {
+      map['goal_id'] = Variable<String>(goalId.value);
+    }
     if (sortOrder.present) {
       map['sort_order'] = Variable<double>(sortOrder.value);
     }
@@ -892,6 +938,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
           ..write('priority: $priority, ')
           ..write('status: $status, ')
           ..write('parentTaskId: $parentTaskId, ')
+          ..write('goalId: $goalId, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('syncedAt: $syncedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -927,6 +974,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       Value<int> priority,
       Value<String> status,
       Value<String?> parentTaskId,
+      Value<String?> goalId,
       Value<double> sortOrder,
       Value<DateTime?> syncedAt,
       required DateTime createdAt,
@@ -947,6 +995,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<int> priority,
       Value<String> status,
       Value<String?> parentTaskId,
+      Value<String?> goalId,
       Value<double> sortOrder,
       Value<DateTime?> syncedAt,
       Value<DateTime> createdAt,
@@ -1007,6 +1056,11 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<String> get parentTaskId => $composableBuilder(
     column: $table.parentTaskId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get goalId => $composableBuilder(
+    column: $table.goalId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1100,6 +1154,11 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get goalId => $composableBuilder(
+    column: $table.goalId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
@@ -1178,6 +1237,9 @@ class $$TasksTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get goalId =>
+      $composableBuilder(column: $table.goalId, builder: (column) => column);
+
   GeneratedColumn<double> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
@@ -1239,6 +1301,7 @@ class $$TasksTableTableManager
                 Value<int> priority = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> parentTaskId = const Value.absent(),
+                Value<String?> goalId = const Value.absent(),
                 Value<double> sortOrder = const Value.absent(),
                 Value<DateTime?> syncedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -1257,6 +1320,7 @@ class $$TasksTableTableManager
                 priority: priority,
                 status: status,
                 parentTaskId: parentTaskId,
+                goalId: goalId,
                 sortOrder: sortOrder,
                 syncedAt: syncedAt,
                 createdAt: createdAt,
@@ -1277,6 +1341,7 @@ class $$TasksTableTableManager
                 Value<int> priority = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> parentTaskId = const Value.absent(),
+                Value<String?> goalId = const Value.absent(),
                 Value<double> sortOrder = const Value.absent(),
                 Value<DateTime?> syncedAt = const Value.absent(),
                 required DateTime createdAt,
@@ -1295,6 +1360,7 @@ class $$TasksTableTableManager
                 priority: priority,
                 status: status,
                 parentTaskId: parentTaskId,
+                goalId: goalId,
                 sortOrder: sortOrder,
                 syncedAt: syncedAt,
                 createdAt: createdAt,

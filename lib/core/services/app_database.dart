@@ -24,6 +24,7 @@ class Tasks extends Table {
   IntColumn get priority => integer().withDefault(const Constant(0))();
   TextColumn get status => text().withDefault(const Constant('pending'))();
   TextColumn get parentTaskId => text().named('parent_task_id').nullable()();
+  TextColumn get goalId => text().named('goal_id').nullable()();
   RealColumn get sortOrder =>
       real().named('sort_order').withDefault(const Constant(0.0))();
   DateTimeColumn get syncedAt => dateTime().named('synced_at').nullable()();
@@ -48,7 +49,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -57,7 +58,9 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
       },
       onUpgrade: (m, from, to) async {
-        // Future migrations will be added here.
+        if (from < 2) {
+          await m.addColumn(tasks, tasks.goalId);
+        }
       },
     );
   }
