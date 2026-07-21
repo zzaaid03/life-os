@@ -13,6 +13,7 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/goals/domain/providers/goal_provider.dart';
+import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 
 /// Screen listing the user's goals.
 class GoalsScreen extends ConsumerWidget {
@@ -132,8 +133,10 @@ class GoalsScreen extends ConsumerWidget {
             ),
           ),
           confirmDismiss: (_) => _confirmDelete(context, ref, goal),
-          onDismissed: (_) =>
-              ref.read(goalListProvider.notifier).deleteGoal(goal.id),
+          onDismissed: (_) async {
+            await ref.read(goalListProvider.notifier).deleteGoal(goal.id);
+            await ref.read(taskListProvider.notifier).refresh();
+          },
           child: _GoalCard(goal: goal, onTap: () => _edit(context, ref, goal)),
         );
       },

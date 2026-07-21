@@ -10,6 +10,7 @@ import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/goals/data/repositories/goal_repository.dart';
 import 'package:life_os/features/goals/data/repositories/supabase_goal_repository.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
+import 'package:life_os/features/tasks/data/repositories/task_repository.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -52,9 +53,11 @@ class GoalListState {
 /// Loads and mutates the user's goals.
 class GoalListNotifier extends StateNotifier<GoalListState> {
   /// Creates a [GoalListNotifier].
-  GoalListNotifier(this._repository) : super(const GoalListState());
+  GoalListNotifier(this._repository, this._taskRepository)
+    : super(const GoalListState());
 
   final GoalRepository _repository;
+  final TaskRepository _taskRepository;
 
   String? _userId;
 
@@ -128,9 +131,19 @@ class GoalListNotifier extends StateNotifier<GoalListState> {
     );
   }
 
-  /// Soft-deletes the goal with [id].
+  /// Soft-deletes the goal with [id], then deletes its linked tasks.
   Future<void> deleteGoal(String id) async {
     await _repository.delete(id);
+
+    final userId = _userId;
+    if (userId != null) {
+      final tasks = await _taskRepository.getAll(userId);
+      final linkedTasks = tasks.where((t) => t.goalId == id);
+      for (final task in linkedTasks) {
+        await _taskRepository.delete(task.id);
+      }
+    }
+
     await refresh();
   }
 }
@@ -139,7 +152,8 @@ class GoalListNotifier extends StateNotifier<GoalListState> {
 final goalListProvider =
     StateNotifierProvider<GoalListNotifier, GoalListState>((ref) {
       final repository = ref.watch(goalRepositoryProvider);
-      final notifier = GoalListNotifier(repository);
+      final taskRepository = ref.watch(taskRepositoryProvider);
+      final notifier = GoalListNotifier(repository, taskRepository);
 
       ref.listen<AuthState>(authProvider, (previous, next) {
         if (next.isAuthenticated &&
