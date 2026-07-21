@@ -1,0 +1,98 @@
+name: Deploy web bundle
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy
+        type: choice
+        options:
+          - stable
+          - staging
+        required: true
+        default: stable
+
+permissions:
+  contents: read
+
+# Two pushes in quick succession must not rsync into the same directory at
+# once — --delete makes an interleaved deploy destructive.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ github.event.inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "name=stable" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=staging" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.0"
+          channel: stable
+
+      # Fail fast on a missing secret. Without this, .env is written with an
+      # empty value, the build succeeds, and a broken bundle deploys — the
+      # site then white-screens in the browser with no CI failure to explain it.
+      - name: Verify required secrets are present
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        run: |
+          missing=0
+          for key in SUPABASE_URL SUPABASE_PUBLISHABLE_KEY GOOGLE_CLIENT_ID; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Repository secret $key is not set."
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+      - name: Write .env
+        run: |
+          cat > .env <<EOF
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY=${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          EOF
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build web bundle
+        run: bash scripts/build-web.sh ${{ steps.env.outputs.name }}
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_DEPLOY_KEY }}
+
+      - name: Pin VPS host key
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "167.233.39.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHZ39wen3sSx21pbiG4osJW9NiF2oafXo1dNd37cGWZW" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy via rsync
+        run: rsync -av --delete build/web/ ibrahim@167.233.39.1:~/lifeos/${{ steps.env.outputs.name }}/

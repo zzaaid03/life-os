@@ -9,6 +9,8 @@ import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/goals/data/repositories/goal_repository.dart';
 import 'package:life_os/features/goals/data/repositories/supabase_goal_repository.dart';
+import 'package:life_os/features/tasks/data/models/task.dart';
+import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -157,3 +159,29 @@ final goalListProvider =
 
       return notifier;
     });
+
+/// The number of tasks linked to the goal with [goalId].
+///
+/// A goal with `count == 0` has no AI-generated tasks and keeps its manual
+/// progress slider; a goal with `count >= 1` shows derived progress instead.
+final goalTaskCountProvider = Provider.family<int, String>((ref, goalId) {
+  final tasks = ref.watch(taskListProvider).tasks;
+  return tasks.where((t) => t.goalId == goalId).length;
+});
+
+/// The derived progress (0.0-1.0) for the goal with [goalId], computed as
+/// completed-linked-tasks / total-linked-tasks. Returns 0.0 if the goal has
+/// no linked tasks — callers should check [goalTaskCountProvider] first to
+/// decide whether to show derived vs. manual progress.
+final goalProgressProvider = Provider.family<double, String>((ref, goalId) {
+  final tasks = ref
+      .watch(taskListProvider)
+      .tasks
+      .where((t) => t.goalId == goalId)
+      .toList();
+  if (tasks.isEmpty) return 0.0;
+  final completed = tasks
+      .where((t) => t.status == TaskStatus.completed)
+      .length;
+  return completed / tasks.length;
+});

@@ -26,6 +26,7 @@ class Task extends Equatable implements Entity {
     this.priority = TaskPriority.none,
     this.status = TaskStatus.pending,
     this.parentTaskId,
+    this.goalId,
     this.sortOrder = 0,
     this.syncedAt,
     required this.createdAt,
@@ -51,6 +52,7 @@ class Task extends Equatable implements Entity {
       priority: TaskPriority.values[json['priority'] as int? ?? 0],
       status: _parseStatus(json['status'] as String?),
       parentTaskId: json['parent_task_id'] as String?,
+      goalId: json['goal_id'] as String?,
       sortOrder: (json['sort_order'] as num?)?.toDouble() ?? 0,
       syncedAt: json['synced_at'] != null
           ? DateTime.parse(json['synced_at'] as String)
@@ -92,6 +94,9 @@ class Task extends Equatable implements Entity {
   /// The ID of the parent task (for subtasks).
   final String? parentTaskId;
 
+  /// The ID of the goal this task was generated for, if any.
+  final String? goalId;
+
   /// Sort ordering within a list.
   final double sortOrder;
 
@@ -125,6 +130,7 @@ class Task extends Equatable implements Entity {
       'priority': priority.index,
       'status': status.name,
       'parent_task_id': parentTaskId,
+      'goal_id': goalId,
       'sort_order': sortOrder,
       'synced_at': syncedAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
@@ -145,6 +151,7 @@ class Task extends Equatable implements Entity {
     TaskPriority? priority,
     TaskStatus? status,
     String? parentTaskId,
+    String? goalId,
     double? sortOrder,
     DateTime? syncedAt,
     DateTime? createdAt,
@@ -163,6 +170,7 @@ class Task extends Equatable implements Entity {
       priority: priority ?? this.priority,
       status: status ?? this.status,
       parentTaskId: parentTaskId ?? this.parentTaskId,
+      goalId: goalId ?? this.goalId,
       sortOrder: sortOrder ?? this.sortOrder,
       syncedAt: syncedAt ?? this.syncedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -200,6 +208,7 @@ class Task extends Equatable implements Entity {
     priority,
     status,
     parentTaskId,
+    goalId,
     sortOrder,
     createdAt,
     updatedAt,

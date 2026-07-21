@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:life_os/core/config/env_config.dart';
 import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
@@ -19,6 +20,31 @@ import 'package:life_os/shared/widgets/floating_nav_bar.dart';
 
 /// The maximum content width for tablet/desktop layouts.
 const double _kMaxContentWidth = 600;
+
+/// A slim banner shown only on staging builds so testers can tell the
+/// environment apart from stable at a glance.
+class _StagingBanner extends StatelessWidget {
+  const _StagingBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: Colors.amber.shade700,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: const Text(
+        'STAGING',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.black,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
 
 /// The application shell that wraps all main app screens.
 class AppShell extends ConsumerWidget {
@@ -35,7 +61,12 @@ class AppShell extends ConsumerWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: _kMaxContentWidth),
-            child: child,
+            child: Column(
+              children: [
+                if (EnvConfig.isStaging) const _StagingBanner(),
+                Expanded(child: child),
+              ],
+            ),
           ),
         ),
       ),
@@ -80,8 +111,7 @@ class AppShell extends ConsumerWidget {
         },
         onAddGoal: () {
           Navigator.of(sheetContext).pop();
-          // TODO: re-point to AI Goal Breakdown when it exists
-          context.go(AppRoutes.goals);
+          context.push(AppRoutes.goalBreakdown);
         },
       ),
     );

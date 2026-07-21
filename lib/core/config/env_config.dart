@@ -13,4 +13,14 @@ abstract final class EnvConfig {
 
   /// Google OAuth web client ID.
   static const String googleClientIdKey = 'GOOGLE_CLIENT_ID';
+
+  /// Deployment environment, set at build time via
+  /// `--dart-define=APP_ENV=staging`. Defaults to `stable`.
+  static const String appEnv = String.fromEnvironment(
+    'APP_ENV',
+    defaultValue: 'stable',
+  );
+
+  /// Whether this build is running against the staging environment.
+  static const bool isStaging = appEnv == 'staging';
 }

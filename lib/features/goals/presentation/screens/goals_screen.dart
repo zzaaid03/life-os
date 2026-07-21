@@ -6,6 +6,8 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
@@ -17,21 +19,13 @@ class GoalsScreen extends ConsumerWidget {
   /// Creates a [GoalsScreen].
   const GoalsScreen({super.key});
 
-  Future<void> _create(BuildContext context, WidgetRef ref) async {
-    final result = await _GoalEditorDialog.show(context);
-    if (result == null) return;
-    await ref
-        .read(goalListProvider.notifier)
-        .createGoal(
-          title: result.title,
-          description: result.description,
-          progress: result.progress,
-          targetDate: result.targetDate,
-        );
-  }
-
   Future<void> _edit(BuildContext context, WidgetRef ref, Goal goal) async {
-    final result = await _GoalEditorDialog.show(context, existing: goal);
+    final hasLinkedTasks = ref.read(goalTaskCountProvider(goal.id)) > 0;
+    final result = await _GoalEditorDialog.show(
+      context,
+      existing: goal,
+      progressDisabled: hasLinkedTasks,
+    );
     if (result == null) return;
     await ref
         .read(goalListProvider.notifier)
@@ -39,11 +33,13 @@ class GoalsScreen extends ConsumerWidget {
           goal.copyWith(
             title: result.title,
             description: result.description,
-            progress: result.progress,
+            progress: hasLinkedTasks ? goal.progress : result.progress,
             targetDate: result.targetDate,
-            status: result.progress >= 1.0
-                ? GoalStatus.completed
-                : GoalStatus.active,
+            status: hasLinkedTasks
+                ? goal.status
+                : (result.progress >= 1.0
+                      ? GoalStatus.completed
+                      : GoalStatus.active),
           ),
         );
   }
@@ -59,7 +55,7 @@ class GoalsScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.add_rounded),
             tooltip: 'New goal',
-            onPressed: () => _create(context, ref),
+            onPressed: () => context.push(AppRoutes.goalBreakdown),
           ),
         ],
       ),
@@ -144,17 +140,24 @@ class GoalsScreen extends ConsumerWidget {
   }
 }
 
-class _GoalCard extends StatelessWidget {
+class _GoalCard extends ConsumerWidget {
   const _GoalCard({required this.goal, required this.onTap});
 
   final Goal goal;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isCompleted = goal.status == GoalStatus.completed;
-    final pct = (goal.progress * 100).round();
+    final linkedTaskCount = ref.watch(goalTaskCountProvider(goal.id));
+    final hasLinkedTasks = linkedTaskCount > 0;
+    final progress = hasLinkedTasks
+        ? ref.watch(goalProgressProvider(goal.id))
+        : goal.progress;
+    final isCompleted = hasLinkedTasks
+        ? progress >= 1.0
+        : goal.status == GoalStatus.completed;
+    final pct = (progress * 100).round();
 
     return Material(
       color: theme.colorScheme.surface,
@@ -213,7 +216,7 @@ class _GoalCard extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(2),
                 child: LinearProgressIndicator(
-                  value: goal.progress,
+                  value: progress,
                   minHeight: 5,
                   backgroundColor: theme.colorScheme.primary.withValues(
                     alpha: 0.1,
@@ -271,17 +274,25 @@ class _GoalEditorResult {
 
 /// A centered dialog for creating or editing a goal, with a progress slider.
 class _GoalEditorDialog extends StatefulWidget {
-  const _GoalEditorDialog({this.existing});
+  const _GoalEditorDialog({this.existing, this.progressDisabled = false});
 
   final Goal? existing;
+
+  /// Whether the progress slider is disabled because this goal's progress
+  /// is derived from its linked tasks instead.
+  final bool progressDisabled;
 
   static Future<_GoalEditorResult?> show(
     BuildContext context, {
     Goal? existing,
+    bool progressDisabled = false,
   }) {
     return showDialog<_GoalEditorResult>(
       context: context,
-      builder: (_) => _GoalEditorDialog(existing: existing),
+      builder: (_) => _GoalEditorDialog(
+        existing: existing,
+        progressDisabled: progressDisabled,
+      ),
     );
   }
 
@@ -391,7 +402,9 @@ class _GoalEditorDialogState extends State<_GoalEditorDialog> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Text(
-                  'Progress · ${(_progress * 100).round()}%',
+                  widget.progressDisabled
+                      ? 'Progress · from linked tasks'
+                      : 'Progress · ${(_progress * 100).round()}%',
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
@@ -400,7 +413,9 @@ class _GoalEditorDialogState extends State<_GoalEditorDialog> {
                   value: _progress,
                   divisions: 20,
                   label: '${(_progress * 100).round()}%',
-                  onChanged: (value) => setState(() => _progress = value),
+                  onChanged: widget.progressDisabled
+                      ? null
+                      : (value) => setState(() => _progress = value),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(

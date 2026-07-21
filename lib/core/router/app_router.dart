@@ -13,6 +13,7 @@ import 'package:life_os/features/auth/presentation/screens/login_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/splash_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/welcome_screen.dart';
+import 'package:life_os/features/goals/presentation/screens/goal_breakdown_screen.dart';
 import 'package:life_os/features/goals/presentation/screens/goals_screen.dart';
 import 'package:life_os/features/home/presentation/screens/home_screen.dart';
 import 'package:life_os/features/inbox/presentation/screens/inbox_scan_screen.dart';
@@ -62,6 +63,7 @@ abstract final class AppRoutes {
 
   // Life features
   static const String goals = '/goals';
+  static const String goalBreakdown = '/goals/new';
 }
 
 /// Creates and configures the GoRouter instance.
@@ -230,6 +232,11 @@ GoRouter createRouter({required WidgetRef ref}) {
         path: AppRoutes.goals,
         name: 'goals',
         builder: (context, state) => const GoalsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.goalBreakdown,
+        name: 'goalBreakdown',
+        builder: (context, state) => const GoalBreakdownScreen(),
       ),
     ],
 

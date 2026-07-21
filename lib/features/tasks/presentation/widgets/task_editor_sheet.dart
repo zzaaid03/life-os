@@ -23,6 +23,8 @@ class TaskEditorSheet extends StatefulWidget {
     this.defaultPriority = TaskPriority.none,
     this.initialTitle,
     this.initialDescription,
+    this.initialDueDate,
+    this.goalId,
   });
 
   /// The task to edit, or null for a new task.
@@ -37,6 +39,12 @@ class TaskEditorSheet extends StatefulWidget {
   /// Prefilled description for create mode (ignored when editing).
   final String? initialDescription;
 
+  /// Prefilled due date for create mode (ignored when editing).
+  final DateTime? initialDueDate;
+
+  /// The goal to link a newly-created task to (ignored when editing).
+  final String? goalId;
+
   /// Shows the editor as a centered dialog.
   static Future<Task?> show(
     BuildContext context, {
@@ -44,6 +52,8 @@ class TaskEditorSheet extends StatefulWidget {
     TaskPriority defaultPriority = TaskPriority.none,
     String? initialTitle,
     String? initialDescription,
+    DateTime? initialDueDate,
+    String? goalId,
   }) {
     return showDialog<Task>(
       context: context,
@@ -52,6 +62,8 @@ class TaskEditorSheet extends StatefulWidget {
         defaultPriority: defaultPriority,
         initialTitle: initialTitle,
         initialDescription: initialDescription,
+        initialDueDate: initialDueDate,
+        goalId: goalId,
       ),
     );
   }
@@ -78,7 +90,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
       text: widget.task?.description ?? widget.initialDescription ?? '',
     );
     _priority = widget.task?.priority ?? widget.defaultPriority;
-    _dueDate = widget.task?.dueDate;
+    _dueDate = widget.task?.dueDate ?? widget.initialDueDate;
   }
 
   @override
@@ -134,6 +146,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
               : _descriptionController.text.trim(),
           priority: _priority,
           dueDate: _dueDate,
+          goalId: widget.goalId,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
