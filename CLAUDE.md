@@ -10,7 +10,7 @@ using Groq, model `llama-3.3-70b-versatile`). Feature-first architecture — mir
 for new features. Supabase project ref: `ganbmkphtzdvxxnmprku`. CLI via `npx supabase` (no global
 install, no Docker). Runs on Chrome for dev (`flutter run -d chrome`).
 
-## Current state (2026-07-21) — origin/main @ c86a574 — LIVE IN PRODUCTION
+## Current state (2026-07-21) — origin/main @ f620639 — LIVE IN PRODUCTION
 WORKING: AI inbox scan (Gmail read SERVER-SIDE via a stored refresh token → Groq → tasks +
 job-application updates), job tracker with manual add/edit/delete, tasks, unified timeline, AI Daily
 Brief card, dark mode + theme toggle, 5-status job vocab (applied/viewed/interview/rejected/accepted),
@@ -36,42 +36,49 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
   `GOOGLE_CLIENT_ID`. Environments differ ONLY by `--dart-define=APP_ENV` (staging shows a banner).
   Both point at the SAME Supabase project — deliberate, not an oversight.
 
-## Session handoff (2026-07-21, evening)
-- **DONE (committed + pushed, LIVE on both envs @ `c86a574`):** AI Goal Breakdown full slice
-  (migration 012 `tasks.goal_id`, `goal-breakdown` Edge Function, input→generate→review→save flow,
-  derived goal progress); GitHub Actions CI deploy; `.env.example` public-asset warning; STAGING
-  banner; abandoned Docker/nginx config deleted; `staging` branch created.
-- **⚠️ KNOWN BUGS SHIPPED — fix these next (found by review, NOT yet fixed):**
-  1. **Drift drops `goal_id` on native.** `task_local_data_source.dart` `_taskToCompanion` has no
-     `goalId:` entry and `_taskFromEntry` omits `'goal_id'`, and the Drift `Tasks` table in
-     `lib/core/services/app_database.dart` has no such column. Native writes local-first, so the
-     value is discarded and later synced to Supabase as NULL. **Web is unaffected** (web uses
-     `TaskRepositoryImpl.remoteOnly`) — which is why it passed testing and shipped.
-  2. **`schemaVersion` still 1** with an empty `onUpgrade` stub. Adding the column above REQUIRES
-     bumping to 2 + `m.addColumn(tasks, tasks.goalId)`. This is the repo's first real Drift migration.
-  3. **Silent partial failure on save** (`goal_breakdown_screen.dart`). `TaskListNotifier.createTask`
-     is optimistic and `unawaited(...)`s the write, so the screen's try/catch can only ever catch a
-     GOAL failure. If tasks fail to persist, the user sees success and gets an orphaned goal.
-     **This one DOES affect web/production.**
-  - Lower priority: timezone off-by-one on `targetDate`; AI tasks carry UTC `DateTime`s while all
-    others are local; home dashboard still shows raw `goal.progress` not derived; `goalId` param on
-    `TaskEditorSheet` is dead code; archived tasks inflate the progress denominator.
-- **OPEN DECISION (unanswered):** migration 012 uses `goal_id ... ON DELETE CASCADE`, so deleting a
-  goal deletes all its tasks. Planner recommended `ON DELETE SET NULL` (tasks survive, unlinked).
-  Needs Zaid's answer; changing it now means a small migration 013.
-- **PENDING manual steps:** CONFIRMED DONE — migration 012 applied, `goal-breakdown` deployed, all 4
-  GitHub secrets installed, Supabase redirect allowlist + Google console updated for the `.dev` domains.
-  **UNCONFIRMED (carried over from the previous session, never verified):** whether the rewritten
-  `daily-brief` function was ever deployed —
-  `npx supabase functions deploy daily-brief --project-ref ganbmkphtzdvxxnmprku`. Symptom if not: the
-  Daily Brief card reads generic rather than personal/specific. Cheap to just redeploy and check.
-- **NOT VERIFIED THIS SESSION:** nobody has smoke-tested the LIVE production site end to end (login,
-  inbox scan, goal breakdown). Staging was deployed and verified only at the HTTP level (200, correct
-  title, correct bundle). Do this before treating prod as trusted.
+## Session handoff (2026-07-21, late evening)
+- **DONE (LIVE IN PRODUCTION @ `f620639`):** all 3 known Goal Breakdown bugs from the previous
+  handoff are FIXED, verified by diff-trace (not by worker report), and deployed:
+  1. Drift now persists `goal_id` — column added to the `Tasks` table, mapped in BOTH
+     `_taskToCompanion` and `_taskFromEntry`. Round-trip verified end to end via `Task.toJson()`.
+  2. `schemaVersion` bumped 1 → 2 with a `if (from < 2) m.addColumn(tasks, tasks.goalId)` guard.
+     This is the repo's first real Drift migration. Native-only; untested until the mobile round.
+  3. Goal-save now writes through `taskRepositoryProvider` and AWAITS it, so real task-persistence
+     failures reach the screen's catch instead of showing false success.
+- **ON `staging`, NOT YET IN PROD — awaiting Zaid's manual test:** goal-delete confirmation dialog
+  (`confirmDismiss` on the `Dismissible` in `goals_screen.dart`, names the goal + linked task count)
+  and cascade delete (`GoalListNotifier.deleteGoal` now deletes the goal first, then its linked
+  tasks). Merge to `main` only after Zaid confirms: Cancel truly cancels, and unlinked tasks survive.
+- **RESOLVED DECISION — cascade:** Zaid chose to DELETE linked tasks when a goal is deleted
+  (chose "A" over unlink-and-keep, with the tradeoff explained). Do not re-litigate. Note migration
+  012's `ON DELETE CASCADE` is INERT — the goal repo soft-deletes (sets `deleted_at`) and never
+  issues a SQL DELETE, so the cascade is implemented in Dart, not by the DB.
+- **RESOLVED:** `daily-brief` IS deployed and working (Zaid confirmed). Prod smoke-test done by Zaid.
+- **NOT A BUG — the "job applications leak" scare:** friends reported seeing each other's job
+  applications. Investigated: RLS on `job_applications` is correct (`auth.uid() = user_id` on all
+  4 verbs), no migration weakens it, and `getAll` filters by `user_id`. Root cause was that Google
+  OAuth was in Testing mode with only Zaid's 2 accounts allowed, so friends signed in AS ZAID.
+  Zaid has since added them as test users. **Lesson: verify the isolation layers before believing a
+  breach report — and note a shared test account also shares the stored Gmail refresh token.**
+- **REMAINING QA-ROUND WORK (all located, none fixed):**
+  - Derived progress read RAW at TWO sites: `home_screen.dart:207`, `timeline_provider.dart:93`
+    (`goals_screen.dart:154-156` already does it correctly).
+  - Archived tasks inflate the progress denominator — `goal_provider.dart:167-187` filters only on
+    `goalId`, never excludes `TaskStatus.archived`. Also skews the delete dialog's task count.
+  - Timezone: `goal.dart:115` emits naive local `toIso8601String()` into a `DATE` column;
+    `goal_breakdown_service.dart:82` sends it naive to the Edge Function, which does `new Date()`
+    (JS parses bare dates as UTC) — horizon can shift a day.
+  - UTC/local mix: `goal_breakdown_service.dart:41` parses server `...Z` with NO `.toLocal()`, so AI
+    task dueDates are `isUtc == true` while hand-made ones are local.
+  - `goalId` param on `TaskEditorSheet` (`:27,149`) IS consumed in the create branch but NO call site
+    passes it, and the edit branch drops it. `goal_breakdown_screen.dart:150` is where it belongs.
+  - **Show the signed-in account in the UI** — would have prevented the entire OAuth scare above.
 - **TELL IBRAHIM:** his brief specified `rsync ... :~/lifeos/<env>/`, which FAILS — `rrsync` chroots to
   `/home/ibrahim/lifeos` and resolves paths relative to it, so `~` is taken literally and it tries
   `/home/ibrahim/lifeos/~/lifeos/<env>`. Correct destination is just `<env>/`.
-- **NEXT:** fix the 3 known bugs above on the `staging` branch, verify on staging, then merge to `main`.
+- **MINOR:** CI warns `actions/checkout@v4` + `ssh-agent@v0.9.0` still target Node 20. One-line bump
+  whenever the workflow is next touched; not worth its own round.
+- **NEXT:** merge staging→main once Zaid's delete test passes, then run the QA round above.
 - **DECISIONS:** due dates mandatory on tasks. Staging + stable deliberately share ONE Supabase project
   (Zaid's call — do not re-litigate); therefore NEVER trial a migration on staging.
 
@@ -82,8 +89,10 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
    **TODO: full QA / clean-code pass — never done, still outstanding.** This was the last planned item
    of this phase before hosting was prioritised ahead of it.
 2. **Web hosting** ✅ DONE 2026-07-21 — live on prod + staging with CI (see "Hosting / deploy").
-3. **Fix the 3 known Goal Breakdown bugs** (handoff section) — do this before mobile: bugs #1/#2 are
-   Drift/native-only and would otherwise ambush the mobile round on day one.
+3. **Fix the 3 known Goal Breakdown bugs** ✅ DONE 2026-07-21, live @ `f620639`. Mobile is unblocked.
+   **QA round IN FLIGHT:** goal-delete confirm + cascade on `staging` awaiting test; the rest of the
+   QA list is in the handoff section (derived progress ×2, archived denominator, timezone, UTC mix,
+   dead `goalId` param, show-signed-in-account).
 4. **Mobile app version** (Android/iOS).
 5. **Public launch**: Google OAuth verification (needed to leave Testing mode). Note the `gmail.readonly`
    sensitive scope makes this a real timeline risk — Google review is slow. Until then only
@@ -109,6 +118,15 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
 - Web and native take DIFFERENT persistence paths: web = `TaskRepositoryImpl.remoteOnly` (straight to
   Supabase), native = Drift local-first then sync. **A new Task column must be added to the Drift table
   AND `_taskToCompanion`/`_taskFromEntry`, or it silently vanishes on native while working fine on web.**
+- **Soft deletes make DB `ON DELETE CASCADE` inert.** Goals and tasks soft-delete (set `deleted_at`)
+  and never issue a SQL `DELETE`, so FK cascades declared in migrations NEVER fire from the app. Any
+  cascade behaviour must be written in Dart. Don't assume a migration's `ON DELETE` clause is live.
+- **A "security breach" report is usually a config problem.** Before believing cross-user data leaks,
+  check the isolation layers (RLS policies, `.eq('user_id')`, then `select relrowsecurity from
+  pg_class`). While Google OAuth is in Testing mode, only listed test users can sign in — so testers
+  end up sharing ONE account, which looks exactly like a leak and also shares that account's stored
+  Gmail refresh token. Client-side `.eq()` filters are NOT security; only RLS is (the publishable
+  key ships in the public bundle).
 - Always confirm you're in `C:\Users\Zaid\Desktop\life-os` (a stale clone exists at Documents\github\life-os).
 - VERIFY worker/agent reports independently: `git status`, `flutter analyze`, read the diff.
 
