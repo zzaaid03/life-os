@@ -59,8 +59,15 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
 - **OPEN DECISION (unanswered):** migration 012 uses `goal_id ... ON DELETE CASCADE`, so deleting a
   goal deletes all its tasks. Planner recommended `ON DELETE SET NULL` (tasks survive, unlinked).
   Needs Zaid's answer; changing it now means a small migration 013.
-- **PENDING manual steps:** none open. (Migration 012 applied, `goal-breakdown` deployed, all 4 GitHub
-  secrets installed, Supabase redirect allowlist + Google console updated for the `.dev` domains.)
+- **PENDING manual steps:** CONFIRMED DONE — migration 012 applied, `goal-breakdown` deployed, all 4
+  GitHub secrets installed, Supabase redirect allowlist + Google console updated for the `.dev` domains.
+  **UNCONFIRMED (carried over from the previous session, never verified):** whether the rewritten
+  `daily-brief` function was ever deployed —
+  `npx supabase functions deploy daily-brief --project-ref ganbmkphtzdvxxnmprku`. Symptom if not: the
+  Daily Brief card reads generic rather than personal/specific. Cheap to just redeploy and check.
+- **NOT VERIFIED THIS SESSION:** nobody has smoke-tested the LIVE production site end to end (login,
+  inbox scan, goal breakdown). Staging was deployed and verified only at the HTTP level (200, correct
+  title, correct bundle). Do this before treating prod as trusted.
 - **TELL IBRAHIM:** his brief specified `rsync ... :~/lifeos/<env>/`, which FAILS — `rrsync` chroots to
   `/home/ibrahim/lifeos` and resolves paths relative to it, so `~` is taken literally and it tries
   `/home/ibrahim/lifeos/~/lifeos/<env>`. Correct destination is just `<env>/`.
@@ -69,11 +76,18 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
   (Zaid's call — do not re-litigate); therefore NEVER trial a migration on staging.
 
 ## Roadmap
-1. **Pre-mobile refinement** (running as split worker rounds): ✅ Notes+Habits removed. TODO: turn Goals
-   into "AI Goal Breakdown" (goal → Groq → tasks; new `goal-breakdown` function); fix Daily Brief to be
-   specific + drop removed-feature refs; full QA/clean-code pass.
-2. **Mobile app version** (Android/iOS).
-3. **Public launch**: Google OAuth verification (needed to leave Testing mode).
+1. **Pre-mobile refinement** (split worker rounds): ✅ Notes+Habits removed. ✅ Daily Brief made
+   specific + Habits-free (`6c91fdd`). ✅ Due dates mandatory on tasks. ✅ `(+)` FAB Add Task/Add Goal
+   chooser. ✅ AI Goal Breakdown shipped (with 3 known bugs — see handoff).
+   **TODO: full QA / clean-code pass — never done, still outstanding.** This was the last planned item
+   of this phase before hosting was prioritised ahead of it.
+2. **Web hosting** ✅ DONE 2026-07-21 — live on prod + staging with CI (see "Hosting / deploy").
+3. **Fix the 3 known Goal Breakdown bugs** (handoff section) — do this before mobile: bugs #1/#2 are
+   Drift/native-only and would otherwise ambush the mobile round on day one.
+4. **Mobile app version** (Android/iOS).
+5. **Public launch**: Google OAuth verification (needed to leave Testing mode). Note the `gmail.readonly`
+   sensitive scope makes this a real timeline risk — Google review is slow. Until then only
+   jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
 - Raw-SQL Supabase tables need explicit `GRANT ... TO authenticated, service_role` or they throw
