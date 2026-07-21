@@ -62,7 +62,7 @@ class OnboardingScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Text(
                 'Your life, beautifully organized.\n'
-                'Track habits, capture notes, and achieve your goals.',
+                'Track tasks and achieve your goals.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),

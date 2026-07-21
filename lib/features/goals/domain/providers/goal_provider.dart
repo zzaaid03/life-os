@@ -1,6 +1,6 @@
 /// Riverpod providers for the goals feature.
 ///
-/// Mirrors the notes/jobs provider pattern: a list notifier that loads on
+/// Mirrors the jobs provider pattern: a list notifier that loads on
 /// auth, supports create/update/delete + progress updates, and refreshes.
 library;
 

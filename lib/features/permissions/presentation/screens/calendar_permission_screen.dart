@@ -80,7 +80,7 @@ class CalendarPermissionScreen extends StatelessWidget {
               ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Connect your calendar to see your events alongside your habits, goals, and tasks. Everything in one timeline.',
+                'Connect your calendar to see your events alongside your goals and tasks. Everything in one timeline.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),

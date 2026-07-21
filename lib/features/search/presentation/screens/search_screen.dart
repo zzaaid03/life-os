@@ -73,7 +73,7 @@ class _SearchScreenState extends State<SearchScreen> {
             child: EmptyStateWidget(
               icon: Icons.search_rounded,
               title: 'Search your life.',
-              subtitle: 'Find tasks, notes, habits, and goals.',
+              subtitle: 'Find tasks and goals.',
             ),
           ).animate().fadeIn(duration: 400.ms, delay: 300.ms),
         ],

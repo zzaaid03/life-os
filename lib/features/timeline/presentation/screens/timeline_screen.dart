@@ -1,8 +1,8 @@
 /// Timeline screen — unified chronological feed of life events.
 ///
-/// Aggregates created/completed tasks, notes, habit check-offs, goal
-/// updates, and job-application changes (via [timelineEventsProvider]),
-/// grouped by day with a type-specific icon per event.
+/// Aggregates created/completed tasks, goal updates, and job-application
+/// changes (via [timelineEventsProvider]), grouped by day with a
+/// type-specific icon per event.
 library;
 
 import 'package:flutter/material.dart';
@@ -41,8 +41,7 @@ class TimelineScreen extends ConsumerWidget {
                 icon: Icons.timeline_rounded,
                 title: 'Your journey begins today.',
                 subtitle:
-                    'Tasks, notes, habits, goals, and job updates will '
-                    'appear here.',
+                    'Tasks, goals, and job updates will appear here.',
               ),
             ).animate().fadeIn(duration: 400.ms, delay: 200.ms)
           else
@@ -131,8 +130,6 @@ class _TimelineTile extends StatelessWidget {
   Color _color(ThemeData theme) => switch (event.type) {
     TimelineEventType.taskCreated => theme.colorScheme.primary,
     TimelineEventType.taskCompleted => AppColors.success,
-    TimelineEventType.noteCreated => AppColors.info,
-    TimelineEventType.habitCheckedOff => AppColors.warning,
     TimelineEventType.goalUpdated => theme.colorScheme.primary,
     TimelineEventType.jobStatusChanged => AppColors.info,
   };

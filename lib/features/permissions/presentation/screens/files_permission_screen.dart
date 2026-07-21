@@ -80,7 +80,7 @@ class FilesPermissionScreen extends StatelessWidget {
               ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Life OS can attach photos and files to your notes and tasks. Your files stay on your device until you choose to sync.',
+                'Life OS can attach photos and files to your tasks. Your files stay on your device until you choose to sync.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),

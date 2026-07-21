@@ -2,9 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:life_os/core/data/entity.dart';
 import 'package:life_os/features/attachments/data/models/attachment.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
-import 'package:life_os/features/habits/data/models/habit.dart';
-import 'package:life_os/features/habits/data/models/habit_entry.dart';
-import 'package:life_os/features/notes/data/models/note.dart';
 import 'package:life_os/features/tags/data/models/tag.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 
@@ -120,30 +117,6 @@ void main() {
     });
   });
 
-  group('Note model', () {
-    test('serializes to and from JSON', () {
-      final note = Note(
-        id: 'n1',
-        userId: 'u1',
-        title: 'Meeting notes',
-        content: 'Discussed Q3 goals',
-        isPinned: true,
-        color: '#FF5733',
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final json = note.toJson();
-      final restored = Note.fromJson(json);
-
-      expect(restored.id, equals(note.id));
-      expect(restored.title, equals(note.title));
-      expect(restored.content, equals(note.content));
-      expect(restored.isPinned, isTrue);
-      expect(restored.color, equals('#FF5733'));
-    });
-  });
-
   group('Goal model', () {
     test('serializes to and from JSON', () {
       final goal = Goal(
@@ -162,48 +135,6 @@ void main() {
       expect(restored.id, equals(goal.id));
       expect(restored.progress, equals(0.5));
       expect(restored.status, equals(GoalStatus.active));
-    });
-  });
-
-  group('Habit model', () {
-    test('serializes to and from JSON', () {
-      final habit = Habit(
-        id: 'h1',
-        userId: 'u1',
-        name: 'Meditate',
-        frequencyType: HabitFrequency.daily,
-        targetCount: 1,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final json = habit.toJson();
-      final restored = Habit.fromJson(json);
-
-      expect(restored.id, equals(habit.id));
-      expect(restored.name, equals('Meditate'));
-      expect(restored.frequencyType, equals(HabitFrequency.daily));
-    });
-  });
-
-  group('HabitEntry model', () {
-    test('serializes to and from JSON', () {
-      final entry = HabitEntry(
-        id: 'he1',
-        userId: 'u1',
-        habitId: 'h1',
-        completedDate: now,
-        count: 2,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final json = entry.toJson();
-      final restored = HabitEntry.fromJson(json);
-
-      expect(restored.id, equals(entry.id));
-      expect(restored.habitId, equals('h1'));
-      expect(restored.count, equals(2));
     });
   });
 

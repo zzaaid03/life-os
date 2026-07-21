@@ -83,7 +83,7 @@ class AppShell extends ConsumerWidget {
           title: 'Quick Create',
           message:
               'Quick create is coming soon. You\'ll be able to add '
-              'tasks, notes, habits, and goals from here.',
+              'tasks and goals from here.',
         ),
       );
     }

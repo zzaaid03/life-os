@@ -82,7 +82,7 @@ class NotificationPermissionScreen extends StatelessWidget {
               ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Life OS sends gentle reminders for habits, tasks, and goals. No spam. Just what matters.',
+                'Life OS sends gentle reminders for tasks and goals. No spam. Just what matters.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
