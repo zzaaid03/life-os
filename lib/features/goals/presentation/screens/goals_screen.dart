@@ -131,11 +131,45 @@ class GoalsScreen extends ConsumerWidget {
               color: AppColors.error,
             ),
           ),
+          confirmDismiss: (_) => _confirmDelete(context, ref, goal),
           onDismissed: (_) =>
               ref.read(goalListProvider.notifier).deleteGoal(goal.id),
           child: _GoalCard(goal: goal, onTap: () => _edit(context, ref, goal)),
         );
       },
+    );
+  }
+
+  Future<bool?> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    Goal goal,
+  ) {
+    final linkedTaskCount = ref.read(goalTaskCountProvider(goal.id));
+    final body = linkedTaskCount > 0
+        ? '"${goal.title}" and its $linkedTaskCount linked '
+              '${linkedTaskCount == 1 ? 'task' : 'tasks'} will be deleted. '
+              "This can't be undone."
+        : '"${goal.title}" will be deleted. '
+              "This can't be undone.";
+
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete goal?'),
+        content: Text(body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 }
