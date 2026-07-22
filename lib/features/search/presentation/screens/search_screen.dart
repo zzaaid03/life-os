@@ -43,7 +43,7 @@ class _SearchScreenState extends State<SearchScreen> {
           TextField(
             controller: _controller,
             decoration: InputDecoration(
-              hintText: 'Search your life...',
+              hintText: 'Search anything…',
               prefixIcon: const Icon(Icons.search_rounded),
               filled: true,
               fillColor: theme.colorScheme.surface,
@@ -72,7 +72,7 @@ class _SearchScreenState extends State<SearchScreen> {
           const Center(
             child: EmptyStateWidget(
               icon: Icons.search_rounded,
-              title: 'Search your life.',
+              title: 'What are you looking for?',
               subtitle: 'Find tasks and goals.',
             ),
           ).animate().fadeIn(duration: 400.ms, delay: 300.ms),

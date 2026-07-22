@@ -107,7 +107,7 @@ class SettingsScreen extends ConsumerWidget {
 
           const SizedBox(height: AppSpacing.xxxl),
 
-          // Sign out
+          // Log out
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
@@ -127,7 +127,7 @@ class SettingsScreen extends ConsumerWidget {
                   borderRadius: AppRadius.button,
                 ),
               ),
-              child: const Text('Sign Out'),
+              child: const Text('Log out'),
             ),
           ).animate().fadeIn(duration: 400.ms, delay: 500.ms),
 
