@@ -16,6 +16,20 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+try {
+    $Stamp = (git rev-parse --short HEAD 2>$null)
+    if (-not $Stamp) { $Stamp = [string][DateTimeOffset]::UtcNow.ToUnixTimeSeconds() }
+} catch {
+    $Stamp = [string][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+}
+Write-Host "Cache-busting with stamp: $Stamp"
+
+$IndexPath = "build\web\index.html"
+(Get-Content $IndexPath -Raw) -replace 'src="flutter_bootstrap\.js"', "src=`"flutter_bootstrap.js?v=$Stamp`"" | Set-Content $IndexPath -NoNewline
+
+$BootstrapPath = "build\web\flutter_bootstrap.js"
+(Get-Content $BootstrapPath -Raw) -replace 'main\.dart\.js', "main.dart.js?v=$Stamp" | Set-Content $BootstrapPath -NoNewline
+
 $OutputPath = Join-Path (Get-Location) "build\web"
 Write-Host "Build output: $OutputPath"
 Write-Host "The bundle at build/web is deployed by the GitHub Actions workflow (.github/workflows/deploy.yml)."

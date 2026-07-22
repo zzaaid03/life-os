@@ -18,5 +18,10 @@ fi
 echo "Building web release for APP_ENV=$ENV ..."
 flutter build web --release --dart-define=APP_ENV="$ENV"
 
+STAMP="$(git rev-parse --short HEAD 2>/dev/null || date +%s)"
+echo "Cache-busting with stamp: $STAMP"
+sed -i "s/src=\"flutter_bootstrap.js\"/src=\"flutter_bootstrap.js?v=$STAMP\"/" build/web/index.html
+sed -i "s/main\.dart\.js/main.dart.js?v=$STAMP/g" build/web/flutter_bootstrap.js
+
 echo "Build output: $(pwd)/build/web"
 echo "The bundle at build/web is deployed by the GitHub Actions workflow (.github/workflows/deploy.yml)."
