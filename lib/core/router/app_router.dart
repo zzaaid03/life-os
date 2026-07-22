@@ -67,15 +67,20 @@ abstract final class AppRoutes {
 }
 
 /// Creates and configures the GoRouter instance.
-GoRouter createRouter({required WidgetRef ref}) {
-  final authState = ref.watch(authProvider);
-  final profileState = ref.watch(profileProvider);
+GoRouter createRouter(Ref ref) {
+  final refresh = ValueNotifier<int>(0);
+  ref.listen(authProvider, (_, _) => refresh.value++);
+  ref.listen(profileProvider, (_, _) => refresh.value++);
+  ref.onDispose(refresh.dispose);
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: false,
+    refreshListenable: refresh,
 
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
+      final profileState = ref.read(profileProvider);
       final isAuthenticated = authState.isAuthenticated;
       final location = state.matchedLocation;
 
@@ -278,3 +283,7 @@ GoRouter createRouter({required WidgetRef ref}) {
     ),
   );
 }
+
+/// Builds the [GoRouter] instance once; redirects re-run via
+/// [refreshListenable] instead of the router being recreated on rebuild.
+final routerProvider = Provider<GoRouter>(createRouter);

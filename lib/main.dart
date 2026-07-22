@@ -118,7 +118,7 @@ class _LifeOSAppState extends ConsumerState<LifeOSApp> {
 
   @override
   Widget build(BuildContext context) {
-    final router = createRouter(ref: ref);
+    final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
