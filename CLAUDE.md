@@ -36,63 +36,61 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
   `GOOGLE_CLIENT_ID`. Environments differ ONLY by `--dart-define=APP_ENV` (staging shows a banner).
   Both point at the SAME Supabase project — deliberate, not an oversight.
 
-## Session handoff (2026-07-22)
-- **WORKFLOW DIRECTIVE (Zaid, this session):** ALL work happens on `staging` from now on. Do NOT
-  merge `staging → main` or deploy the web bundle to stable until Zaid EXPLICITLY says "merge"/"move
-  to stable". Until then, staging is the only surface. He wants ACTIONS, not questions — decide and
-  produce; don't stall asking things he can answer by testing.
-- **CONFIRMED DONE (on `staging` @ `9ba21e6`, NOT on `main`):** goal-delete confirm dialog + cascade
-  delete. Zaid tested it and reports it "works 100%". It is still `staging`-only per the directive
-  above — `main` remains @ `f620639`. `staging` is 5 commits ahead of `main` (the whole goal-delete
-  round). Cancel cancels, cascade deletes linked tasks, unlinked tasks survive — all confirmed.
-- **ORPHAN-TASK CLEANUP — done per Zaid (NOT independently verified; planner has no DB access):**
-  pre-cascade orphans (live tasks whose goal was soft-deleted) were cleaned via a soft-delete UPDATE
-  (`SET deleted_at = NOW()` on `tasks` where `goal_id` → a `goals` row with `deleted_at IS NOT NULL`).
-  Soft-delete was chosen to match the app + stay reversible. Zaid said "everything is perfect" after.
-- **CONFIRMED REAL BUG — AI manufactures fake job applications (code-verified this session):** two
-  friends (now real test users signing in with their OWN Gmail) reported job applications for jobs
-  they never applied to ("respawned" every scan). An Explore agent traced it to THREE stacked defects:
-  1. **Loose prompt** — `supabase/functions/extract-tasks/index.ts` `SYSTEM_PROMPT` told the model to
-     emit a job update for "any email about job applications OR opportunities" and had a catch-all
-     forcing ambiguous job-related emails (recruiter nudges, expiring postings) into `status: applied`.
-     So alerts/recruiter mail/newsletters became "applications you submitted." No "did the user apply?"
-     guard anywhere.
-  2. **No review step** — extracted TASKS get an Add/Dismiss confirm; job updates AUTO-PERSIST silently
-     (`inbox_scan_provider.dart:117-122` → `job_application_repository.dart:36-103 upsertFromScan`).
-  3. **No dedup guard** — tasks are deduped against `processed_emails` (`inbox_scan_provider.dart:96-115`)
-     but job updates BYPASS it, so the same email re-surfaces a job row on every scan (= "respawned").
-  Idempotency of job rows today: `(user_id, company, role)` if company present, else
-  `(user_id, ''  , source_email_id)`, else unconditional insert (can duplicate).
-- **THE LOCKED PLAN (Zaid's priority order, all on `staging`):**
-  1. **Tighten extraction criteria** (Lever 1) — stricter prompt. ✅ WORKER PROMPT ISSUED this session
-     (rewrite the `=== JOB UPDATES ===` block: only the recipient's OWN application lifecycle; explicit
-     exclude-list for alerts/recruiters/newsletters; ambiguity → SKIP, never `applied`). AWAITING the
-     worker's report — successor's FIRST job is to verify that diff, then deploy + real-scan test.
-  2. **Add a review step** (Lever 2) — make job updates reviewable/confirmable like tasks (stop auto-persist).
-  3. **Add the dedup guard** (Lever 3) — route job updates through the `processed_emails` check.
-  4. **Onboarding / "What's New" system** (upgraded Bucket A) — a first-sign-in guided walkthrough of
-     main functions AND a reusable base for announcing future updates to existing users. Needs a design
-     spec (bring a proposal; don't ask open-ended). Fold "show signed-in account in UI" in here — it's
-     cheap, onboarding-adjacent, and would have pre-empted the OAuth scare.
-  5. **Calendar widget in the timeline** (validate scope first — it's a feature).
-  6. **Light-mode color tuning.**
-  7. **"Log out" vs "Sign out"** — verify actual wording, make consistent.
-  8. **"Search your life" tagline** → replace. Planner-banked candidates: "Find anything, instantly." /
-     "What are you looking for?" / "Recall anything." / "Your whole life, one search." (Zaid to pick.)
-  9. **Bucket C — theme switch reloads the whole page** instead of applying in-session (likely a full
-     app rebuild instead of a `ThemeMode` swap via Riverpod). Investigate; may be quick.
-- **CAUTION — EDGE FUNCTIONS ARE NOT STAGING-ISOLATED.** There is ONE Supabase project shared by
-  staging + stable, so `npx supabase functions deploy extract-tasks` goes LIVE FOR ALL TEST USERS the
-  instant it runs — you canNOT trial it on staging only (same reason migrations can't be). The Lever-1
-  fix is only-stricter (worst case it misses a real application, which beats inventing fake ones), so
-  deploying it is a net-safe improvement — but TELL Zaid it's not staging-isolated before deploying.
-- **STILL-OUTSTANDING QA correctness bugs (located earlier, NOT in Zaid's 9-item list — surface when
-  relevant, don't drop):** derived progress read RAW at `home_screen.dart:207` & `timeline_provider.dart:93`;
-  archived tasks inflate the progress denominator at `goal_provider.dart:167-187` (also skews delete-dialog
-  count); timezone naive-local at `goal.dart:115` + `goal_breakdown_service.dart:82`; UTC/local mix at
-  `goal_breakdown_service.dart:41`; dead `goalId` param on `TaskEditorSheet` (`:27,149`, belongs at
-  `goal_breakdown_screen.dart:150`); goal delete is swipe-only (undiscoverable on desktop — add an explicit
-  action in the goal edit sheet).
+## Session handoff (2026-07-22, evening — ROADMAP CLEARED)
+- **WORKFLOW DIRECTIVE (still active):** ALL work stays on `staging`. Do NOT merge `staging → main`
+  or deploy the web bundle to stable until Zaid EXPLICITLY says "merge"/"move to stable". Staging is
+  the only surface. He wants ACTIONS, not questions — decide and produce.
+- **GIT STATE:** `staging` @ `d623d68` (pushed, clean tree). `main` still @ `f620639` (untouched —
+  none of this round is on `main`). Everything below is live on **staging only**.
+- **THE ENTIRE 9-ITEM LOCKED PLAN IS DONE + Zaid-tested on staging this session:**
+  1. ✅ **Tighten job-extraction prompt** (`extract-tasks/index.ts`) — DEPLOYED to the shared Supabase
+     project (live for all test users; it's only-stricter so net-safe). Recipient's-own-application-only
+     + exclude-list (alerts/recruiters/newsletters) + ambiguity→SKIP; `applied` no longer a catch-all.
+  2. ✅ **Job-update review step (Option B)** — job updates matching an EXISTING application auto-apply
+     silently; brand-NEW applications now surface as Add/Dismiss cards (no more silent auto-persist).
+     `job_application_repository.applyKnownAndCollectNew` + `_findExistingId`; card UI in `inbox_scan_screen`.
+  3. ✅ **Dedup guard** — job updates now filtered through `processed_emails` like tasks (combined
+     `getProcessedIds`/`markProcessed`), so they stop "respawning" every scan.
+  4. ✅ **Onboarding / "What's New" engine** — new `lib/features/onboarding/`: versioned `kReleases`
+     list drives BOTH first-run tour AND future What's-New (bump a version + append a `Release` to
+     announce). SharedPreferences-backed `acknowledgedVersion` (local, `loaded` guard). Modal carousel
+     shown after sign-in on home; re-openable via Settings → About → "What's new". (Show-signed-in-account
+     was ALREADY done — Settings → Account shows the email — so no rebuild.)
+  5. ✅ **Apple-style month calendar in Timeline** — new `lib/features/calendar/`, uses `table_calendar`
+     (dependency added), tasks-by-due-date dots + selected-day list, theme-driven (light+dark).
+  6. ✅ **Smooth theme switch (was the #9 full-page-reload bug)** — ROOT CAUSE was `createRouter` called
+     inside `LifeOSApp.build()` and `ref.watch`ing auth/profile, so ANY rebuild (incl. theme) rebuilt the
+     GoRouter and reset navigation. FIX: `routerProvider = Provider<GoRouter>(createRouter)` (built once);
+     redirects re-run via a `refreshListenable` (ValueNotifier bumped by `ref.listen` on auth+profile);
+     `main.dart` now `ref.watch(routerProvider)`. Auth redirects re-verified by Zaid on staging.
+  6b. ✅ **Light-mode color tuning** (folded into #6) — the `(+)` chooser text was unreadable: light
+     `ColorScheme` set `primaryContainer` but not `onPrimaryContainer` (fell back to a washed default).
+     Fixed by `onPrimaryContainer: AppColors.primaryDark` in `app_theme.dart`; also softened the sheet's
+     modal `barrierColor` to black@32% for a lighter light-mode dim. (If Zaid ever wants the chooser
+     tiles bolder, switch them to solid `primary` bg + white `onPrimary` text — one-line, offered & declined.)
+  7. ✅ **"Sign Out" → "Log out"** (`settings_screen.dart`).
+  8. ✅ **Tagline** → "What are you looking for?" (+ hint "Search anything…") in `search_screen.dart`.
+  9. ✅ (== #6 above.)
+- **CAUTION — EDGE FUNCTIONS / MIGRATIONS ARE NOT STAGING-ISOLATED.** ONE Supabase project is shared by
+  staging + stable, so `npx supabase functions deploy` and any migration go LIVE FOR ALL TEST USERS
+  instantly. The extract-tasks deploy (#1) was net-safe (only-stricter). Always TELL Zaid before deploying.
+- **PRODUCTION SERVICE-WORKER CACHE — TO-DO before/at merge-to-stable:** Flutter web installs a service
+  worker that serves the OLD bundle first and updates only in the background — so users see stale UI until
+  a SECOND visit (bit us HARD this session: repeated "nothing changed" that was pure cache; only
+  clear-site-data / truly-fresh incognito showed new builds). When merging to stable, add a cache-busting
+  step (e.g. version-stamp `index.html`/asset URLs, or a SW update-and-reload prompt) so real users get
+  updates on first load. Not urgent while staging-only, but MUST be handled before public launch.
+- **STILL-OUTSTANDING QA correctness bugs (never in the 9-item list — NOT yet fixed; surface when
+  relevant):**
+  - derived progress read RAW at `home_screen.dart:207` & `timeline_provider.dart:93` (NOTE: home_screen
+    was refactored to `ConsumerStatefulWidget` this session — re-confirm the line before editing);
+  - archived tasks inflate the progress denominator at `goal_provider.dart:167-187` (also skews the
+    delete-dialog count);
+  - timezone naive-local at `goal.dart:115` + `goal_breakdown_service.dart:82`; UTC/local mix at
+    `goal_breakdown_service.dart:41` (the new calendar normalizes due dates via `.toLocal()` → date-only,
+    so it's internally consistent, but shares the underlying naive-local risk near midnight);
+  - dead `goalId` param on `TaskEditorSheet` (`:27,149`, belongs at `goal_breakdown_screen.dart:150`);
+  - goal delete is swipe-only (undiscoverable on desktop — add an explicit action in the goal edit sheet).
 - **TELL IBRAHIM (still open):** his brief's `rsync ... :~/lifeos/<env>/` FAILS — `rrsync` chroots to
   `/home/ibrahim/lifeos`, so `~` is literal. Correct destination is just `<env>/`.
 - **MINOR:** CI `actions/checkout@v4` + `ssh-agent@v0.9.0` still target Node 20 — one-line bump when the
@@ -100,7 +98,8 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
 - **DECISIONS:** due dates mandatory on tasks. Staging + stable deliberately share ONE Supabase project
   (do not re-litigate); therefore NEVER trial a migration OR an edge-function change on staging alone.
   Cascade = DELETE linked tasks on goal delete (implemented in Dart; migration 012's `ON DELETE CASCADE`
-  is INERT because goals soft-delete). `daily-brief` deployed & working.
+  is INERT because goals soft-delete). `daily-brief` deployed & working. Onboarding/theme prefs are LOCAL
+  (SharedPreferences) — per-device, re-shows if cache cleared; upgrade to a server flag when mobile lands.
 
 ## Roadmap
 1. **Pre-mobile refinement** (split worker rounds): ✅ Notes+Habits removed. ✅ Daily Brief made
@@ -110,9 +109,12 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
    of this phase before hosting was prioritised ahead of it.
 2. **Web hosting** ✅ DONE 2026-07-21 — live on prod + staging with CI (see "Hosting / deploy").
 3. **Fix the 3 known Goal Breakdown bugs** ✅ DONE 2026-07-21, live @ `f620639`. Mobile is unblocked.
-   **QA round IN FLIGHT:** goal-delete confirm + cascade on `staging` awaiting test; the rest of the
-   QA list is in the handoff section (derived progress ×2, archived denominator, timezone, UTC mix,
-   dead `goalId` param, show-signed-in-account).
+   **QA + polish round ✅ DONE on `staging` @ `d623d68` (NOT on `main`), Zaid-tested 2026-07-22 eve:**
+   goal-delete cascade; the whole job-extraction fake-application bug (prompt + review step + dedup);
+   onboarding/What's-New engine; Apple-style Timeline calendar; smooth theme switch (router-rebuild fix);
+   light-mode chooser readability; "Log out" wording; new search tagline. See handoff for details.
+   **Still-open QA-correctness bugs (NOT fixed):** derived-progress raw reads ×2, archived denominator,
+   timezone naive-local, dead `goalId` param, swipe-only goal delete — all in the handoff section.
 4. **Mobile app version** (Android/iOS).
 5. **Public launch**: Google OAuth verification (needed to leave Testing mode). Note the `gmail.readonly`
    sensitive scope makes this a real timeline risk — Google review is slow. Until then only
