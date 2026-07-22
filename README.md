@@ -2,19 +2,35 @@
 
 Your life, beautifully organized.
 
-**Life OS** is a premium, open-source life management application built with Flutter. It combines habit tracking, journaling, goal setting, and personal analytics into one beautifully designed experience.
+**Life OS** is a premium, open-source life management application built with Flutter. Its headline feature is AI that reads your Gmail, extracts tasks automatically, and keeps your job applications up to date — on top of that it gives you a unified timeline, AI-assisted goal breakdown, and a daily AI briefing to keep you organized.
 
 ---
 
 ## Features
 
-- **Timeline** — Chronological view of your life events, habits, and journal entries
-- **Life Dashboard** — Track goals, habits, health metrics, and personal growth
+- **AI Inbox Scan** — Reads your Gmail and automatically extracts tasks and job-application updates
+- **Job Application Tracker** — Manual add/edit/delete with a 5-stage status pipeline (applied, viewed, interview, rejected, accepted)
+- **AI Goal Breakdown** — Turn a goal into AI-suggested tasks with derived progress tracking
+- **AI Daily Brief** — A daily AI-generated summary of what matters today
+- **Timeline & Calendar** — Unified timeline with a month calendar view of your tasks
 - **Search** — Full-text search across all your data
-- **Offline First** — Works seamlessly without internet using local SQLite storage
+- **Offline First (mobile)** — The native/mobile app works seamlessly without internet using local SQLite storage
 - **Cloud Sync** — Real-time sync across devices via Supabase
 - **Dark Mode** — Beautiful light and dark themes
 - **Authentication** — Email/password and Google sign-in
+
+---
+
+## Roadmap
+
+*Indicative direction, not a commitment to dates.*
+
+- [x] Web app — live in production
+- [x] AI inbox scan, job tracker, goal breakdown, daily brief
+- [ ] **Mobile apps (Android & iOS)** — next up
+- [ ] Public availability — currently in closed testing while Google completes verification of the Gmail access scope
+- [ ] Account-level settings sync (theme and onboarding preferences are currently stored per-device)
+- [ ] Push notifications and reminders
 
 ---
 
