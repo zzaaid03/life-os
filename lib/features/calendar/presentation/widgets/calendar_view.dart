@@ -1,8 +1,8 @@
 /// Month calendar view for the Timeline screen.
 ///
-/// Shows a swipeable month grid (Apple-Calendar-like) with a dot under
-/// any day that has tasks due, plus a list of the selected day's tasks
-/// below the grid.
+/// Shows a swipeable month grid (Apple-Calendar-like) where each day cell
+/// lists the titles of the tasks due that day and days with tasks are
+/// tinted, plus a list of the selected day's full tasks below the grid.
 library;
 
 import 'package:flutter/material.dart';
@@ -46,6 +46,97 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
     return map;
   }
 
+  /// Shared day-cell renderer used by every [CalendarBuilders] slot.
+  Widget _dayCell(
+    ThemeData theme,
+    DateTime day,
+    List<Task> dayTasks, {
+    bool isSelected = false,
+    bool isToday = false,
+    bool isOutside = false,
+  }) {
+    final primary = theme.colorScheme.primary;
+    final onSurface = theme.colorScheme.onSurface;
+    final hasTasks = dayTasks.isNotEmpty;
+
+    final Color? background = isOutside
+        ? null
+        : isSelected
+        ? primary.withValues(alpha: 0.25)
+        : hasTasks
+        ? primary.withValues(alpha: 0.12)
+        : null;
+
+    Border? border;
+    if (isSelected) {
+      border = Border.all(color: primary, width: 1.5);
+    } else if (isToday && !isOutside) {
+      border = Border.all(color: primary.withValues(alpha: 0.5));
+    }
+
+    final numberColor = isOutside
+        ? onSurface.withValues(alpha: 0.25)
+        : isToday || isSelected
+        ? primary
+        : onSurface;
+    final titleColor = onSurface.withValues(alpha: isOutside ? 0.3 : 0.75);
+
+    return Container(
+      margin: const EdgeInsets.all(2),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+        border: border,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${day.day}',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.1,
+              fontWeight: isToday || isSelected
+                  ? FontWeight.w700
+                  : FontWeight.w500,
+              color: numberColor,
+            ),
+          ),
+          if (hasTasks) ...[
+            const SizedBox(height: 3),
+            for (final task in dayTasks.take(2))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 1),
+                child: Text(
+                  task.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9,
+                    height: 1.15,
+                    color: titleColor,
+                  ),
+                ),
+              ),
+            if (dayTasks.length > 2)
+              Text(
+                '+${dayTasks.length - 2}',
+                style: TextStyle(
+                  fontSize: 8,
+                  height: 1.1,
+                  fontWeight: FontWeight.w600,
+                  color: onSurface.withValues(alpha: isOutside ? 0.3 : 0.5),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -63,6 +154,8 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
           currentDay: DateTime.now(),
           calendarFormat: CalendarFormat.month,
           availableGestures: AvailableGestures.horizontalSwipe,
+          rowHeight: 82,
+          daysOfWeekHeight: 22,
           headerStyle: HeaderStyle(
             formatButtonVisible: false,
             titleCentered: true,
@@ -88,41 +181,38 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          calendarStyle: CalendarStyle(
+          // Day states (today / selected / tinted) are drawn entirely by
+          // [calendarBuilders] below, so no decorations live here.
+          calendarStyle: const CalendarStyle(
             outsideDaysVisible: true,
-            markersMaxCount: 1,
-            defaultTextStyle: theme.textTheme.bodyMedium!.copyWith(
-              color: theme.colorScheme.onSurface,
+            cellMargin: EdgeInsets.zero,
+            cellPadding: EdgeInsets.zero,
+          ),
+          calendarBuilders: CalendarBuilders<Task>(
+            defaultBuilder: (context, day, focusedDay) => _dayCell(
+              theme,
+              day,
+              tasksByDay[_dateOnly(day)] ?? const <Task>[],
             ),
-            weekendTextStyle: theme.textTheme.bodyMedium!.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            todayBuilder: (context, day, focusedDay) => _dayCell(
+              theme,
+              day,
+              tasksByDay[_dateOnly(day)] ?? const <Task>[],
+              isToday: true,
             ),
-            outsideTextStyle: theme.textTheme.bodyMedium!.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
+            selectedBuilder: (context, day, focusedDay) => _dayCell(
+              theme,
+              day,
+              tasksByDay[_dateOnly(day)] ?? const <Task>[],
+              isSelected: true,
+              isToday: isSameDay(day, DateTime.now()),
             ),
-            todayDecoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.transparent,
-              border: Border.all(color: theme.colorScheme.primary, width: 1.5),
+            outsideBuilder: (context, day, focusedDay) => _dayCell(
+              theme,
+              day,
+              tasksByDay[_dateOnly(day)] ?? const <Task>[],
+              isOutside: true,
             ),
-            todayTextStyle: theme.textTheme.bodyMedium!.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-            selectedDecoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: theme.colorScheme.primary,
-            ),
-            selectedTextStyle: theme.textTheme.bodyMedium!.copyWith(
-              color: theme.colorScheme.onPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-            markerDecoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: theme.colorScheme.primary,
-            ),
-            markerSize: 5,
-            markerMargin: const EdgeInsets.only(top: 4),
           ),
           selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
           onDaySelected: (selected, focused) {
@@ -134,8 +224,6 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
           onPageChanged: (focused) {
             _focusedDay = focused;
           },
-          eventLoader: (day) =>
-              tasksByDay[DateTime(day.year, day.month, day.day)] ?? const [],
         ),
         const SizedBox(height: AppSpacing.md),
         if (selectedTasks.isEmpty)
