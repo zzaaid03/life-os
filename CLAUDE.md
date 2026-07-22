@@ -36,6 +36,41 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
   `GOOGLE_CLIENT_ID`. Environments differ ONLY by `--dart-define=APP_ENV` (staging shows a banner).
   Both point at the SAME Supabase project — deliberate, not an oversight.
 
+## Session handoff (2026-07-22, late — QA-CORRECTNESS ROUND)
+- **WORKFLOW DIRECTIVE (unchanged):** ALL work stays on `staging`; do NOT merge to `main` / deploy
+  stable until Zaid explicitly says so. Actions, not questions.
+- **GIT STATE:** `staging` @ `958dee4` (pushed, clean tree; 5 commits ahead of the evening handoff's
+  `41ffd71`). `main` still @ `f620639` (untouched). Everything below is **staging only**.
+- **QA-CORRECTNESS ROUND — the previously-"still-outstanding" bugs are now ALL FIXED (commits
+  `294a7ee`..`958dee4`). Bugs 2–5 Zaid-tested 100%; #1 (dashboard) + #6 (calendar) PENDING his visual
+  test (pushed, awaiting CI + his check):**
+  1. ✅ **Derived-progress raw reads (Bug A)** — home goal card + timeline now route through
+     `goalTaskCountProvider`/`goalProgressProvider` (derived % when ≥1 linked task, else manual
+     `goal.progress`), mirroring goals_screen. `294a7ee`.
+  2. ✅ **Archived denominator (Bug B)** — added `t.status != TaskStatus.archived` to BOTH goal
+     providers; also fixes the delete-dialog linked-task count. `294a7ee`. *(Zaid: 100%.)*
+  3. ✅ **Timezone (Bug C)** — all goal DateTimes normalized to **store-UTC / display-local**
+     (`.toLocal()` on reads, `.toUtc().toIso8601String()` on writes) across `goal.dart` (target/synced/
+     created/updated/deleted) + `goal_breakdown_service.dart` (suggestedDueDate/targetDate). `5dd42c0`.
+     *(Zaid: 100%. NB: pre-existing rows may render one day off ONCE on first load, then stay consistent — expected, not a bug.)*
+  4. ✅ **Dead `goalId` param removed** from `TaskEditorSheet` (no call site supplied it; goal-linked
+     path builds its Task at `goal_breakdown_screen.dart:217`). `2f3566f`. *(Zaid: 100%.)*
+  5. ✅ **Explicit "Delete goal" button** in `_GoalEditorDialog` (edit mode only), reuses the swipe
+     path's confirm+delete+refresh via a shared `_deleteWithConfirm`; swipe still single-confirms. `2f3566f`. *(Zaid: 100%.)*
+  6. ✅ **Dashboard: Goals surfaced higher** — moved the goals block up to right after "Focus for Today"
+     (was dead-last under a "Life" heading), renamed the header "Life"→"Goals". `c54056c`. **PENDING Zaid visual test.**
+  7. ✅ **Timeline = calendar-only + task titles in cells** — removed the old chronological event list
+     and its now-dead helpers (`_groupByDay`/`_DayHeader`/`_TimelineTile`); redesigned the
+     `table_calendar` in `calendar/presentation/widgets/calendar_view.dart`: taller cells
+     (`rowHeight:82`), each day cell shows task TITLES as text (up to 2 + "+N") instead of dots,
+     days-with-tasks tinted (`primary@12%`, selected @25%+border, today border) via `calendarBuilders`;
+     `eventLoader`/marker knobs removed; the tap-a-day task list below is retained. `958dee4`. **PENDING Zaid visual test.**
+- **NEXT:** once Zaid OKs #1 + #6 → the QA/clean-code phase is fully closed. Then his open call is:
+  (a) **merge staging→main / deploy stable** — REQUIRES the SW-cache fix FIRST (see evening handoff), or
+  (b) **start the mobile track**. Nothing new is locked.
+- All other cautions from the evening handoff below still apply (edge-fns NOT staging-isolated;
+  SW-cache to-do before stable; TELL IBRAHIM the rsync `~` bug; Node-20 CI bump).
+
 ## Session handoff (2026-07-22, evening — ROADMAP CLEARED)
 - **WORKFLOW DIRECTIVE (still active):** ALL work stays on `staging`. Do NOT merge `staging → main`
   or deploy the web bundle to stable until Zaid EXPLICITLY says "merge"/"move to stable". Staging is
@@ -80,17 +115,10 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
   clear-site-data / truly-fresh incognito showed new builds). When merging to stable, add a cache-busting
   step (e.g. version-stamp `index.html`/asset URLs, or a SW update-and-reload prompt) so real users get
   updates on first load. Not urgent while staging-only, but MUST be handled before public launch.
-- **STILL-OUTSTANDING QA correctness bugs (never in the 9-item list — NOT yet fixed; surface when
-  relevant):**
-  - derived progress read RAW at `home_screen.dart:207` & `timeline_provider.dart:93` (NOTE: home_screen
-    was refactored to `ConsumerStatefulWidget` this session — re-confirm the line before editing);
-  - archived tasks inflate the progress denominator at `goal_provider.dart:167-187` (also skews the
-    delete-dialog count);
-  - timezone naive-local at `goal.dart:115` + `goal_breakdown_service.dart:82`; UTC/local mix at
-    `goal_breakdown_service.dart:41` (the new calendar normalizes due dates via `.toLocal()` → date-only,
-    so it's internally consistent, but shares the underlying naive-local risk near midnight);
-  - dead `goalId` param on `TaskEditorSheet` (`:27,149`, belongs at `goal_breakdown_screen.dart:150`);
-  - goal delete is swipe-only (undiscoverable on desktop — add an explicit action in the goal edit sheet).
+- **STILL-OUTSTANDING QA correctness bugs — ✅ ALL FIXED in the 2026-07-22 LATE round (see the
+  QA-CORRECTNESS handoff section above for commit-by-commit detail): derived-progress raw reads,
+  archived denominator, timezone naive-local, dead `goalId` param, swipe-only goal delete.** (Line
+  numbers in the old bullets were already stale — the fixes were re-mapped fresh before editing.)
 - **TELL IBRAHIM (still open):** his brief's `rsync ... :~/lifeos/<env>/` FAILS — `rrsync` chroots to
   `/home/ibrahim/lifeos`, so `~` is literal. Correct destination is just `<env>/`.
 - **MINOR:** CI `actions/checkout@v4` + `ssh-agent@v0.9.0` still target Node 20 — one-line bump when the
@@ -113,8 +141,11 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
    goal-delete cascade; the whole job-extraction fake-application bug (prompt + review step + dedup);
    onboarding/What's-New engine; Apple-style Timeline calendar; smooth theme switch (router-rebuild fix);
    light-mode chooser readability; "Log out" wording; new search tagline. See handoff for details.
-   **Still-open QA-correctness bugs (NOT fixed):** derived-progress raw reads ×2, archived denominator,
-   timezone naive-local, dead `goalId` param, swipe-only goal delete — all in the handoff section.
+   **QA-correctness bugs ✅ ALL FIXED on `staging` @ `958dee4` (2026-07-22 late):** derived-progress
+   raw reads, archived denominator, timezone (store-UTC/display-local), dead `goalId` param, explicit
+   goal-delete button — PLUS dashboard goals surfaced higher and Timeline redesigned to a calendar-only
+   view with task titles inside day cells (#1/#6 pending Zaid's visual test). See the QA-CORRECTNESS
+   handoff section for commit-by-commit detail. **QA/clean-code phase effectively closed pending #1/#6 sign-off.**
 4. **Mobile app version** (Android/iOS).
 5. **Public launch**: Google OAuth verification (needed to leave Testing mode). Note the `gmail.readonly`
    sensitive scope makes this a real timeline risk — Google review is slow. Until then only
