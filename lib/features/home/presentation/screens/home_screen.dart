@@ -19,6 +19,8 @@ import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/goals/domain/providers/goal_provider.dart';
 import 'package:life_os/features/home/domain/daily_brief_provider.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
+import 'package:life_os/features/onboarding/domain/announcements_provider.dart';
+import 'package:life_os/features/onboarding/presentation/announcements_sheet.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
@@ -29,15 +31,36 @@ import 'package:life_os/shared/widgets/empty_state_widget.dart';
 import 'package:life_os/shared/widgets/quick_action_button.dart';
 import 'package:life_os/shared/widgets/section_header.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _announcementsPrompted = false;
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final profileState = ref.watch(profileProvider);
     final displayName =
         profileState.profile?.displayName ?? authState.displayName ?? 'there';
+
+    final announcementsState = ref.watch(announcementsProvider);
+    if (!_announcementsPrompted &&
+        announcementsState.loaded &&
+        unseenReleases(announcementsState.ackedVersion).isNotEmpty) {
+      _announcementsPrompted = true;
+      final releases = unseenReleases(announcementsState.ackedVersion);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        AnnouncementsSheet.show(context, releases).then((_) {
+          ref.read(announcementsProvider.notifier).acknowledgeAll();
+        });
+      });
+    }
 
     return SingleChildScrollView(
       padding: AppSpacing.screenPadding,

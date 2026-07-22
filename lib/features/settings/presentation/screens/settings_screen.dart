@@ -10,6 +10,8 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/theme/theme_mode_provider.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/onboarding/domain/release_notes.dart';
+import 'package:life_os/features/onboarding/presentation/announcements_sheet.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -94,6 +96,11 @@ class SettingsScreen extends ConsumerWidget {
                 icon: Icons.privacy_tip_outlined,
                 title: 'Privacy',
                 onTap: () => _showComingSoon(context, 'Privacy'),
+              ),
+              _SettingsTile(
+                icon: Icons.tips_and_updates_outlined,
+                title: "What's new",
+                onTap: () => AnnouncementsSheet.show(context, kReleases),
               ),
             ],
           ).animate().fadeIn(duration: 400.ms, delay: 400.ms),
