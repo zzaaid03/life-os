@@ -89,35 +89,48 @@ class InboxScanController extends StateNotifier<InboxScanState> {
 
       final userId = _ref.read(authProvider).userId;
       var tasks = result.tasks;
+      var jobUpdates = result.jobUpdates;
 
       if (userId != null) {
         final processedRepo = _ref.read(processedEmailsRepositoryProvider);
 
-        // Drop suggestions the user has already seen in a previous scan.
-        final ids = result.tasks
+        // Drop suggestions/job updates already seen in a previous scan.
+        final taskIds = result.tasks
             .map((t) => t.sourceEmailId)
             .whereType<String>()
             .where((id) => id.isNotEmpty)
             .toList();
+        final jobIds = result.jobUpdates
+            .map((j) => j.sourceEmailId)
+            .whereType<String>()
+            .where((id) => id.isNotEmpty)
+            .toList();
+        final allIds = [...taskIds, ...jobIds];
         try {
-          final seen = await processedRepo.getProcessedIds(userId, ids);
+          final seen = await processedRepo.getProcessedIds(userId, allIds);
           tasks = result.tasks
               .where(
                 (t) =>
                     t.sourceEmailId == null || !seen.contains(t.sourceEmailId),
               )
               .toList();
+          jobUpdates = result.jobUpdates
+              .where(
+                (j) =>
+                    j.sourceEmailId == null || !seen.contains(j.sourceEmailId),
+              )
+              .toList();
           // Everything surfaced this scan counts as seen from now on.
-          await processedRepo.markProcessed(userId, ids);
+          await processedRepo.markProcessed(userId, allIds);
         } catch (_) {
-          // Dedup is best-effort; a failure just means suggestions may
-          // reappear on the next scan.
+          // Dedup is best-effort; a failure just means suggestions/job
+          // updates may reappear on the next scan.
         }
 
-        if (result.jobUpdates.isNotEmpty) {
+        if (jobUpdates.isNotEmpty) {
           await _ref
               .read(jobApplicationRepositoryProvider)
-              .upsertFromScan(result.jobUpdates, userId);
+              .upsertFromScan(jobUpdates, userId);
           await _ref.read(jobListProvider.notifier).refresh();
         }
       }
@@ -125,7 +138,7 @@ class InboxScanController extends StateNotifier<InboxScanState> {
       state = InboxScanState(
         phase: InboxScanPhase.done,
         tasks: tasks,
-        jobUpdates: result.jobUpdates,
+        jobUpdates: jobUpdates,
         scannedAccount: result.scannedAccount,
         hasScannedOnce: true,
       );
