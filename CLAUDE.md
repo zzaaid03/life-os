@@ -10,7 +10,12 @@ using Groq, model `llama-3.3-70b-versatile`). Feature-first architecture — mir
 for new features. Supabase project ref: `ganbmkphtzdvxxnmprku`. CLI via `npx supabase` (no global
 install, no Docker). Runs on Chrome for dev (`flutter run -d chrome`).
 
-## Current state (2026-07-21) — origin/main @ f620639 — LIVE IN PRODUCTION
+## Current state (2026-07-22) — origin/main @ 7799332 — LIVE IN PRODUCTION
+**`main` and `staging` are BOTH at `7799332` (merged 2026-07-22, fast-forward, 24 commits).** Everything
+described in the two 2026-07-22 handoff sections below is now on STABLE, not staging-only. The old
+"staging only / do not merge" workflow directive in those sections is SPENT — it was satisfied by this
+merge. Default back to: work on `staging`, merge to `main` when Zaid says so.
+
 WORKING: AI inbox scan (Gmail read SERVER-SIDE via a stored refresh token → Groq → tasks +
 job-application updates), job tracker with manual add/edit/delete, tasks, unified timeline, AI Daily
 Brief card, dark mode + theme toggle, 5-status job vocab (applied/viewed/interview/rejected/accepted),
@@ -67,16 +72,14 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
      days-with-tasks tinted (`primary@12%`, selected @25%+border, today border) via `calendarBuilders`;
      `eventLoader`/marker knobs removed; the tap-a-day task list below is retained. `958dee4`. *(Zaid: confirmed good.)*
 - **NEXT (LOCKED — chosen by Zaid 2026-07-22 late): OPTION (a) — MERGE `staging` → `main` / DEPLOY
-  STABLE.** ⚠️ HARD PREREQUISITE: the **service-worker cache fix MUST land first** (see the SW-CACHE
-  to-do in the evening handoff) — otherwise real stable users get stale bundles on first load. Sequence:
-  (1) build the SW-cache fix ON `staging`, test it (hard-refresh proves updates land on FIRST load),
-  (2) THEN merge staging→main so CI deploys stable. The successor must CONFIRM with Zaid before the
-  actual merge (first public-facing deploy). Leading fix candidate: `flutter build web --pwa-strategy=none`
-  in `scripts/build-web.sh` (stops generating the SW → no stale cache; app is online-only so losing PWA
-  offline is fine) — but scope `scripts/build-web.sh` + `web/index.html` first and pick with Zaid.
-  Option (b) mobile track is deferred behind this.
+  STABLE. ✅ DONE 2026-07-22.** The cache fix landed on `staging` (`7799332`), Zaid authorized the merge,
+  `main` fast-forwarded `f620639..7799332` (24 commits, sole author Zaid Jarrar, no agent attribution),
+  CI run `29940066260` deployed stable green, and the live bundle at `https://lifeos.deadthrone.dev` was
+  verified serving `flutter_bootstrap.js?v=7799332` → `main.dart.js?v=7799332` behind a no-store shell.
+  **Option (b) — the MOBILE track — is now the next roadmap item.**
 - All other cautions from the evening handoff below still apply (edge-fns NOT staging-isolated;
-  SW-cache to-do before stable; TELL IBRAHIM the rsync `~` bug; Node-20 CI bump).
+  Node-20 CI bump). ✅ SW-cache to-do: RESOLVED (see the RESOLVED block below). ✅ TELL IBRAHIM the
+  rsync `~` bug: DONE — Ibrahim acknowledged and corrected his brief 2026-07-22.
 
 ## Session handoff (2026-07-22, evening — ROADMAP CLEARED)
 - **WORKFLOW DIRECTIVE (still active):** ALL work stays on `staging`. Do NOT merge `staging → main`
@@ -116,12 +119,31 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
 - **CAUTION — EDGE FUNCTIONS / MIGRATIONS ARE NOT STAGING-ISOLATED.** ONE Supabase project is shared by
   staging + stable, so `npx supabase functions deploy` and any migration go LIVE FOR ALL TEST USERS
   instantly. The extract-tasks deploy (#1) was net-safe (only-stricter). Always TELL Zaid before deploying.
-- **PRODUCTION SERVICE-WORKER CACHE — TO-DO before/at merge-to-stable:** Flutter web installs a service
-  worker that serves the OLD bundle first and updates only in the background — so users see stale UI until
-  a SECOND visit (bit us HARD this session: repeated "nothing changed" that was pure cache; only
-  clear-site-data / truly-fresh incognito showed new builds). When merging to stable, add a cache-busting
-  step (e.g. version-stamp `index.html`/asset URLs, or a SW update-and-reload prompt) so real users get
-  updates on first load. Not urgent while staging-only, but MUST be handled before public launch.
+- **PRODUCTION SERVICE-WORKER CACHE — ✅ RESOLVED 2026-07-22 (`7799332`). Two facts here were WRONG in
+  the original write-up; do not relearn them:**
+  1. **It was never the service worker.** On Flutter 3.44.7 the emitted `flutter_service_worker.js` is an
+     ~815-byte SELF-UNREGISTERING STUB (`install→skipWaiting`, `activate→registration.unregister()`) —
+     no `RESOURCES` map, no `fetch` handler, no Cache Storage. It caches NOTHING. The staleness was
+     ordinary HTTP caching of the root-level entry files.
+  2. **Therefore `--pwa-strategy=none` was the WRONG fix** (it was the leading candidate). It suppresses
+     the stub — and the stub is the only thing that evicts the REAL caching SW that older Flutter builds
+     installed on existing browsers. Removing it would strand those clients permanently. **Keep the stub
+     generated. Never add `--pwa-strategy=none`.**
+  3. **Caddy was already configured correctly** — Ibrahim serves `index.html`, `flutter_service_worker.js`,
+     and `version.json` with `Cache-Control: no-cache, no-store, must-revalidate`, and `/assets/*` with
+     immutable 1-year caching. (An agent inferred "no Cache-Control" from Caddy DEFAULTS instead of
+     checking the live config — verify with `curl -sI` before blaming server config.)
+  4. **The actual gap + the fix:** `main.dart.js` and `flutter_bootstrap.js` live at the bundle ROOT, so
+     they match neither Caddy rule and fell through to heuristic caching. `scripts/build-web.sh` (+ the
+     `.ps1` twin) now post-build stamps them with the git short SHA: `index.html` → `flutter_bootstrap.js?v=$STAMP`,
+     and inside that file → `main.dart.js?v=$STAMP`. Plus `<meta http-equiv="Cache-Control" content="no-cache">`
+     in `web/index.html`. Chain: no-store shell → new bootstrap URL → new main.dart.js URL. No link can go stale.
+  5. **If you change the build flags, keep `scripts/build-web.sh` and `scripts/build-web.ps1` in sync** —
+     CI uses the `.sh`; the `.ps1` is the local-Windows twin and is NOT exercised by CI.
+- **`/assets/*` is served immutable for 1 YEAR — and `.env` ships under `/assets/`.** If `SUPABASE_URL`,
+  `SUPABASE_PUBLISHABLE_KEY`, or `GOOGLE_CLIENT_ID` is ever rotated, returning visitors can hold a stale
+  `.env` for up to a year. Rotating a key therefore REQUIRES a coordinated cache-busting plan (ask Ibrahim
+  to purge or rename), not just a redeploy.
 - **STILL-OUTSTANDING QA correctness bugs — ✅ ALL FIXED in the 2026-07-22 LATE round (see the
   QA-CORRECTNESS handoff section above for commit-by-commit detail): derived-progress raw reads,
   archived denominator, timezone naive-local, dead `goalId` param, swipe-only goal delete.** (Line
@@ -152,8 +174,13 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
    raw reads, archived denominator, timezone (store-UTC/display-local), dead `goalId` param, explicit
    goal-delete button — PLUS dashboard goals surfaced higher and Timeline redesigned to a calendar-only
    view with task titles inside day cells (#1/#6 pending Zaid's visual test). See the QA-CORRECTNESS
-   handoff section for commit-by-commit detail. **QA/clean-code phase effectively closed pending #1/#6 sign-off.**
-4. **Mobile app version** (Android/iOS).
+   handoff section for commit-by-commit detail. **QA/clean-code phase CLOSED — Zaid signed off on #1/#6.**
+3b. **Cache-bust + MERGE TO STABLE ✅ DONE 2026-07-22 — `main` @ `7799332`.** Entry-asset version
+   stamping shipped (`scripts/build-web.sh` + `.ps1`, `web/index.html`), then `staging`→`main`
+   fast-forwarded and CI deployed stable green; live bundle verified by `curl`. **Stable is no longer
+   the 2026-07-21 snapshot — everything from the QA + polish rounds is now in production.** This merge
+   was a pure bundle swap: NO migrations and NO edge-function deploys were part of it.
+4. **Mobile app version** (Android/iOS) ← **NEXT UP.**
 5. **Public launch**: Google OAuth verification (needed to leave Testing mode). Note the `gmail.readonly`
    sensitive scope makes this a real timeline risk — Google review is slow. Until then only
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
