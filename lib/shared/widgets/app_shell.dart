@@ -103,6 +103,7 @@ class AppShell extends ConsumerWidget {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
       isScrollControlled: true,
       builder: (sheetContext) => _AddChooserSheet(
         onAddTask: () {
