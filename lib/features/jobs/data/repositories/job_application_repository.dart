@@ -102,6 +102,64 @@ class JobApplicationRepository {
     }
   }
 
+  /// Returns the id of the existing row [update] refers to, using the same
+  /// identity rules as [upsertFromScan], or `null` if there is no match.
+  Future<String?> _findExistingId(JobUpdate update, String userId) async {
+    if (update.company.isNotEmpty) {
+      final existing = await _client
+          .from(_table)
+          .select('id')
+          .eq('user_id', userId)
+          .eq('company', update.company)
+          .eq('role', update.role)
+          .maybeSingle();
+      return existing?['id'] as String?;
+    }
+
+    final emailId = update.sourceEmailId;
+    if (emailId != null && emailId.isNotEmpty) {
+      final existing = await _client
+          .from(_table)
+          .select('id')
+          .eq('user_id', userId)
+          .eq('company', '')
+          .eq('source_email_id', emailId)
+          .maybeSingle();
+      return existing?['id'] as String?;
+    }
+
+    return null;
+  }
+
+  /// Option B: auto-applies status/summary to job updates that match an
+  /// EXISTING application, and returns the updates that refer to a brand-new
+  /// application (no matching row) so the UI can confirm before adding them.
+  Future<List<JobUpdate>> applyKnownAndCollectNew(
+    List<JobUpdate> updates,
+    String userId,
+  ) async {
+    final newOnes = <JobUpdate>[];
+
+    for (final update in updates) {
+      final id = await _findExistingId(update, userId);
+
+      if (id != null) {
+        await _client
+            .from(_table)
+            .update({
+              'status': update.status,
+              'summary': update.summary,
+              'source_email_id': update.sourceEmailId,
+            })
+            .eq('id', id);
+      } else {
+        newOnes.add(update);
+      }
+    }
+
+    return newOnes;
+  }
+
   /// Creates a job application manually. Returns the inserted row.
   Future<JobApplication> create({
     required String userId,

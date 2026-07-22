@@ -17,6 +17,8 @@ import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_consent_provider.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_provider.dart';
 import 'package:life_os/features/inbox/presentation/widgets/inbox_consent_dialog.dart';
+import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
+import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/jobs/presentation/job_display.dart';
 import 'package:life_os/features/jobs/presentation/widgets/job_status_chip.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
@@ -121,6 +123,30 @@ class InboxScanScreen extends ConsumerWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Added "${suggestion.title}"'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// Persists a brand-new job update to the tracker and removes its card.
+  Future<void> _addJobApplication(
+    BuildContext context,
+    WidgetRef ref,
+    JobUpdate update,
+  ) async {
+    final userId = ref.read(authProvider).userId;
+    if (userId == null) return;
+
+    await ref
+        .read(jobApplicationRepositoryProvider)
+        .upsertFromScan([update], userId);
+    await ref.read(jobListProvider.notifier).refresh();
+    ref.read(inboxScanProvider.notifier).removeJobUpdate(update);
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Added to your job tracker'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -258,9 +284,19 @@ class InboxScanScreen extends ConsumerWidget {
         const SizedBox(height: AppSpacing.xl),
       ],
       if (hasJobs) ...[
-        _SectionTitle(title: 'Job Updates', count: scanState.jobUpdates.length),
+        _SectionTitle(
+          title: 'New Job Applications',
+          count: scanState.jobUpdates.length,
+        ),
         const SizedBox(height: AppSpacing.sm),
-        ...scanState.jobUpdates.map((j) => _JobUpdateCard(update: j)),
+        ...scanState.jobUpdates.map(
+          (j) => _JobUpdateCard(
+            update: j,
+            onAdd: () => _addJobApplication(context, ref, j),
+            onDismiss: () =>
+                ref.read(inboxScanProvider.notifier).dismissJobUpdate(j),
+          ),
+        ),
       ],
       const SizedBox(height: AppSpacing.massive),
     ];
@@ -464,9 +500,15 @@ class _SuggestedTaskCard extends StatelessWidget {
 }
 
 class _JobUpdateCard extends StatelessWidget {
-  const _JobUpdateCard({required this.update});
+  const _JobUpdateCard({
+    required this.update,
+    required this.onAdd,
+    required this.onDismiss,
+  });
 
   final JobUpdate update;
+  final VoidCallback onAdd;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -486,33 +528,59 @@ class _JobUpdateCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  jobDisplayTitle(
-                    company: update.company,
-                    role: update.role,
-                    status: update.status,
-                  ),
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            jobDisplayTitle(
+                              company: update.company,
+                              role: update.role,
+                              status: update.status,
+                            ),
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        JobStatusChip(status: update.status),
+                      ],
+                    ),
+                    if (update.summary.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        update.summary,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              JobStatusChip(status: update.status),
+              IconButton(
+                icon: const Icon(Icons.check_rounded),
+                color: AppColors.success,
+                tooltip: 'Add to tracker',
+                onPressed: onAdd,
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                tooltip: 'Dismiss',
+                onPressed: onDismiss,
+              ),
             ],
           ),
-          if (update.summary.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              update.summary,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                height: 1.4,
-              ),
-            ),
-          ],
         ],
       ),
     );

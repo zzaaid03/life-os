@@ -128,9 +128,9 @@ class InboxScanController extends StateNotifier<InboxScanState> {
         }
 
         if (jobUpdates.isNotEmpty) {
-          await _ref
+          jobUpdates = await _ref
               .read(jobApplicationRepositoryProvider)
-              .upsertFromScan(jobUpdates, userId);
+              .applyKnownAndCollectNew(jobUpdates, userId);
           await _ref.read(jobListProvider.notifier).refresh();
         }
       }
@@ -163,6 +163,16 @@ class InboxScanController extends StateNotifier<InboxScanState> {
 
   /// Removes a suggestion the user dismissed.
   void dismissTask(SuggestedTask task) => removeTask(task);
+
+  /// Removes a job update after the user added it to the tracker.
+  void removeJobUpdate(JobUpdate update) {
+    state = state.copyWith(
+      jobUpdates: state.jobUpdates.where((j) => !identical(j, update)).toList(),
+    );
+  }
+
+  /// Removes a job update the user dismissed.
+  void dismissJobUpdate(JobUpdate update) => removeJobUpdate(update);
 }
 
 /// The app-wide inbox scan state.
