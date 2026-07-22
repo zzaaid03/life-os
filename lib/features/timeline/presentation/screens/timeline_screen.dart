@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/features/calendar/presentation/widgets/calendar_view.dart';
 import 'package:life_os/features/timeline/domain/timeline_provider.dart';
 import 'package:life_os/shared/widgets/empty_state_widget.dart';
 
@@ -35,6 +36,8 @@ class TimelineScreen extends ConsumerWidget {
             ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.xxl),
+          const CalendarView(),
+          const SizedBox(height: AppSpacing.lg),
           if (events.isEmpty)
             const Center(
               child: EmptyStateWidget(
