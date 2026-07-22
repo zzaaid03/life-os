@@ -4,6 +4,7 @@
 /// auth, supports create/update/delete + progress updates, and refreshes.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:life_os/features/auth/data/models/auth_state.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
@@ -135,14 +136,28 @@ class GoalListNotifier extends StateNotifier<GoalListState> {
   Future<void> deleteGoal(String id) async {
     await _repository.delete(id);
 
-    final userId = _userId;
-    if (userId != null) {
-      final tasks = await _taskRepository.getAll(userId);
-      final linkedTasks = tasks.where((t) => t.goalId == id);
-      for (final task in linkedTasks) {
-        await _taskRepository.delete(task.id);
+    String? userId = _userId;
+    if (userId == null) {
+      for (final goal in state.goals) {
+        if (goal.id == id) {
+          userId = goal.userId;
+          break;
+        }
       }
     }
+    if (userId == null) {
+      throw StateError('Cannot delete goal $id: no user id available');
+    }
+
+    final tasks = await _taskRepository.getAll(userId);
+    final linkedTasks = tasks.where((t) => t.goalId == id).toList();
+    for (final task in linkedTasks) {
+      await _taskRepository.delete(task.id);
+    }
+    debugPrint(
+      'deleteGoal($id): found ${linkedTasks.length} linked tasks, '
+      'deleted ${linkedTasks.length}',
+    );
 
     await refresh();
   }

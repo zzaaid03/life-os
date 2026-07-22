@@ -134,8 +134,18 @@ class GoalsScreen extends ConsumerWidget {
           ),
           confirmDismiss: (_) => _confirmDelete(context, ref, goal),
           onDismissed: (_) async {
-            await ref.read(goalListProvider.notifier).deleteGoal(goal.id);
-            await ref.read(taskListProvider.notifier).refresh();
+            try {
+              await ref.read(goalListProvider.notifier).deleteGoal(goal.id);
+              await ref.read(taskListProvider.notifier).refresh();
+            } catch (_) {
+              await ref.read(goalListProvider.notifier).refresh();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Couldn't delete goal. Please try again."),
+                ),
+              );
+            }
           },
           child: _GoalCard(goal: goal, onTap: () => _edit(context, ref, goal)),
         );
