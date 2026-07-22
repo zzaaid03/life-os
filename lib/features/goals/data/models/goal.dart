@@ -38,19 +38,19 @@ class Goal extends Equatable implements Entity {
       title: json['title'] as String,
       description: json['description'] as String?,
       targetDate: json['target_date'] != null
-          ? DateTime.parse(json['target_date'] as String)
+          ? DateTime.parse(json['target_date'] as String).toLocal()
           : null,
       progress: (json['progress'] as num?)?.toDouble() ?? 0,
       status: _parseStatus(json['status'] as String?),
       category: json['category'] as String?,
       sortOrder: (json['sort_order'] as num?)?.toDouble() ?? 0,
       syncedAt: json['synced_at'] != null
-          ? DateTime.parse(json['synced_at'] as String)
+          ? DateTime.parse(json['synced_at'] as String).toLocal()
           : null,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
       deletedAt: json['deleted_at'] != null
-          ? DateTime.parse(json['deleted_at'] as String)
+          ? DateTime.parse(json['deleted_at'] as String).toLocal()
           : null,
       syncStatus: SyncStatus.values.firstWhere(
         (s) => s.name == json['sync_status'],
@@ -112,15 +112,15 @@ class Goal extends Equatable implements Entity {
       'user_id': userId,
       'title': title,
       'description': description,
-      'target_date': targetDate?.toIso8601String(),
+      'target_date': targetDate?.toUtc().toIso8601String(),
       'progress': progress,
       'status': status.name,
       'category': category,
       'sort_order': sortOrder,
-      'synced_at': syncedAt?.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-      'deleted_at': deletedAt?.toIso8601String(),
+      'synced_at': syncedAt?.toUtc().toIso8601String(),
+      'created_at': createdAt.toUtc().toIso8601String(),
+      'updated_at': updatedAt.toUtc().toIso8601String(),
+      'deleted_at': deletedAt?.toUtc().toIso8601String(),
       'sync_status': syncStatus.name,
       'version': version,
     };

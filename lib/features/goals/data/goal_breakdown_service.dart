@@ -38,7 +38,8 @@ class SuggestedGoalTask {
       title: (json['title'] as String? ?? '').trim(),
       description: (json['description'] as String?)?.trim(),
       priority: (json['priority'] as String? ?? 'none').trim().toLowerCase(),
-      suggestedDueDate: DateTime.parse(json['suggestedDueDate'] as String),
+      suggestedDueDate:
+          DateTime.parse(json['suggestedDueDate'] as String).toLocal(),
     );
   }
 
@@ -79,7 +80,7 @@ class GoalBreakdownService {
         body: {
           'goalTitle': goalTitle,
           'goalDescription': goalDescription,
-          'targetDate': targetDate?.toIso8601String(),
+          'targetDate': targetDate?.toUtc().toIso8601String(),
         },
       );
     } catch (e) {
