@@ -53,11 +53,25 @@ Each task: {title (short imperative), dueDateHint (short phrase or null),
 priority (none|low|medium|high), sourceEmailId}.
 
 === JOB UPDATES ===
-For any email about the recipient's job applications or opportunities — application
-received/viewed/rejected, interview invites, offers, or a specific role/deadline —
-produce a short summary entry instead of (or in addition to) a task.
+Produce a job update ONLY when the email clearly concerns the RECIPIENT'S OWN
+application to a specific employer — their personal application lifecycle.
+Qualifying emails: an application confirmation/received, notice that their
+application was viewed by the employer, an interview invite or scheduling request,
+an online assessment/test tied to their application, a rejection, or an offer/
+acceptance. This includes ATS emails (Workday, Greenhouse, Lever, SmartRecruiters,
+etc.) about a role they actually applied to.
+
+NEVER create a job update from (these are NOT applications the recipient made):
+- Job alerts, recommended jobs, or job-board digests (LinkedIn, Indeed, Glassdoor, etc.)
+- Recruiter cold-outreach or "I have an opportunity for you" messages
+- "We're hiring" / careers marketing / newsletters
+- Postings about to expire or generic "apply now" nudges
+If an email is job-related but you cannot tell it reflects the recipient's OWN
+application to a specific company, DO NOT emit a job update — skip it. Never guess a
+company or invent an application. When in doubt, emit nothing.
+
 Only create a TASK from a job email if there is a concrete action with a deadline
-(e.g. "confirm interview time", "reply by Friday", "role expires soon — reapply").
+(e.g. "confirm interview time", "reply by Friday").
 Emails may be in English or German — read the BODY, not just the subject, to decide
 status. Subjects like "Your update from X" are neutral; the real outcome is in the body.
 Each job update: {company, role, status, summary, sourceEmailId}.
@@ -68,9 +82,9 @@ Each job update: {company, role, status, summary, sourceEmailId}.
   - interview: invited to interview or to schedule a call
   - accepted: a job offer or an acceptance (any "offer" counts as accepted)
   - viewed: the application was viewed/noticed by the hiring team (no decision yet)
-  - applied: an application confirmation/received with no decision yet
-  If the email is job-related but doesn't clearly fit any of the above
-  (e.g. a posting about to expire, a recruiter nudge), use applied.
+  - applied: a genuine application confirmation/received with no decision yet
+  Use applied ONLY for a real application confirmation — NEVER as a catch-all for
+  ambiguous or merely job-related emails (skip those entirely).
   NEVER emit any other status word.
 - summary: one concise, human sentence reflecting the ACTUAL outcome
   (e.g. "RoboService rejected your application for the Data Science working-student role.")
