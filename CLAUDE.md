@@ -36,56 +36,71 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
   `GOOGLE_CLIENT_ID`. Environments differ ONLY by `--dart-define=APP_ENV` (staging shows a banner).
   Both point at the SAME Supabase project — deliberate, not an oversight.
 
-## Session handoff (2026-07-21, late evening)
-- **DONE (LIVE IN PRODUCTION @ `f620639`):** all 3 known Goal Breakdown bugs from the previous
-  handoff are FIXED, verified by diff-trace (not by worker report), and deployed:
-  1. Drift now persists `goal_id` — column added to the `Tasks` table, mapped in BOTH
-     `_taskToCompanion` and `_taskFromEntry`. Round-trip verified end to end via `Task.toJson()`.
-  2. `schemaVersion` bumped 1 → 2 with a `if (from < 2) m.addColumn(tasks, tasks.goalId)` guard.
-     This is the repo's first real Drift migration. Native-only; untested until the mobile round.
-  3. Goal-save now writes through `taskRepositoryProvider` and AWAITS it, so real task-persistence
-     failures reach the screen's catch instead of showing false success.
-- **ON `staging`, NOT YET IN PROD — awaiting Zaid's manual test:** goal-delete confirmation dialog
-  (`confirmDismiss` on the `Dismissible` in `goals_screen.dart`, names the goal + linked task count)
-  and cascade delete (`GoalListNotifier.deleteGoal` now deletes the goal first, then its linked
-  tasks). Merge to `main` only after Zaid confirms: Cancel truly cancels, and unlinked tasks survive.
-- **RESOLVED DECISION — cascade:** Zaid chose to DELETE linked tasks when a goal is deleted
-  (chose "A" over unlink-and-keep, with the tradeoff explained). Do not re-litigate. Note migration
-  012's `ON DELETE CASCADE` is INERT — the goal repo soft-deletes (sets `deleted_at`) and never
-  issues a SQL DELETE, so the cascade is implemented in Dart, not by the DB.
-- **RESOLVED:** `daily-brief` IS deployed and working (Zaid confirmed). Prod smoke-test done by Zaid.
-- **NOT A BUG — the "job applications leak" scare:** friends reported seeing each other's job
-  applications. Investigated: RLS on `job_applications` is correct (`auth.uid() = user_id` on all
-  4 verbs), no migration weakens it, and `getAll` filters by `user_id`. Root cause was that Google
-  OAuth was in Testing mode with only Zaid's 2 accounts allowed, so friends signed in AS ZAID.
-  Zaid has since added them as test users. **Lesson: verify the isolation layers before believing a
-  breach report — and note a shared test account also shares the stored Gmail refresh token.**
-- **REMAINING QA-ROUND WORK (all located, none fixed):**
-  - Derived progress read RAW at TWO sites: `home_screen.dart:207`, `timeline_provider.dart:93`
-    (`goals_screen.dart:154-156` already does it correctly).
-  - Archived tasks inflate the progress denominator — `goal_provider.dart:167-187` filters only on
-    `goalId`, never excludes `TaskStatus.archived`. Also skews the delete dialog's task count.
-  - Timezone: `goal.dart:115` emits naive local `toIso8601String()` into a `DATE` column;
-    `goal_breakdown_service.dart:82` sends it naive to the Edge Function, which does `new Date()`
-    (JS parses bare dates as UTC) — horizon can shift a day.
-  - UTC/local mix: `goal_breakdown_service.dart:41` parses server `...Z` with NO `.toLocal()`, so AI
-    task dueDates are `isUtc == true` while hand-made ones are local.
-  - `goalId` param on `TaskEditorSheet` (`:27,149`) IS consumed in the create branch but NO call site
-    passes it, and the edit branch drops it. `goal_breakdown_screen.dart:150` is where it belongs.
-  - **Show the signed-in account in the UI** — would have prevented the entire OAuth scare above.
-  - **No visible delete affordance.** Goal delete is swipe-only (`DismissDirection.endToStart` in
-    `goals_screen.dart:122`). Zaid — who built it — could not find it on desktop Chrome, which is the
-    primary dev/prod surface today. Add an explicit delete action in the goal edit sheet (already
-    opened by `onTap` at `goals_screen.dart:139`) and keep the swipe for mobile. Tasks use the same
-    swipe-only pattern, so check whether they need the same treatment.
-- **TELL IBRAHIM:** his brief specified `rsync ... :~/lifeos/<env>/`, which FAILS — `rrsync` chroots to
-  `/home/ibrahim/lifeos` and resolves paths relative to it, so `~` is taken literally and it tries
-  `/home/ibrahim/lifeos/~/lifeos/<env>`. Correct destination is just `<env>/`.
-- **MINOR:** CI warns `actions/checkout@v4` + `ssh-agent@v0.9.0` still target Node 20. One-line bump
-  whenever the workflow is next touched; not worth its own round.
-- **NEXT:** merge staging→main once Zaid's delete test passes, then run the QA round above.
+## Session handoff (2026-07-22)
+- **WORKFLOW DIRECTIVE (Zaid, this session):** ALL work happens on `staging` from now on. Do NOT
+  merge `staging → main` or deploy the web bundle to stable until Zaid EXPLICITLY says "merge"/"move
+  to stable". Until then, staging is the only surface. He wants ACTIONS, not questions — decide and
+  produce; don't stall asking things he can answer by testing.
+- **CONFIRMED DONE (on `staging` @ `9ba21e6`, NOT on `main`):** goal-delete confirm dialog + cascade
+  delete. Zaid tested it and reports it "works 100%". It is still `staging`-only per the directive
+  above — `main` remains @ `f620639`. `staging` is 5 commits ahead of `main` (the whole goal-delete
+  round). Cancel cancels, cascade deletes linked tasks, unlinked tasks survive — all confirmed.
+- **ORPHAN-TASK CLEANUP — done per Zaid (NOT independently verified; planner has no DB access):**
+  pre-cascade orphans (live tasks whose goal was soft-deleted) were cleaned via a soft-delete UPDATE
+  (`SET deleted_at = NOW()` on `tasks` where `goal_id` → a `goals` row with `deleted_at IS NOT NULL`).
+  Soft-delete was chosen to match the app + stay reversible. Zaid said "everything is perfect" after.
+- **CONFIRMED REAL BUG — AI manufactures fake job applications (code-verified this session):** two
+  friends (now real test users signing in with their OWN Gmail) reported job applications for jobs
+  they never applied to ("respawned" every scan). An Explore agent traced it to THREE stacked defects:
+  1. **Loose prompt** — `supabase/functions/extract-tasks/index.ts` `SYSTEM_PROMPT` told the model to
+     emit a job update for "any email about job applications OR opportunities" and had a catch-all
+     forcing ambiguous job-related emails (recruiter nudges, expiring postings) into `status: applied`.
+     So alerts/recruiter mail/newsletters became "applications you submitted." No "did the user apply?"
+     guard anywhere.
+  2. **No review step** — extracted TASKS get an Add/Dismiss confirm; job updates AUTO-PERSIST silently
+     (`inbox_scan_provider.dart:117-122` → `job_application_repository.dart:36-103 upsertFromScan`).
+  3. **No dedup guard** — tasks are deduped against `processed_emails` (`inbox_scan_provider.dart:96-115`)
+     but job updates BYPASS it, so the same email re-surfaces a job row on every scan (= "respawned").
+  Idempotency of job rows today: `(user_id, company, role)` if company present, else
+  `(user_id, ''  , source_email_id)`, else unconditional insert (can duplicate).
+- **THE LOCKED PLAN (Zaid's priority order, all on `staging`):**
+  1. **Tighten extraction criteria** (Lever 1) — stricter prompt. ✅ WORKER PROMPT ISSUED this session
+     (rewrite the `=== JOB UPDATES ===` block: only the recipient's OWN application lifecycle; explicit
+     exclude-list for alerts/recruiters/newsletters; ambiguity → SKIP, never `applied`). AWAITING the
+     worker's report — successor's FIRST job is to verify that diff, then deploy + real-scan test.
+  2. **Add a review step** (Lever 2) — make job updates reviewable/confirmable like tasks (stop auto-persist).
+  3. **Add the dedup guard** (Lever 3) — route job updates through the `processed_emails` check.
+  4. **Onboarding / "What's New" system** (upgraded Bucket A) — a first-sign-in guided walkthrough of
+     main functions AND a reusable base for announcing future updates to existing users. Needs a design
+     spec (bring a proposal; don't ask open-ended). Fold "show signed-in account in UI" in here — it's
+     cheap, onboarding-adjacent, and would have pre-empted the OAuth scare.
+  5. **Calendar widget in the timeline** (validate scope first — it's a feature).
+  6. **Light-mode color tuning.**
+  7. **"Log out" vs "Sign out"** — verify actual wording, make consistent.
+  8. **"Search your life" tagline** → replace. Planner-banked candidates: "Find anything, instantly." /
+     "What are you looking for?" / "Recall anything." / "Your whole life, one search." (Zaid to pick.)
+  9. **Bucket C — theme switch reloads the whole page** instead of applying in-session (likely a full
+     app rebuild instead of a `ThemeMode` swap via Riverpod). Investigate; may be quick.
+- **CAUTION — EDGE FUNCTIONS ARE NOT STAGING-ISOLATED.** There is ONE Supabase project shared by
+  staging + stable, so `npx supabase functions deploy extract-tasks` goes LIVE FOR ALL TEST USERS the
+  instant it runs — you canNOT trial it on staging only (same reason migrations can't be). The Lever-1
+  fix is only-stricter (worst case it misses a real application, which beats inventing fake ones), so
+  deploying it is a net-safe improvement — but TELL Zaid it's not staging-isolated before deploying.
+- **STILL-OUTSTANDING QA correctness bugs (located earlier, NOT in Zaid's 9-item list — surface when
+  relevant, don't drop):** derived progress read RAW at `home_screen.dart:207` & `timeline_provider.dart:93`;
+  archived tasks inflate the progress denominator at `goal_provider.dart:167-187` (also skews delete-dialog
+  count); timezone naive-local at `goal.dart:115` + `goal_breakdown_service.dart:82`; UTC/local mix at
+  `goal_breakdown_service.dart:41`; dead `goalId` param on `TaskEditorSheet` (`:27,149`, belongs at
+  `goal_breakdown_screen.dart:150`); goal delete is swipe-only (undiscoverable on desktop — add an explicit
+  action in the goal edit sheet).
+- **TELL IBRAHIM (still open):** his brief's `rsync ... :~/lifeos/<env>/` FAILS — `rrsync` chroots to
+  `/home/ibrahim/lifeos`, so `~` is literal. Correct destination is just `<env>/`.
+- **MINOR:** CI `actions/checkout@v4` + `ssh-agent@v0.9.0` still target Node 20 — one-line bump when the
+  workflow is next touched.
 - **DECISIONS:** due dates mandatory on tasks. Staging + stable deliberately share ONE Supabase project
-  (Zaid's call — do not re-litigate); therefore NEVER trial a migration on staging.
+  (do not re-litigate); therefore NEVER trial a migration OR an edge-function change on staging alone.
+  Cascade = DELETE linked tasks on goal delete (implemented in Dart; migration 012's `ON DELETE CASCADE`
+  is INERT because goals soft-delete). `daily-brief` deployed & working.
 
 ## Roadmap
 1. **Pre-mobile refinement** (split worker rounds): ✅ Notes+Habits removed. ✅ Daily Brief made
