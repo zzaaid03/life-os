@@ -87,6 +87,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .fadeIn(duration: 400.ms, delay: 400.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 400.ms),
           const SizedBox(height: AppSpacing.xxxl),
+          const SectionHeader(title: 'Goals'),
+          const _GoalsCard()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 450.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 450.ms),
+          const SizedBox(height: AppSpacing.xxxl),
           const SectionHeader(title: 'Inbox Assistant'),
           const _InboxScanCard()
               .animate()
@@ -97,12 +103,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .animate()
               .fadeIn(duration: 400.ms, delay: 500.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 500.ms),
-          const SizedBox(height: AppSpacing.xxxl),
-          const SectionHeader(title: 'Life'),
-          const _GoalsCard()
-              .animate()
-              .fadeIn(duration: 400.ms, delay: 600.ms)
-              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 600.ms),
           const SizedBox(height: AppSpacing.massive),
         ],
       ),
