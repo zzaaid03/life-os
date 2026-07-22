@@ -39,11 +39,12 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
 ## Session handoff (2026-07-22, late — QA-CORRECTNESS ROUND)
 - **WORKFLOW DIRECTIVE (unchanged):** ALL work stays on `staging`; do NOT merge to `main` / deploy
   stable until Zaid explicitly says so. Actions, not questions.
-- **GIT STATE:** `staging` @ `958dee4` (pushed, clean tree; 5 commits ahead of the evening handoff's
-  `41ffd71`). `main` still @ `f620639` (untouched). Everything below is **staging only**.
+- **GIT STATE:** `staging` pushed & clean (6 commits ahead of the evening handoff's `41ffd71`, tip is
+  this doc update). `main` still @ `f620639` (untouched). Everything below is **staging only** — but see
+  NEXT: Zaid has now authorized starting the merge-to-stable track.
 - **QA-CORRECTNESS ROUND — the previously-"still-outstanding" bugs are now ALL FIXED (commits
-  `294a7ee`..`958dee4`). Bugs 2–5 Zaid-tested 100%; #1 (dashboard) + #6 (calendar) PENDING his visual
-  test (pushed, awaiting CI + his check):**
+  `294a7ee`..`958dee4`) and ALL Zaid-tested 100% (incl. #1 dashboard + #6 calendar, confirmed
+  2026-07-22 late). THE QA / CLEAN-CODE PHASE IS CLOSED:**
   1. ✅ **Derived-progress raw reads (Bug A)** — home goal card + timeline now route through
      `goalTaskCountProvider`/`goalProgressProvider` (derived % when ≥1 linked task, else manual
      `goal.progress`), mirroring goals_screen. `294a7ee`.
@@ -58,16 +59,22 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
   5. ✅ **Explicit "Delete goal" button** in `_GoalEditorDialog` (edit mode only), reuses the swipe
      path's confirm+delete+refresh via a shared `_deleteWithConfirm`; swipe still single-confirms. `2f3566f`. *(Zaid: 100%.)*
   6. ✅ **Dashboard: Goals surfaced higher** — moved the goals block up to right after "Focus for Today"
-     (was dead-last under a "Life" heading), renamed the header "Life"→"Goals". `c54056c`. **PENDING Zaid visual test.**
+     (was dead-last under a "Life" heading), renamed the header "Life"→"Goals". `c54056c`. *(Zaid: confirmed good.)*
   7. ✅ **Timeline = calendar-only + task titles in cells** — removed the old chronological event list
      and its now-dead helpers (`_groupByDay`/`_DayHeader`/`_TimelineTile`); redesigned the
      `table_calendar` in `calendar/presentation/widgets/calendar_view.dart`: taller cells
      (`rowHeight:82`), each day cell shows task TITLES as text (up to 2 + "+N") instead of dots,
      days-with-tasks tinted (`primary@12%`, selected @25%+border, today border) via `calendarBuilders`;
-     `eventLoader`/marker knobs removed; the tap-a-day task list below is retained. `958dee4`. **PENDING Zaid visual test.**
-- **NEXT:** once Zaid OKs #1 + #6 → the QA/clean-code phase is fully closed. Then his open call is:
-  (a) **merge staging→main / deploy stable** — REQUIRES the SW-cache fix FIRST (see evening handoff), or
-  (b) **start the mobile track**. Nothing new is locked.
+     `eventLoader`/marker knobs removed; the tap-a-day task list below is retained. `958dee4`. *(Zaid: confirmed good.)*
+- **NEXT (LOCKED — chosen by Zaid 2026-07-22 late): OPTION (a) — MERGE `staging` → `main` / DEPLOY
+  STABLE.** ⚠️ HARD PREREQUISITE: the **service-worker cache fix MUST land first** (see the SW-CACHE
+  to-do in the evening handoff) — otherwise real stable users get stale bundles on first load. Sequence:
+  (1) build the SW-cache fix ON `staging`, test it (hard-refresh proves updates land on FIRST load),
+  (2) THEN merge staging→main so CI deploys stable. The successor must CONFIRM with Zaid before the
+  actual merge (first public-facing deploy). Leading fix candidate: `flutter build web --pwa-strategy=none`
+  in `scripts/build-web.sh` (stops generating the SW → no stale cache; app is online-only so losing PWA
+  offline is fine) — but scope `scripts/build-web.sh` + `web/index.html` first and pick with Zaid.
+  Option (b) mobile track is deferred behind this.
 - All other cautions from the evening handoff below still apply (edge-fns NOT staging-isolated;
   SW-cache to-do before stable; TELL IBRAHIM the rsync `~` bug; Node-20 CI bump).
 
