@@ -227,7 +227,7 @@ class _GoalsCard extends ConsumerWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(2),
                     child: LinearProgressIndicator(
-                      value: goal.progress,
+                      value: _goalProgress(ref, goal),
                       minHeight: 4,
                       backgroundColor: Theme.of(
                         context,
@@ -251,6 +251,14 @@ class _GoalsCard extends ConsumerWidget {
               ],
             ),
     );
+  }
+
+  /// Derived progress if the goal has linked tasks, else manual progress.
+  double _goalProgress(WidgetRef ref, Goal goal) {
+    final linkedCount = ref.watch(goalTaskCountProvider(goal.id));
+    return linkedCount > 0
+        ? ref.watch(goalProgressProvider(goal.id))
+        : goal.progress;
   }
 }
 

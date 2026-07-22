@@ -90,14 +90,19 @@ final timelineEventsProvider = Provider<List<TimelineEvent>>((ref) {
   // Goals — one event per goal reflecting its latest update.
   final goals = ref.watch(goalListProvider).goals;
   for (final goal in goals) {
-    final pct = (goal.progress * 100).round();
+    final linkedCount = ref.watch(goalTaskCountProvider(goal.id));
+    final progress = linkedCount > 0
+        ? ref.watch(goalProgressProvider(goal.id))
+        : goal.progress;
+    final pct = (progress * 100).round();
+    final isCompleted = linkedCount > 0
+        ? progress >= 1.0
+        : goal.status == GoalStatus.completed;
     events.add(
       TimelineEvent(
         type: TimelineEventType.goalUpdated,
         title: goal.title,
-        subtitle: goal.status == GoalStatus.completed
-            ? 'Completed \u{1F389}'
-            : '$pct% there',
+        subtitle: isCompleted ? 'Completed \u{1F389}' : '$pct% there',
         timestamp: goal.updatedAt,
       ),
     );

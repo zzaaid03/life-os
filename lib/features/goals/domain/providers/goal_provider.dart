@@ -195,7 +195,9 @@ final goalListProvider =
 /// progress slider; a goal with `count >= 1` shows derived progress instead.
 final goalTaskCountProvider = Provider.family<int, String>((ref, goalId) {
   final tasks = ref.watch(taskListProvider).tasks;
-  return tasks.where((t) => t.goalId == goalId).length;
+  return tasks
+      .where((t) => t.goalId == goalId && t.status != TaskStatus.archived)
+      .length;
 });
 
 /// The derived progress (0.0-1.0) for the goal with [goalId], computed as
@@ -206,7 +208,7 @@ final goalProgressProvider = Provider.family<double, String>((ref, goalId) {
   final tasks = ref
       .watch(taskListProvider)
       .tasks
-      .where((t) => t.goalId == goalId)
+      .where((t) => t.goalId == goalId && t.status != TaskStatus.archived)
       .toList();
   if (tasks.isEmpty) return 0.0;
   final completed = tasks
