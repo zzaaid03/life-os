@@ -28,6 +28,11 @@ class GoalsScreen extends ConsumerWidget {
       progressDisabled: hasLinkedTasks,
     );
     if (result == null) return;
+    if (result.delete) {
+      if (!context.mounted) return;
+      await _deleteWithConfirm(context, ref, goal);
+      return;
+    }
     await ref
         .read(goalListProvider.notifier)
         .updateGoal(
@@ -151,6 +156,28 @@ class GoalsScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// Confirms, then deletes [goal] using the same path as swipe-to-delete.
+  Future<void> _deleteWithConfirm(
+    BuildContext context,
+    WidgetRef ref,
+    Goal goal,
+  ) async {
+    final confirmed = await _confirmDelete(context, ref, goal);
+    if (confirmed != true) return;
+    try {
+      await ref.read(goalListProvider.notifier).deleteGoal(goal.id);
+      await ref.read(taskListProvider.notifier).refresh();
+    } catch (_) {
+      await ref.read(goalListProvider.notifier).refresh();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't delete goal. Please try again."),
+        ),
+      );
+    }
   }
 
   Future<bool?> _confirmDelete(
@@ -311,12 +338,23 @@ class _GoalEditorResult {
     this.description,
     required this.progress,
     this.targetDate,
-  });
+  }) : delete = false;
+
+  /// Signals that the user asked to delete the goal instead of saving it.
+  const _GoalEditorResult.delete()
+    : title = '',
+      description = null,
+      progress = 0,
+      targetDate = null,
+      delete = true;
 
   final String title;
   final String? description;
   final double progress;
   final DateTime? targetDate;
+
+  /// Whether the dialog was closed by the "Delete goal" button.
+  final bool delete;
 }
 
 /// A centered dialog for creating or editing a goal, with a progress slider.
@@ -539,6 +577,19 @@ class _GoalEditorDialogState extends State<_GoalEditorDialog> {
                     ),
                   ],
                 ),
+                if (widget.existing != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).pop(const _GoalEditorResult.delete()),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: const Text('Delete goal'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
