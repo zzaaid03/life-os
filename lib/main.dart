@@ -19,6 +19,7 @@ import 'package:life_os/core/theme/app_theme.dart';
 import 'package:life_os/core/theme/theme_mode_provider.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/auth/domain/providers/oauth_tab_dismiss_provider.dart';
+import 'package:life_os/features/demo/demo_mode.dart';
 import 'package:life_os/features/inbox/data/google_credentials_repository.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -74,7 +75,26 @@ Future<void> _initializeAndRun() async {
     }
   }
 
-  runApp(const ProviderScope(child: LifeOSApp()));
+  runApp(const AppBootstrap());
+}
+
+/// Rebuilds the [ProviderScope] with a fresh, uniquely-keyed container
+/// whenever [demoModeController] flips — entering demo mode gives a clean
+/// container seeded with in-memory demo overrides; exiting (or reloading)
+/// wipes it and returns to the real, Supabase-backed providers.
+class AppBootstrap extends StatelessWidget {
+  /// Creates an [AppBootstrap].
+  const AppBootstrap({super.key});
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+    valueListenable: demoModeController,
+    builder: (context, demo, _) => ProviderScope(
+      key: ValueKey(demo ? 'demo' : 'real'),
+      overrides: demo ? buildDemoOverrides() : const [],
+      child: const LifeOSApp(),
+    ),
+  );
 }
 
 /// The root widget of Life OS.

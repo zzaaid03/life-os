@@ -11,6 +11,7 @@ import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/features/demo/demo_mode.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -77,6 +78,29 @@ class WelcomeScreen extends StatelessWidget {
                   .animate()
                   .fadeIn(duration: 500.ms, delay: 700.ms)
                   .slideY(begin: 0.12, end: 0, duration: 500.ms, delay: 700.ms),
+              const SizedBox(height: AppSpacing.md),
+              // Sandbox demo CTA
+              SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: enterDemoMode,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: AppRadius.button,
+                        ),
+                        textStyle: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      child: const Text('Try it — no sign-up'),
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(duration: 500.ms, delay: 850.ms)
+                  .slideY(begin: 0.12, end: 0, duration: 500.ms, delay: 850.ms),
               const SizedBox(height: AppSpacing.massive),
             ],
           ),

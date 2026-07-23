@@ -24,6 +24,7 @@ import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/tasks/data/datasources/task_local_data_source.dart';
 import 'package:life_os/features/tasks/data/datasources/task_remote_data_source.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
+import 'package:life_os/features/tasks/data/repositories/task_repository.dart';
 import 'package:life_os/features/tasks/data/repositories/task_repository_impl.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -89,8 +90,9 @@ class _NullLocalDataSource implements TaskLocalDataSource {
   Future<List<Task>> getPendingSync(String userId) async => [];
 }
 
-/// Provides the [TaskRepositoryImpl].
-final taskRepositoryProvider = Provider<TaskRepositoryImpl>((ref) {
+/// Provides the [TaskRepository] (concrete [TaskRepositoryImpl], or a demo
+/// override in sandbox demo mode).
+final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   final remote = ref.watch(taskRemoteDataSourceProvider);
   final syncQueue = ref.watch(syncQueueProvider);
 
@@ -140,7 +142,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   TaskListNotifier(this._repository, this._syncService)
     : super(const TaskListState());
 
-  final TaskRepositoryImpl _repository;
+  final TaskRepository _repository;
   final SyncService _syncService;
 
   String? _userId;
