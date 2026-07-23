@@ -44,23 +44,23 @@ class Task extends Equatable implements Entity {
       title: json['title'] as String,
       description: json['description'] as String?,
       dueDate: json['due_date'] != null
-          ? DateTime.parse(json['due_date'] as String)
+          ? DateTime.parse(json['due_date'] as String).toLocal()
           : null,
       completedAt: json['completed_at'] != null
-          ? DateTime.parse(json['completed_at'] as String)
+          ? DateTime.parse(json['completed_at'] as String).toLocal()
           : null,
-      priority: TaskPriority.values[json['priority'] as int? ?? 0],
+      priority: _parsePriority(json['priority'] as int?),
       status: _parseStatus(json['status'] as String?),
       parentTaskId: json['parent_task_id'] as String?,
       goalId: json['goal_id'] as String?,
       sortOrder: (json['sort_order'] as num?)?.toDouble() ?? 0,
       syncedAt: json['synced_at'] != null
-          ? DateTime.parse(json['synced_at'] as String)
+          ? DateTime.parse(json['synced_at'] as String).toLocal()
           : null,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
       deletedAt: json['deleted_at'] != null
-          ? DateTime.parse(json['deleted_at'] as String)
+          ? DateTime.parse(json['deleted_at'] as String).toLocal()
           : null,
       syncStatus: _parseSyncStatus(json['sync_status'] as String?),
       version: json['version'] as int? ?? 1,
@@ -125,17 +125,17 @@ class Task extends Equatable implements Entity {
       'user_id': userId,
       'title': title,
       'description': description,
-      'due_date': dueDate?.toIso8601String(),
-      'completed_at': completedAt?.toIso8601String(),
+      'due_date': dueDate?.toUtc().toIso8601String(),
+      'completed_at': completedAt?.toUtc().toIso8601String(),
       'priority': priority.index,
-      'status': status.name,
+      'status': _encodeStatus(status),
       'parent_task_id': parentTaskId,
       'goal_id': goalId,
       'sort_order': sortOrder,
-      'synced_at': syncedAt?.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-      'deleted_at': deletedAt?.toIso8601String(),
+      'synced_at': syncedAt?.toUtc().toIso8601String(),
+      'created_at': createdAt.toUtc().toIso8601String(),
+      'updated_at': updatedAt.toUtc().toIso8601String(),
+      'deleted_at': deletedAt?.toUtc().toIso8601String(),
       'sync_status': syncStatus.name,
       'version': version,
     };
@@ -188,6 +188,20 @@ class Task extends Equatable implements Entity {
       'archived' => TaskStatus.archived,
       _ => TaskStatus.pending,
     };
+  }
+
+  static String _encodeStatus(TaskStatus status) {
+    return switch (status) {
+      TaskStatus.inProgress => 'in_progress',
+      _ => status.name,
+    };
+  }
+
+  static TaskPriority _parsePriority(int? index) {
+    if (index == null || index < 0 || index >= TaskPriority.values.length) {
+      return TaskPriority.none;
+    }
+    return TaskPriority.values[index];
   }
 
   static SyncStatus _parseSyncStatus(String? value) {

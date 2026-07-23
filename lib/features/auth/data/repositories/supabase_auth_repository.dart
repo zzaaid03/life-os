@@ -113,7 +113,8 @@ class SupabaseAuthRepository implements AuthRepository {
     //
     // On native platforms (Android, iOS), OAuth uses platform-specific
     // deep links / custom URL schemes, so no redirectTo is needed.
-    final redirectTo = kIsWeb ? Uri.base.origin : null;
+    final redirectTo =
+        kIsWeb ? Uri.base.origin : 'com.lifeos.app://login-callback';
 
     final response = await _client.auth.signInWithOAuth(
       OAuthProvider.google,
