@@ -1,18 +1,19 @@
 // Supabase Edge Function: daily-brief
 //
-// Builds a warm, 2–3 sentence natural-language summary of the user's day:
-// tasks due today/overdue and active job applications by status. The caller
-// is identified from their Supabase JWT; data is read server-side with the
-// service role and only compact counts/titles are sent to Groq
-// (llama-3.3-70b-versatile). Returns { brief: string }.
+// Builds a deterministic, plain-sentence summary of the user's day: overdue
+// tasks, tasks due today/soon, the single highest-priority open task, a
+// company-matched cross-reference between standout job applications and the
+// task list, and a completed-this-week count. Every sentence is assembled in
+// TypeScript directly from the caller's own rows — no model is involved, so
+// nothing is ever invented. The caller is identified from their Supabase
+// JWT; data is read server-side with the service role. Returns
+// { brief: string }.
 //
 // Deploy:  npx supabase functions deploy daily-brief
-// Secrets: GROQ_API_KEY (shared with extract-tasks);
-//          SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected.
+// Secrets: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -30,7 +31,29 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-const SYSTEM_PROMPT = `You write a personal "daily brief" for the user's life dashboard. You receive compact JSON about their day: their first name, the count and titles of tasks due today or overdue, the count of unscheduled tasks, job applications grouped by status, and "standout" job updates (interviews, acceptances, rejections) with the company name. Write 2-3 warm, natural sentences that are SPECIFIC to this exact data: cite the real number of tasks due today/overdue and name at least one actual task title when there are any; if there are standout job updates, name the company (e.g. "your interview at Acme"); address them by first name if one is provided. Never invent anything not in the data. Never use generic motivational filler, clichés, or hype ("seize the day", "you've got this", "make it count", "crush your goals"). If every list and count is empty, warmly invite them to plan their day. No emojis, no bullet points, no headings — just the sentences.`;
+// `priority` mirrors `TaskPriority` in lib/features/tasks/data/models/task.dart,
+// stored as the enum index (0=none, 1=low, 2=medium, 3=high) in
+// `tasks.priority` — a higher number is a higher priority, directly comparable.
+interface OpenTask {
+  id: string;
+  title: string;
+  due_date: string | null;
+  priority: number;
+  status: string;
+}
+
+interface CompletedTask {
+  id: string;
+  title: string;
+  updated_at: string;
+}
+
+interface JobApplication {
+  company: string;
+  role: string;
+  status: string;
+  updated_at: string;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -38,10 +61,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    if (!GROQ_API_KEY) {
-      return jsonResponse({ error: "GROQ_API_KEY is not configured." }, 500);
-    }
-
     // Identify the caller from their JWT.
     const jwt = (req.headers.get("Authorization") ?? "").replace(
       /^Bearer\s+/i,
@@ -57,93 +76,196 @@ Deno.serve(async (req: Request) => {
       (userData.user.user_metadata?.display_name as string | undefined) ??
       (userData.user.user_metadata?.full_name as string | undefined) ??
       "";
+    const firstName = displayName.split(" ")[0] ?? "";
 
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    // `due_date` is stored as the caller's local midnight converted to UTC
+    // (e.g. local July 24 at UTC+2 is stored as 2026-07-23T22:00Z), so day
+    // boundaries computed from raw UTC misclassify tasks near midnight. The
+    // client sends its UTC offset in minutes; shift `now` by that offset,
+    // take the UTC calendar date of the shifted instant (i.e. the caller's
+    // local date), then shift back to get the true instant of local midnight.
+    let tzOffsetMinutes = 0;
+    try {
+      const body = await req.json();
+      const rawOffset = body?.tzOffsetMinutes;
+      if (typeof rawOffset === "number" && Number.isFinite(rawOffset)) {
+        tzOffsetMinutes = Math.max(-840, Math.min(840, rawOffset));
+      }
+    } catch {
+      tzOffsetMinutes = 0;
+    }
 
-    // Compact reads — counts and titles only, never bodies/contents.
-    const [tasksRes, jobsRes] = await Promise.all([
+    const now = new Date();
+    const offsetMs = tzOffsetMinutes * 60000;
+    const shifted = new Date(now.getTime() + offsetMs);
+    const day0Start = new Date(
+      Date.UTC(
+        shifted.getUTCFullYear(),
+        shifted.getUTCMonth(),
+        shifted.getUTCDate(),
+      ) - offsetMs,
+    );
+    const day1Start = new Date(day0Start.getTime() + 24 * 60 * 60 * 1000);
+    const day4Start = new Date(day0Start.getTime() + 4 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [openTasksRes, completedTasksRes, jobsRes] = await Promise.all([
       admin
         .from("tasks")
-        .select("title, due_date, status")
+        .select("id, title, due_date, priority, status")
         .eq("user_id", userId)
         .is("deleted_at", null)
         .neq("status", "completed")
         .neq("status", "archived"),
       admin
+        .from("tasks")
+        .select("id, title, updated_at")
+        .eq("user_id", userId)
+        .is("deleted_at", null)
+        .eq("status", "completed")
+        .gte("updated_at", thirtyDaysAgo.toISOString()),
+      admin
         .from("job_applications")
-        .select("company, role, status")
+        .select("company, role, status, updated_at")
         .eq("user_id", userId),
     ]);
 
-    const tasks = (tasksRes.data ?? []) as {
-      title: string;
-      due_date: string | null;
-      status: string;
-    }[];
-    const dueToday = tasks.filter(
-      (t) => t.due_date && new Date(t.due_date) <= todayEnd,
-    );
-    const undated = tasks.filter((t) => !t.due_date);
+    const openTasks = (openTasksRes.data ?? []) as OpenTask[];
+    const completedTasks = (completedTasksRes.data ?? []) as CompletedTask[];
+    const jobs = (jobsRes.data ?? []) as JobApplication[];
 
-    const jobs = (jobsRes.data ?? []) as {
-      company: string;
-      role: string;
-      status: string;
-    }[];
-    const jobsByStatus: Record<string, number> = {};
-    for (const j of jobs) {
-      jobsByStatus[j.status] = (jobsByStatus[j.status] ?? 0) + 1;
+    const overdue = openTasks.filter(
+      (t) => t.due_date && new Date(t.due_date) < day0Start,
+    );
+    const dueToday = openTasks.filter(
+      (t) =>
+        t.due_date &&
+        new Date(t.due_date) >= day0Start &&
+        new Date(t.due_date) < day1Start,
+    );
+    const dueSoon = openTasks.filter(
+      (t) =>
+        t.due_date &&
+        new Date(t.due_date) >= day1Start &&
+        new Date(t.due_date) < day4Start,
+    );
+
+    // Highest-priority open task, tie-broken by earliest due date (tasks
+    // with no due date sort last within the same priority).
+    let nextUp: OpenTask | null = null;
+    for (const t of openTasks) {
+      if (!nextUp) {
+        nextUp = t;
+        continue;
+      }
+      if (t.priority > nextUp.priority) {
+        nextUp = t;
+        continue;
+      }
+      if (t.priority === nextUp.priority) {
+        const tDue = t.due_date
+          ? new Date(t.due_date).getTime()
+          : Number.POSITIVE_INFINITY;
+        const nextDue = nextUp.due_date
+          ? new Date(nextUp.due_date).getTime()
+          : Number.POSITIVE_INFINITY;
+        if (tDue < nextDue) nextUp = t;
+      }
     }
+
+    const completedThisWeek = completedTasks.filter(
+      (t) => new Date(t.updated_at) >= sevenDaysAgo,
+    ).length;
 
     const standoutJobs = jobs
       .filter(
         (j) =>
-          ["interview", "accepted", "rejected"].includes(j.status) &&
-          j.company,
+          (j.status === "interview" || j.status === "accepted") &&
+          new Date(j.updated_at) >= fourteenDaysAgo,
       )
-      .map((j) => ({ company: j.company, role: j.role, status: j.status }))
-      .slice(0, 6);
+      .sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      )
+      .slice(0, 3);
 
-    const summaryInput = {
-      name: displayName.split(" ")[0] ?? "",
-      tasksDueTodayOrOverdue: dueToday.slice(0, 8).map((t) => t.title),
-      tasksDueTodayOrOverdueCount: dueToday.length,
-      unscheduledTaskCount: undated.length,
-      jobApplicationsByStatus: jobsByStatus,
-      standoutJobs,
-    };
+    const sentences: string[] = [];
 
-    const groqRes = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          temperature: 0.3,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: JSON.stringify(summaryInput) },
-          ],
-        }),
-      },
-    );
-
-    if (!groqRes.ok) {
-      return jsonResponse(
-        { error: "Groq API error", detail: await groqRes.text() },
-        502,
+    if (overdue.length > 0) {
+      const titles = overdue.slice(0, 3).map((t) => t.title).join(", ");
+      sentences.push(
+        overdue.length === 1
+          ? `You have 1 overdue task: ${titles}.`
+          : `You have ${overdue.length} overdue tasks: ${titles}.`,
       );
     }
 
-    const data = await groqRes.json();
-    const brief = (data.choices?.[0]?.message?.content ?? "").trim();
-    if (!brief) {
-      return jsonResponse({ error: "empty_brief" }, 502);
+    if (dueToday.length > 0) {
+      sentences.push(
+        dueToday.length === 1
+          ? "1 task is due today."
+          : `${dueToday.length} tasks are due today.`,
+      );
+    }
+
+    if (dueSoon.length > 0) {
+      sentences.push(
+        dueSoon.length === 1
+          ? "1 task is due in the next few days."
+          : `${dueSoon.length} tasks are due in the next few days.`,
+      );
+    }
+
+    if (nextUp) {
+      sentences.push(`Your top priority is "${nextUp.title}".`);
+    }
+
+    for (const job of standoutJobs) {
+      const companyLower = job.company.toLowerCase();
+      const openMatch = openTasks.find((t) =>
+        t.title.toLowerCase().includes(companyLower)
+      );
+      const completedMatch = completedTasks.find((t) =>
+        t.title.toLowerCase().includes(companyLower)
+      );
+      if (openMatch) {
+        sentences.push(
+          `${job.company} — ${job.status} stage. Next step: ${openMatch.title}.`,
+        );
+      } else if (completedMatch) {
+        sentences.push(
+          `${job.company} — ${job.status} stage. Your last step (${completedMatch.title}) is done — nothing open.`,
+        );
+      } else {
+        sentences.push(`${job.company} — ${job.status} stage. No task is tracking it.`);
+      }
+    }
+
+    const hasNothingToReport =
+      overdue.length === 0 &&
+      dueToday.length === 0 &&
+      dueSoon.length === 0 &&
+      standoutJobs.length === 0;
+
+    if (hasNothingToReport) {
+      const brief = firstName
+        ? `${firstName}, nothing needs your attention today.`
+        : "Nothing needs your attention today.";
+      return jsonResponse({ brief });
+    }
+
+    if (completedThisWeek > 0) {
+      sentences.push(
+        completedThisWeek === 1
+          ? "You completed 1 task this week."
+          : `You completed ${completedThisWeek} tasks this week.`,
+      );
+    }
+
+    let brief = sentences.join(" ");
+    if (firstName) {
+      brief = `${firstName}, ${brief.charAt(0).toLowerCase()}${brief.slice(1)}`;
     }
 
     return jsonResponse({ brief });
