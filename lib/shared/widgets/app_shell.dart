@@ -14,6 +14,7 @@ import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/demo/demo_mode.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
 import 'package:life_os/shared/widgets/floating_nav_bar.dart';
@@ -46,6 +47,56 @@ class _StagingBanner extends StatelessWidget {
   }
 }
 
+/// A slim persistent banner shown only while the sandbox demo is active,
+/// reminding the user nothing they do here is saved.
+class _DemoBanner extends StatelessWidget {
+  const _DemoBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      color: colorScheme.primaryContainer,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 4,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              "Demo mode — your changes won't be saved",
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          TextButton(
+            onPressed: exitDemoMode,
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.onPrimaryContainer,
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: 2,
+              ),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Sign up',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The application shell that wraps all main app screens.
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.child});
@@ -55,6 +106,7 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
+    final isDemoMode = ref.watch(isDemoModeProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -64,6 +116,7 @@ class AppShell extends ConsumerWidget {
             child: Column(
               children: [
                 if (EnvConfig.isStaging) const _StagingBanner(),
+                if (isDemoMode) const _DemoBanner(),
                 Expanded(child: child),
               ],
             ),

@@ -37,6 +37,10 @@ void enterDemoMode() => demoModeController.value = true;
 /// Exits demo mode — the app rebuilds against the real repositories.
 void exitDemoMode() => demoModeController.value = false;
 
+/// Whether the current provider container is the demo one. Always `false`
+/// in the real app; overridden to `true` inside [buildDemoOverrides].
+final isDemoModeProvider = Provider<bool>((ref) => false);
+
 /// Provider overrides that route every repository read to its in-memory
 /// demo counterpart, so demo mode never makes a Supabase or edge-function
 /// call.
@@ -59,5 +63,6 @@ List<Override> buildDemoOverrides() {
     goalBreakdownServiceProvider.overrideWithValue(
       DemoGoalBreakdownService(),
     ),
+    isDemoModeProvider.overrideWithValue(true),
   ];
 }

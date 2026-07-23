@@ -56,12 +56,12 @@ class WelcomeScreen extends StatelessWidget {
                   .fadeIn(duration: 500.ms, delay: 400.ms)
                   .slideY(begin: 0.08, end: 0, duration: 500.ms, delay: 400.ms),
               const Spacer(flex: 2),
-              // Primary CTA
+              // Primary CTA — the sandbox demo is the headline entry point.
               SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: FilledButton(
-                      onPressed: () => context.go(AppRoutes.login),
+                      onPressed: enterDemoMode,
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: AppColors.white,
@@ -72,19 +72,19 @@ class WelcomeScreen extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      child: const Text('Get Started'),
+                      child: const Text('Try it — no sign-up'),
                     ),
                   )
                   .animate()
                   .fadeIn(duration: 500.ms, delay: 700.ms)
                   .slideY(begin: 0.12, end: 0, duration: 500.ms, delay: 700.ms),
               const SizedBox(height: AppSpacing.md),
-              // Sandbox demo CTA
+              // Secondary CTA — real sign-up/sign-in, still clearly reachable.
               SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: OutlinedButton(
-                      onPressed: enterDemoMode,
+                      onPressed: () => context.go(AppRoutes.login),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
@@ -95,7 +95,7 @@ class WelcomeScreen extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      child: const Text('Try it — no sign-up'),
+                      child: const Text('Sign up or log in'),
                     ),
                   )
                   .animate()
