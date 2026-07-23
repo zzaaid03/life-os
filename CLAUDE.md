@@ -77,8 +77,12 @@ trivial**) since missing requirements silently stall reviews.
 **A LinkedIn launch post was drafted for Zaid this session** (drives to the demo, no sign-up promised).
 If he asks again, it lives in the session transcript — rewrite fresh rather than guessing at it.
 
-**CI note:** the deploy-race fix (`a1614a3`) still has NOT been exercised by a genuine simultaneous
-two-branch push — staging finished before main was pushed, so the runs never overlapped. Both were green.
+**CI DEPLOY-RACE FIX (`a1614a3`) IS NOW VERIFIED — 2026-07-23. Do not re-test or re-investigate.** A
+docs-only commit was deliberately pushed to `main` and `staging` back-to-back (a zero-risk payload). Runs
+`30042237169` (main) and `30042239659` (staging) behaved EXACTLY as designed: main went `in_progress`
+while staging sat `pending`, i.e. **queued behind it instead of racing**, and BOTH completed `success`.
+The `rrsync` "Another instance is running" / exit-12 failure mode is closed. Queuing (~2.5 min for the
+second run) is CORRECT behaviour, not a hang.
 
 ## SUPERSEDED — Current state (earlier 2026-07-23) — MOBILE WORKS, ALL BUGS CLOSED
 **`staging` @ `7cfa7b9`. `main` still @ `4ea20c5`** — the whole mobile round is staging-only and has
