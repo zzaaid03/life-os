@@ -18,9 +18,11 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-23) — `staging` @ 4d010d7 (pushed, clean) — MOBILE IS RUNNING ON DEVICE
-**`staging` @ `4d010d7`. `main` still @ `9aefe8c`** — the whole mobile round is staging-only and has
-NOT been merged to stable. Web production is untouched and healthy. Default: work on `staging`, merge
+## Current state (2026-07-23) — `staging` @ 7cfa7b9 (pushed, clean) — MOBILE WORKS, ALL BUGS CLOSED
+**`staging` @ `7cfa7b9`. `main` still @ `4ea20c5`** — the whole mobile round is staging-only and has
+NOT been merged to stable. (An earlier handoff said `main` was @ `9aefe8c`; that was wrong — verified
+`4ea20c5` on 2026-07-23.) **Zaid device-tested Android + iPhone after this round and reports the app
+"works 100%".** Web production is untouched and healthy. Default: work on `staging`, merge
 to `main` only when Zaid says so.
 
 **ROADMAP ITEM 4 (MOBILE) IS ESSENTIALLY DONE — the app now runs on Zaid's real Android phone AND his
@@ -65,7 +67,50 @@ GROQ_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET. Migrations 001–012 appli
 stored refresh token (`google_credentials`) minted server-side. Google OAuth app is still in TESTING
 mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
 
-## Session handoff (2026-07-23 — MOBILE KICKOFF ROUND) — 3 OPEN BUGS, ALL DEVICE-TESTED BY ZAID
+## Session handoff (2026-07-23, late — BUGFIX ROUND) — ALL 3 BUGS CLOSED, NOTHING OPEN
+**WORKFLOW DIRECTIVE (unchanged):** all work stays on `staging`; do NOT merge to `main` until Zaid
+says so. Actions, not questions. **The next round starts from a clean slate — there are no open bugs.**
+
+**GIT STATE:** `staging` @ `7cfa7b9` (pushed, clean). `main` @ `4ea20c5` (untouched). Two commits this
+round: `8aa616d` (OAuth tab) and `7cfa7b9` (Daily Brief). Sole author Zaid Jarrar, no agent attribution.
+
+1. ✅ **OAuth browser tab now auto-dismisses** (`8aa616d`). New `oauthTabDismissProvider`
+   (`lib/features/auth/domain/providers/`) mirrors `googleCredentialsCaptureProvider`: subscribes to
+   `onAuthStateChange` and calls `closeInAppWebView()` on `signedIn`, **native only** (`!kIsWeb`).
+   Activated by a `ref.read` in `LifeOSApp.initState`. `url_launcher` promoted to a direct dependency
+   (it was already transitive via `supabase_flutter`). The Custom Tab launch mode was deliberately LEFT
+   as the platform default — do NOT switch it to `LaunchMode.externalApplication`, that is worse UX.
+   Web sign-in untouched. **Zaid device-tested on Android + iPhone: works.**
+2. ✅ **Daily Brief rewritten and fixed** (`7cfa7b9`). Three separate defects, all closed:
+   - **It was never hallucinating.** HUGO BOSS / amber / Keysight / "Ibrahim Jarrar" were REAL rows in
+     `job_applications` — junk created by the AI extractor before the 2026-07-22 tightening. That fix
+     stopped new junk but never cleaned existing rows; Zaid deleted them manually from the Jobs tab.
+     **Lesson: the brief reads THREE tables (tasks, completed tasks, job_applications). Checking only
+     the task list and concluding "hallucination" was wrong.**
+   - **Staleness:** `DailyBriefNotifier.loadIfNeeded()` only fired from `home_screen.dart` `initState`,
+     which never re-runs (Home is kept alive by the nav shell) — so the brief was fetched exactly once
+     per app launch. It now watches `taskListProvider`, compares a sorted `id:status:dueDate`
+     signature, and re-fetches behind a **2s debounce** with in-flight serialisation.
+   - **Grounding:** the edge function **no longer calls Groq at all.** Every sentence is assembled in
+     TypeScript from the caller's own rows (overdue / due today / due soon / highest-priority open task
+     / completed-this-week). Standout jobs are cross-referenced against task titles by company name and
+     reported by what actually exists: an open next step, a finished one, or "no task is tracking it".
+     **It never says a job is "upcoming" — `job_applications` stores NO interview date** (only
+     `applied_at`/`updated_at`), so any such claim was unfounded. When nothing is due it says so plainly.
+   - **Timezone:** `due_date` is `TIMESTAMPTZ` and the app stores **local midnight converted to UTC**,
+     so UTC day boundaries misclassified tasks by a full day (tomorrow → "due today"). The client now
+     sends `tzOffsetMinutes`; the function clamps it to ±840, defaults to 0 on a missing/bad body, and
+     derives local-midnight boundaries from it. This was caught in planner review, NOT by the worker.
+   - **DEPLOYED** to the shared project 2026-07-23 with Zaid's authorization. **Zaid device-tested: works.**
+   - **Known limitation, accepted:** company↔task matching is a case-insensitive substring test, so a
+     short company name could match an unrelated task title. Not worth fuzzy-matching for one user.
+3. ✅ **Native `providerRefreshToken` capture — CLOSED, was never a gap.**
+   `googleCredentialsCaptureProvider` (`lib/features/inbox/data/google_credentials_repository.dart`)
+   already listens to the raw `onAuthStateChange` stream and upserts the token whenever it sees a new
+   one; `main.dart` activates it at startup. The `main.dart` startup block is the WEB path. **Do not
+   re-investigate this.**
+
+## Session handoff (2026-07-23 — MOBILE KICKOFF ROUND) — SUPERSEDED, all 3 bugs now fixed (see above)
 **WORKFLOW DIRECTIVE:** all work stays on `staging`; do NOT merge to `main` until Zaid says so.
 Actions, not questions. **NEXT ROUND = fix these three bugs.** They are the ONLY open items.
 
@@ -269,7 +314,8 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
 4. **Mobile app version** (Android/iOS) ✅ **SHIPPED TO DEVICE 2026-07-23 on `staging` @ `4d010d7`**
    (NOT merged to `main`). Runs on Zaid's real Android phone and real iPhone. See the 2026-07-23
    handoff for build facts, the iOS free-provisioning constraints, and the 3 open bugs.
-   **NEXT ROUND = the 3 open bugs (OAuth tab dismissal, Daily Brief, low-pri token capture).**
+   **✅ ALL 3 BUGS CLOSED 2026-07-23 late on `staging` @ `7cfa7b9`, device-tested by Zaid ("works
+   100%"). Roadmap item 4 is COMPLETE. Nothing is open.** See the BUGFIX ROUND handoff above.
    Deliberately OUT of scope for v1 mobile (Zaid's decision 2026-07-23): **goals stay network-only** —
    there is no Drift `Goals` table and no goal sync, so with no signal the goals list is empty and
    creating a goal fails, while tasks keep working offline. Same for tags/attachments/jobs/profile.
@@ -279,6 +325,27 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **`npx supabase functions deploy` NEEDS `--workdir .` from this repo.** CLI 2.109.1 locates the
+  project root via `supabase/config.toml`, which this repo deliberately does NOT have, so it resolves
+  to the wrong directory, warns `failed to read file: ... no such file or directory`, uploads an empty
+  bundle and dies with `Entrypoint path does not exist`. The working command is:
+  `npx supabase functions deploy <name> --workdir . --project-ref ganbmkphtzdvxxnmprku`.
+  Nothing partial deploys when it fails — it is a pure path-resolution error, so a retry is safe.
+  **This is NOT a reason to create `config.toml`** (a later `config push` could overwrite hosted auth
+  settings, including the OAuth redirect allow-list mobile sign-in depends on).
+- **"The AI hallucinated it" is a hypothesis, not a finding — check EVERY table the feature reads.**
+  2026-07-23 the Daily Brief was reported as inventing company names. It was faithfully reporting real
+  `job_applications` rows; only the tasks/goals lists had been checked. The real defect was junk data
+  plus an ungrounded label ("upcoming" for a table with no date column).
+- **A model cannot be prompted into traceability.** When the requirement is "every sentence must map to
+  a real row", delete the model and assemble the text in code. `daily-brief` was rewritten this way and
+  got faster and free as a side effect. Reach for an LLM for judgement, not for reporting facts.
+- **Check the TIMESTAMPTZ boundary math on anything server-side that says "today".** Due dates are
+  stored as local midnight converted to UTC, so server-side UTC day boundaries are off by a full day
+  for any user east of UTC. Pass the client's `tzOffsetMinutes` and derive boundaries from it.
+- **An unawaited `Future` inside a `try` makes the `catch` dead code.** A worker wrapped
+  `closeInAppWebView()` in try/catch without awaiting it; the error would have escaped as an unhandled
+  async error. `flutter analyze` did NOT flag it — read async code by eye.
 - **Get the bug REPRODUCTION from Zaid before diagnosing.** 2026-07-23: "sign-in doesn't return to the
   app" sent a planner down a redirect-allow-list investigation; the actual behaviour was that sign-in
   DID work and only the browser tab failed to auto-close. Different bug, different fix. Ask "what
