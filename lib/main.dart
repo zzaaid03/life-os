@@ -18,6 +18,7 @@ import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_theme.dart';
 import 'package:life_os/core/theme/theme_mode_provider.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/auth/domain/providers/oauth_tab_dismiss_provider.dart';
 import 'package:life_os/features/inbox/data/google_credentials_repository.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -92,6 +93,10 @@ class _LifeOSAppState extends ConsumerState<LifeOSApp> {
     // session. Reading the provider starts its raw `onAuthStateChange`
     // subscription so any Google sign-in persists its refresh token.
     ref.read(googleCredentialsCaptureProvider);
+
+    // Closes the native Google sign-in browser tab once the OAuth deep link
+    // completes, so the user isn't left tapping X manually.
+    ref.read(oauthTabDismissProvider);
 
     // Load profile when auth state becomes authenticated
     ref.listenManual(authProvider, (previous, next) {
