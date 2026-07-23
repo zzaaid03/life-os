@@ -19,10 +19,15 @@ on:
 permissions:
   contents: read
 
-# Two pushes in quick succession must not rsync into the same directory at
-# once — --delete makes an interleaved deploy destructive.
+# Two deploys must never rsync to the VPS at once. The group is deliberately
+# a CONSTANT, not keyed on github.ref: the server-side restriction is one
+# rrsync instance per account, so a stable-and-staging pair pushed together
+# raced and one run died with "Another instance of rrsync is running"
+# (exit 12) — twice. Serialising per-branch was not enough.
+# cancel-in-progress stays false: queue, never cancel. Interrupting an
+# in-flight --delete rsync is how you get a half-deleted live bundle.
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy-vps
   cancel-in-progress: false
 
 jobs:
