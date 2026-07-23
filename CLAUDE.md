@@ -18,7 +18,69 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-23) — `staging` @ 7cfa7b9 (pushed, clean) — MOBILE WORKS, ALL BUGS CLOSED
+## Current state (2026-07-23, late) — `main` AND `staging` @ `2d004f7` — DEMO MODE LIVE IN PRODUCTION
+**Both branches are at `2d004f7`, pushed, clean, no divergence.** Production
+(https://lifeos.deadthrone.dev) and staging both verified serving `flutter_bootstrap.js?v=2d004f7`.
+This merge also finally shipped the whole MOBILE round to production (it had been staging-only).
+
+**DEMO / SANDBOX MODE IS SHIPPED.** Strangers can now explore the app with NO sign-up and NO Gmail
+access — critical because Google OAuth is still in Testing mode, so no stranger can sign in at all.
+Tap **"Try it — no sign-up"** on the welcome screen → the app enters an ephemeral sandbox.
+
+**How it works (do not re-derive):** `lib/features/demo/demo_mode.dart` holds `demoModeController`
+(a `ValueNotifier<bool>`), `enterDemoMode()`/`exitDemoMode()`, `isDemoModeProvider`, and
+`buildDemoOverrides()`. `AppBootstrap` in `main.dart` wraps the app in a `ValueListenableBuilder` that
+rebuilds `ProviderScope` with a **`ValueKey` keyed to the demo flag** — so entering gives a brand-new
+container with fresh seeded state and exiting/reloading wipes it. **Ephemeral is free; there is no
+storage and no reset button by design.** 9 providers are overridden: `authRepositoryProviderOverride`,
+`profileRepositoryProvider`, task/job/goal repos, `dailyBriefProvider`, `inboxScanServiceProvider`,
+`processedEmailsRepositoryProvider`, `goalBreakdownServiceProvider`, `isDemoModeProvider`.
+- **The fake auth `userId` MUST equal `demoUserId` (`'demo-user'`) from `demo_seed.dart`** — the demo
+  repos filter `getAll(userId)`, so a mismatch silently yields empty lists.
+- Seed persona = **"Alex," a PM job-seeker mid-hunt**: 4 jobs (Meridian Financial *interview*, Nimbus
+  Labs *applied*, Vertex Design *viewed*, Orbital Systems *rejected*), 9 tasks (overdue/today/upcoming/
+  completed), 2 goals with linked tasks. **All dates are relative to `DateTime.now()`** so it never rots.
+- **The AI is scripted, not live.** `DemoInboxScanService` waits 2s then returns a canned `ScanResult`
+  (2 tasks + a NEW Cascade Robotics application, deliberately absent from the seed so it surfaces as an
+  Add/Dismiss review card). `DemoGoalBreakdownService` returns 4 goal-agnostic tasks. `DemoDailyBriefNotifier`
+  returns a canned brief. **Zero network in demo — verified**: all three base services are concrete classes
+  whose ENTIRE network surface is the one method each demo subclass overrides (no `super.` calls).
+
+**Two production-behaviour changes shipped with this merge (expected, not bugs):** (1) existing WEB
+task rows may render **one day off on first load** then stay consistent — the Task store-UTC/display-local
+fix reached web for the first time; (2) the Daily Brief on web is now fresher and timezone-correct.
+
+## Session handoff (2026-07-23, late — DEMO MODE ROUND) — SHIPPED TO PRODUCTION
+**5 rounds, all planner-verified before commit:** `11fd9f9` extract `JobApplicationRepository` interface
+(jobs was the only repo without one) → `5a30ec8` in-memory demo data layer + seed → `e00b76b` enter/exit
+demo with fake auth + seeded repos → `3a78838` scripted inbox scan + goal breakdown → `2d004f7` demo
+banner + "Try it" as primary welcome CTA. Zaid device-tested rounds 3 and 4 at 100%.
+
+**One production-code deviation worth knowing:** `taskRepositoryProvider` was declared
+`Provider<TaskRepositoryImpl>` (concrete) and had to be widened to `Provider<TaskRepository>` (the
+interface) so it could be overridden. Verified behaviour-neutral — nothing outside its own files ever
+referenced the concrete type.
+
+**⚠️ OPEN / NEXT — the sign-up funnel is UNVERIFIED and this is now the top risk.** The demo is live and
+Zaid intends to promote it on LinkedIn. **Google sign-in will NOT work for strangers** (OAuth Testing
+mode, only jarrarzaid3@ / zaidgpt3@). Email/password auth IS implemented and reachable, but **nobody has
+verified a brand-new email/password account works end-to-end against production** (profile creation, RLS,
+first load). **VERIFY THIS BEFORE ANY PUBLIC POST.** If it fails, the demo is the entire experience and the
+post's CTA must not imply people can sign up.
+
+**PENDING (not started): Roadmap item 5 — Google OAuth verification.** This is the long pole to public
+launch (the `gmail.readonly` sensitive scope makes Google's review slow) and is mostly Zaid's manual work
+in the Cloud Console. A planner should prep the submission checklist (scope justification, app homepage,
+privacy-policy URL, domain verification, demo video — **the new demo mode makes recording that video
+trivial**) since missing requirements silently stall reviews.
+
+**A LinkedIn launch post was drafted for Zaid this session** (drives to the demo, no sign-up promised).
+If he asks again, it lives in the session transcript — rewrite fresh rather than guessing at it.
+
+**CI note:** the deploy-race fix (`a1614a3`) still has NOT been exercised by a genuine simultaneous
+two-branch push — staging finished before main was pushed, so the runs never overlapped. Both were green.
+
+## SUPERSEDED — Current state (earlier 2026-07-23) — MOBILE WORKS, ALL BUGS CLOSED
 **`staging` @ `7cfa7b9`. `main` still @ `4ea20c5`** — the whole mobile round is staging-only and has
 NOT been merged to stable. (An earlier handoff said `main` was @ `9aefe8c`; that was wrong — verified
 `4ea20c5` on 2026-07-23.) **Zaid device-tested Android + iPhone after this round and reports the app
