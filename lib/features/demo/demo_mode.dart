@@ -13,10 +13,16 @@ import 'package:life_os/features/demo/data/repositories/demo_auth_repository.dar
 import 'package:life_os/features/demo/data/repositories/demo_daily_brief_notifier.dart';
 import 'package:life_os/features/demo/data/repositories/demo_goal_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_job_application_repository.dart';
+import 'package:life_os/features/demo/data/repositories/demo_processed_emails_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_profile_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_task_repository.dart';
+import 'package:life_os/features/demo/data/services/demo_goal_breakdown_service.dart';
+import 'package:life_os/features/demo/data/services/demo_inbox_scan_service.dart';
+import 'package:life_os/features/goals/data/goal_breakdown_service.dart';
 import 'package:life_os/features/goals/data/repositories/supabase_goal_repository.dart';
 import 'package:life_os/features/home/domain/daily_brief_provider.dart';
+import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
+import 'package:life_os/features/inbox/data/processed_emails_repository.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
 import 'package:life_os/features/profile/data/repositories/supabase_profile_repository.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
@@ -46,5 +52,12 @@ List<Override> buildDemoOverrides() {
     ),
     goalRepositoryProvider.overrideWithValue(DemoGoalRepository()),
     dailyBriefProvider.overrideWith(DemoDailyBriefNotifier.new),
+    inboxScanServiceProvider.overrideWithValue(DemoInboxScanService()),
+    processedEmailsRepositoryProvider.overrideWithValue(
+      DemoProcessedEmailsRepository(),
+    ),
+    goalBreakdownServiceProvider.overrideWithValue(
+      DemoGoalBreakdownService(),
+    ),
   ];
 }
