@@ -10,11 +10,15 @@ using Groq, model `llama-3.3-70b-versatile`). Feature-first architecture — mir
 for new features. Supabase project ref: `ganbmkphtzdvxxnmprku`. CLI via `npx supabase` (no global
 install, no Docker). Runs on Chrome for dev (`flutter run -d chrome`).
 
-## Current state (2026-07-22) — origin/main @ 7799332 — LIVE IN PRODUCTION
-**`main` and `staging` are BOTH at `7799332` (merged 2026-07-22, fast-forward, 24 commits).** Everything
-described in the two 2026-07-22 handoff sections below is now on STABLE, not staging-only. The old
-"staging only / do not merge" workflow directive in those sections is SPENT — it was satisfied by this
-merge. Default back to: work on `staging`, merge to `main` when Zaid says so.
+## Current state (2026-07-22, night) — origin/main @ 9aefe8c — LIVE IN PRODUCTION
+**`main` and `staging` are BOTH at `9aefe8c` (pushed, clean).** README rewritten to match the shipped
+app (was still describing removed habit/journal features; now leads with the AI Gmail→tasks/job-tracking
+capability) + a public Roadmap section — this was Zaid-confirmed and pushed to `main` so it's live on
+GitHub's repo page. Everything from the 2026-07-22 QA + cache-bust + merge rounds is on STABLE, not
+staging-only. Default: work on `staging`, merge to `main` when Zaid says so.
+
+**NEXT UP: Roadmap item 4 — MOBILE (Android/iOS).** This is the next full round. See "Roadmap" below
+and the mobile-kickoff note in the successor prompt this session left behind.
 
 WORKING: AI inbox scan (Gmail read SERVER-SIDE via a stored refresh token → Groq → tasks +
 job-application updates), job tracker with manual add/edit/delete, tasks, unified timeline, AI Daily
@@ -186,6 +190,13 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **Verify inferred state against the live thing, not defaults/memory.** Twice in the 2026-07-22
+  session an agent asserted something false from inference: (1) claimed Caddy sent no Cache-Control
+  because that's the framework default — Ibrahim's actual live config already had it right, verify with
+  `curl -sI`; (2) a worker "corrected" the README to drop email/password auth, assuming Google-only,
+  without grepping — `signInWithPassword`/`signUp` are implemented and reachable via `login_screen.dart`
+  + `forgot_password_screen.dart`. Rule: before stating a fact about server config or shipped features,
+  check it (curl the host, grep the code) — don't infer from what's typical.
 - Raw-SQL Supabase tables need explicit `GRANT ... TO authenticated, service_role` or they throw
   42501 permission-denied. RLS ≠ table grants. (See migrations 008/011. This bug bit us 3×.)
 - Web OAuth `providerRefreshToken` is only present right after `Supabase.initialize()` in main() —
