@@ -7,18 +7,53 @@ extracts tasks, and tracks job applications. **Follow the global agent workflow 
 ## Stack & layout
 Flutter 3.44 / Dart 3.12, Riverpod, GoRouter, Drift (local), Supabase (backend + AI Edge Functions
 using Groq, model `llama-3.3-70b-versatile`). Feature-first architecture — mirror `lib/features/tasks/`
-for new features. Supabase project ref: `ganbmkphtzdvxxnmprku`. CLI via `npx supabase` (no global
-install, no Docker). Runs on Chrome for dev (`flutter run -d chrome`).
+for new features. Supabase project ref: `ganbmkphtzdvxxnmprku`. CLI via `npx supabase`.
+**CHANGED 2026-07-23 — the old "no Docker, unlinked CLI" note is OBSOLETE:** the CLI is now LINKED to
+the shared production project (`supabase/.temp/linked-project.json`, gitignored) and Docker IS
+installed. Two consequences: (1) `npx supabase db push` and `functions deploy` now hit PRODUCTION in
+one command, no confirmation, no undo — treat both as destructive and NEVER delegate them to a worker;
+(2) `npx supabase start` can run a LOCAL stack, so a migration can finally be rehearsed offline before
+touching the shared project. There is still no `supabase/config.toml` — do NOT create one casually: a
+later `supabase config push` could overwrite hosted auth settings, including the OAuth redirect
+allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
+**Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-22, night) — origin/main @ 9aefe8c — LIVE IN PRODUCTION
-**`main` and `staging` are BOTH at `9aefe8c` (pushed, clean).** README rewritten to match the shipped
-app (was still describing removed habit/journal features; now leads with the AI Gmail→tasks/job-tracking
-capability) + a public Roadmap section — this was Zaid-confirmed and pushed to `main` so it's live on
-GitHub's repo page. Everything from the 2026-07-22 QA + cache-bust + merge rounds is on STABLE, not
-staging-only. Default: work on `staging`, merge to `main` when Zaid says so.
+## Current state (2026-07-23) — `staging` @ 4d010d7 (pushed, clean) — MOBILE IS RUNNING ON DEVICE
+**`staging` @ `4d010d7`. `main` still @ `9aefe8c`** — the whole mobile round is staging-only and has
+NOT been merged to stable. Web production is untouched and healthy. Default: work on `staging`, merge
+to `main` only when Zaid says so.
 
-**NEXT UP: Roadmap item 4 — MOBILE (Android/iOS).** This is the next full round. See "Roadmap" below
-and the mobile-kickoff note in the successor prompt this session left behind.
+**ROADMAP ITEM 4 (MOBILE) IS ESSENTIALLY DONE — the app now runs on Zaid's real Android phone AND his
+real iPhone, and he confirmed it works "perfect" apart from the bugs listed below.** This round did:
+- A **Drift-vs-model audit** (Opus agent). Result: **zero field-level gaps for Task** — all 17 fields
+  agree across domain model / Drift table / both mappers / Supabase, `goalId` included. The feared
+  "web-only column silently vanishes on native" bug class DID NOT EXIST. Do not re-run this audit.
+- `db07719` — **Android `INTERNET` permission was declared ONLY in the debug manifest**, so release
+  builds had no network at all. Added to the main manifest. Plus the OAuth deep-link intent-filter
+  (`com.lifeos.app://login-callback`), the matching iOS `CFBundleURLTypes`, and a native `redirectTo`
+  in `supabase_auth_repository.dart` (web branch deliberately unchanged). Plus `task.dart`: store-UTC/
+  display-local for all DateTimes (Task was still naive-local long after Goal was fixed), `inProgress`
+  now encodes as `in_progress` so it round-trips instead of silently reverting to `pending`, and a
+  bounds check on the `TaskPriority.values[...]` lookup.
+- `c4a9ce3` — app display name is now **"Life OS"** on both platforms (was the raw slug `life_os`).
+- `a1614a3` — **CI deploy race fixed** (see below).
+- `4d010d7` — `docs/IOS_BUILD.md`, a self-contained iOS free-provisioning runbook.
+
+**Android build facts:** first APK built 2026-07-23 via `flutter build apk --release`, ~60 MB, at
+`build/app/outputs/flutter-apk/app-release.apk`. Toolchain setup needed on Zaid's machine was:
+Android SDK cmdline-tools + licences + **SDK platform 36 and build-tools 36.0.0** (Flutter 3.44 needs
+36; he had only 34/35). The `[!] Visual Studio` line in `flutter doctor` is Windows-desktop-only and
+is IRRELEVANT — do not send anyone chasing it. **Release APKs are signed with the DEBUG keystore**
+(Flutter's default template, `android/app/build.gradle.kts:29-33`) — fine for sideloading, but Play
+Store will reject it and a properly-signed build later will NOT install over it (uninstall first).
+
+**iOS build facts:** running via **Xcode free provisioning** on a borrowed Mac (Zaid's cousin's — he
+has NO paid Apple Developer account). **TestFlight is therefore NOT available: it requires the $99/yr
+membership. Do not propose TestFlight as a free option.** Free provisioning means the app dies after
+**7 days** unless re-installed from the Mac. Full runbook: `docs/IOS_BUILD.md`.
+
+**Supabase dashboard change made this round:** `com.lifeos.app://login-callback` added to
+Authentication → URL Configuration → **Redirect URLs**. Verified working — sign-in succeeds on device.
 
 WORKING: AI inbox scan (Gmail read SERVER-SIDE via a stored refresh token → Groq → tasks +
 job-application updates), job tracker with manual add/edit/delete, tasks, unified timeline, AI Daily
@@ -29,6 +64,53 @@ BACKEND: Edge Functions deployed: `extract-tasks`, `daily-brief`, `goal-breakdow
 GROQ_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET. Migrations 001–012 applied. Per-user Gmail =
 stored refresh token (`google_credentials`) minted server-side. Google OAuth app is still in TESTING
 mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
+
+## Session handoff (2026-07-23 — MOBILE KICKOFF ROUND) — 3 OPEN BUGS, ALL DEVICE-TESTED BY ZAID
+**WORKFLOW DIRECTIVE:** all work stays on `staging`; do NOT merge to `main` until Zaid says so.
+Actions, not questions. **NEXT ROUND = fix these three bugs.** They are the ONLY open items.
+
+1. **OAuth browser tab does not auto-dismiss (mobile, both platforms).** Sign-in itself WORKS — the
+   deep link returns, the session is created, the AI inbox scan works 100%. The defect is purely that
+   the Google sign-in browser/Custom Tab stays open on top of the app after consent; **the user has to
+   manually tap the X to reveal the app underneath.** Diagnosed area, NOT yet fixed:
+   `supabase_auth_repository.dart` `signInWithGoogle` — look at `authScreenLaunchMode` on
+   `signInWithOAuth` (Custom Tab / in-app webview vs `LaunchMode.externalApplication`) and/or calling
+   `closeInAppWebView()` when the auth-state-change fires. **The redirect allow-list is CORRECT and is
+   NOT the cause — do not go re-investigate it.** Web must be left byte-identical; it works today.
+2. **Daily Brief is wrong and feels worthless (Zaid's words: "doesn't add anything").** Three distinct
+   sub-problems, confirmed on device: (a) **it lists tasks that are already completed** — e.g. an
+   interview he had already attended and marked done still appears; almost certainly the
+   `daily-brief` edge function's task query does not filter out completed/archived status; (b) **it is
+   stale** — takes a long time to reflect a newly-added task, so caching/refresh needs looking at;
+   (c) **product value** — even when correct it says nothing useful. (a) is a straight bug; (c) needs a
+   product conversation with Zaid BEFORE any prompt rewrite. ⚠️ `daily-brief` is an EDGE FUNCTION on
+   the SHARED project — deploying goes live for every user instantly, there is no staging copy. One
+   careful shot, not an iterate-in-prod loop. TELL ZAID BEFORE DEPLOYING.
+3. **(LOW PRIORITY, UNCONFIRMED) Native `providerRefreshToken` capture.** `main.dart:48-67` captures
+   the Google refresh token ONLY at startup right after `Supabase.initialize()` — correct for web,
+   where the OAuth redirect is consumed during init. On native the callback arrives by deep link while
+   the app is ALREADY RUNNING, so that block should never fire. **Zaid tested and reports the AI inbox
+   works 100% on mobile, so this is NOT user-visible today** — the most likely explanation is that his
+   token was already stored from a previous WEB sign-in on the same account. The gap, if real, would
+   only bite an account that has NEVER signed in on web. **Do not spend a round on this. Verify cheaply
+   with a fresh account someday**; if it reproduces, the fix is to also capture the token in the
+   auth-state-change listener, not only at startup.
+
+**CI DEPLOY RACE — FIXED `a1614a3`.** `deploy.yml`'s `concurrency.group` was keyed on `github.ref`, so
+`main` and `staging` runs never queued against each other. The server allows ONE `rrsync` instance per
+account, so pushing both branches together (which is exactly what a merge-to-stable does) raced and one
+run died with `Another instance of rrsync is running` / exit 12 — this happened TWICE (2026-07-22
+16:58, 2026-07-23 10:53). Group is now the constant `deploy-vps`; `cancel-in-progress` stays `false`
+(cancelling a `--delete` rsync mid-flight is how you get a half-deleted live bundle). **There was never
+a stale lock and nothing needed cleaning on the server — do not ask Ibrahim to kill processes.** Note
+our deploy key is `rrsync`-restricted and CANNOT open a shell, so "SSH in and check" is impossible for
+us by design. Still unverified against a real two-branch push — the next merge-to-stable is the test;
+the second run should QUEUE (~2.5 min), which is correct behaviour, not a hang.
+
+**LOW PRIORITY / KNOWN:** the VPS IP is hardcoded in plaintext at `.github/workflows/deploy.yml:105`
+and the repo is PUBLIC, which contradicts the "no infra IPs in commit-visible files" rule. Moving it to
+a GitHub secret is easy but only partial — it is already in git history. Real protection remains the
+rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
 
 ## Hosting / deploy (live since 2026-07-21)
 - **Production:** https://lifeos.deadthrone.dev   **Staging:** https://staging.lifeos.deadthrone.dev
@@ -184,12 +266,35 @@ mode (test users only: jarrarzaid3@, zaidgpt3@) — hosted ≠ publicly usable.
    fast-forwarded and CI deployed stable green; live bundle verified by `curl`. **Stable is no longer
    the 2026-07-21 snapshot — everything from the QA + polish rounds is now in production.** This merge
    was a pure bundle swap: NO migrations and NO edge-function deploys were part of it.
-4. **Mobile app version** (Android/iOS) ← **NEXT UP.**
+4. **Mobile app version** (Android/iOS) ✅ **SHIPPED TO DEVICE 2026-07-23 on `staging` @ `4d010d7`**
+   (NOT merged to `main`). Runs on Zaid's real Android phone and real iPhone. See the 2026-07-23
+   handoff for build facts, the iOS free-provisioning constraints, and the 3 open bugs.
+   **NEXT ROUND = the 3 open bugs (OAuth tab dismissal, Daily Brief, low-pri token capture).**
+   Deliberately OUT of scope for v1 mobile (Zaid's decision 2026-07-23): **goals stay network-only** —
+   there is no Drift `Goals` table and no goal sync, so with no signal the goals list is empty and
+   creating a goal fails, while tasks keep working offline. Same for tags/attachments/jobs/profile.
+   Do not "fix" this without asking; it is a choice, not an oversight.
 5. **Public launch**: Google OAuth verification (needed to leave Testing mode). Note the `gmail.readonly`
    sensitive scope makes this a real timeline risk — Google review is slow. Until then only
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **Get the bug REPRODUCTION from Zaid before diagnosing.** 2026-07-23: "sign-in doesn't return to the
+  app" sent a planner down a redirect-allow-list investigation; the actual behaviour was that sign-in
+  DID work and only the browser tab failed to auto-close. Different bug, different fix. Ask "what
+  exactly did you see?" before theorising.
+- **A worker's diagnosis is a lead, not a conclusion — check it.** 2026-07-23 a worker reported the
+  Android blocker as "install Android Studio + accept licences". Android Studio was ALREADY installed
+  and the SDK already had a `licenses` dir; only cmdline-tools was missing, then only SDK 36. Two
+  minutes of `ls` beat acting on the summary. Likewise a pasted CI diagnosis claimed a stale server
+  lock needing `ps aux`/SSH — our key cannot open a shell, and the run history showed a live
+  cross-branch race instead.
+- **Two independent platform configs failing IDENTICALLY points at the shared server, not the clients.**
+  (Used to reason about the mobile OAuth bug; the logic was sound even though the report turned out to
+  describe a different symptom.)
+- **Verify a file PATH before putting it in a worker prompt.** 2026-07-23 a planner wrote
+  `domain/entities/task.dart` from an audit's line references; the real path is
+  `data/models/task.dart`. The worker caught it, but it could as easily have created a duplicate file.
 - **Verify inferred state against the live thing, not defaults/memory.** Twice in the 2026-07-22
   session an agent asserted something false from inference: (1) claimed Caddy sent no Cache-Control
   because that's the framework default — Ibrahim's actual live config already had it right, verify with
