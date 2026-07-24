@@ -18,7 +18,91 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-23, late) — `main` AND `staging` @ `2d004f7` — DEMO MODE LIVE IN PRODUCTION
+## Current state (2026-07-24) — `main` AND `staging` @ `a48e5b5` — SIGN-UP FUNNEL HARDENED, BRAND ICON SHIPPED
+**Both branches pushed, clean, no divergence.** This round: verified/fixed the real-account sign-up
+funnel end to end (it was silently broken), shipped the LifeOS brand app icon to all three platforms,
+and slowed the task-completion animation. **Two findings are now OPEN — see "NEXT" below.**
+
+**Sign-up funnel — was broken, now fixed, 5 commits:**
+1. Real email/password sign-up on production hit `over_email_send_rate_limit` — Supabase's default
+   built-in email sender (test-only, very low quota) was exhausted the moment the LinkedIn post (which
+   only promotes the no-signup **demo**, not real sign-up) started driving traffic to the site generally.
+   **Fixed:** custom SMTP via Resend, connected directly in Supabase's dashboard using **Ibrahim's own
+   Resend account** (he also owns DNS for `deadthrone.dev` via Cloudflare) — verified independently via
+   `nslookup`: DKIM is live and correct at `resend._domainkey.lifeos.deadthrone.dev`; DMARC is present
+   at the organizational root `_dmarc.deadthrone.dev` (correctly covers the subdomain via DMARC
+   inheritance — do not ask Ibrahim to duplicate it). **Do not re-verify DNS; it's confirmed live.**
+2. With the rate limit gone, a second real bug surfaced: **`signUpWithEmailAndPassword` treated
+   `user != null` as fully authenticated even when Supabase's "Confirm email" setting meant
+   `response.session` was `null`** (pending confirmation). The router then routed straight into the app
+   with no real JWT, and `create_profile_screen.dart`'s write hit `42501 permission denied` under the
+   `anon` role. **Fixed** (`a4e343a`): new `AuthStatus.emailConfirmationPending`, checked via
+   `response.session`; new `CheckEmailScreen` (`/check-email`) shown instead of a broken authenticated
+   state. **Do NOT grant `anon` write access to `profiles`** — that was Postgres's own error-message
+   hint and would open the table to unauthenticated writes from anyone; it was correctly never applied.
+3. Confirmation links themselves were dead (`http://localhost/?error=...&error_code=otp_expired`) —
+   Supabase's **Site URL** (Authentication → URL Configuration) was still the default `localhost`
+   placeholder, separate from the OAuth Redirect URLs allow-list. **Fixed by Zaid in the dashboard** —
+   confirm it's now `https://lifeos.deadthrone.dev` if this ever regresses.
+4. **"Confirm email" is currently back ON** (Zaid re-enabled it to test the fix above) — production
+   sign-up now requires real email confirmation, which correctly works end-to-end today.
+
+**Brand app icon shipped (`33cd7ba`):** design pulled from a claude.ai/design project (a "power +
+pulse" mark — the universal power-glyph ring with a heartbeat/EKG line replacing the usual vertical
+break) via the `DesignSync` MCP tool. Exact CSS geometry was hand-translated to a precise SVG
+(`assets/branding/logo_mark.svg`, colors `#294793` bg / `#F7F8FC` mark — converted from the design's
+`oklch()` values and independently cross-checked). `flutter_launcher_icons` (new dev dependency) now
+generates all Android/iOS/web icon sizes from `assets/branding/logo_mark_1024.png`. Default Flutter
+template icon is fully replaced on all platforms. **Known follow-up, not yet done:** add
+`remove_alpha_ios: true` to the `flutter_launcher_icons` config before any real App Store submission
+(current iOS icons include an alpha channel, which the Store rejects — harmless for sideloading).
+**Round 2 (in-app header lockup: icon + "LifeOS" wordmark on the welcome screen) was never started** —
+do this once the app-icon look is confirmed fine, and note there's no separate marketing site: the
+Flutter web app itself IS `lifeos.deadthrone.dev`, so "website header" = the welcome screen.
+
+**Task-completion animation slowed (`a48e5b5`):** checkbox fill 200ms→350ms, checkmark swap
+150ms→250ms (`task_checkbox.dart`); task title now animates its strikethrough/color change via
+`AnimatedDefaultTextStyle` instead of snapping instantly (`task_card.dart`) — was jarring next to a
+slower checkbox. Cosmetic-only, no logic touched.
+
+**Fresh Android release APK built** (`build/app/outputs/flutter-apk/app-release.apk`, from `a48e5b5` —
+rebuild before handing to Zaid if new commits land first) — **still signed with the debug keystore**,
+fine for sideloading only. **An Ibrahim prompt was issued** (rebuild + reinstall on Zaid's iPhone via
+his Mac's free Xcode provisioning, same flow as `docs/IOS_BUILD.md`) — check with Zaid whether Ibrahim
+has run it yet.
+
+### NEXT — two open findings from testing with "Confirm email" back ON, NEITHER fixed yet
+Zaid asked to offboard with these handed to the successor. **A previous worker's report (the
+task-completion-animation one above) will also be pasted to the successor by Zaid** — it's already
+verified and committed here, so treat that report as historical context, not a pending action.
+
+1. **New users skip `/create-profile` ("What should Life call you?") entirely — confirmed root cause,
+   NOT yet fixed.** `handle_new_user()` (migration 001, `SECURITY DEFINER` trigger) auto-creates a
+   `profiles` row **synchronously at `signUp()` time**, independent of email confirmation, using
+   `COALESCE(raw_user_meta_data->>'display_name', email-prefix)`. By the time the router checks
+   `profileState.profile == null` (`app_router.dart`) after the confirmation-link cold start, the
+   profile already exists, so the check never fires and `/create-profile` is skipped straight to
+   `/home`. **This likely also affects Google sign-in** — the trigger's `COALESCE` only checks the
+   `display_name` metadata key, but Google populates `full_name`/`name` instead, so Google sign-ups
+   probably get an auto-created profile with an **email-prefix fallback name**, silently wrong, never
+   corrected because the same skip applies. **Not yet confirmed against a real Google test — verify
+   before assuming.** Recommended fix direction (discussed with Zaid, not yet decided/built): a local
+   SharedPreferences "onboarding completed" flag **keyed by user ID** (same low-risk, no-migration
+   pattern already used for What's New below), checked by the router instead of `profile == null`.
+   A schema-flag alternative (new `profiles` column) was also considered but would need a migration on
+   the shared Supabase project — tell Zaid before deploying if that direction is chosen instead.
+2. **What's New carousel didn't appear — likely NOT a bug, unconfirmed.** Its gate
+   (`home_screen.dart` + `announcements_provider.dart`) has **zero dependency** on `/create-profile` —
+   it fires independently off a SharedPreferences flag (`announcements_acked_version`) the first time
+   `HomeScreen` builds. That flag is **per-browser, not per-account** (an already-accepted, documented
+   limitation — see "Onboarding/theme prefs are LOCAL" in the Decisions note below). If Zaid tested the
+   new account in the same browser he'd used earlier in the session (when he successfully reached
+   `/home` with confirmation OFF), the carousel would correctly stay hidden for the "new" account too —
+   this is expected behavior given the current design, not a defect. **Ask Zaid to confirm before
+   building anything**; if confirmed, the same per-user-ID-keyed SharedPreferences fix as finding #1
+   would resolve this too, in one pass.
+
+## SUPERSEDED — Current state (2026-07-23, late) — `main` AND `staging` @ `2d004f7` — DEMO MODE LIVE IN PRODUCTION
 **Both branches are at `2d004f7`, pushed, clean, no divergence.** Production
 (https://lifeos.deadthrone.dev) and staging both verified serving `flutter_bootstrap.js?v=2d004f7`.
 This merge also finally shipped the whole MOBILE round to production (it had been staging-only).
@@ -391,6 +475,27 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **A DB trigger that auto-creates a row at signup time can silently defeat an "is this new?" check.**
+  `handle_new_user()` inserts a `profiles` row synchronously at `signUp()`, before email confirmation
+  and regardless of it — so `profile == null` is NOT a reliable "needs onboarding" signal, and the
+  onboarding screen it gates gets skipped. Suspect this pattern anywhere a DB trigger and app-side
+  "first time?" logic both react to the same insert.
+- **`response.user != null` does NOT mean authenticated — check `response.session` too.** With
+  Supabase's "Confirm email" ON, `signUp()` returns a `user` but `session: null` until they click the
+  link. Code that treats `user != null` as "logged in" will route someone into the app with no real
+  JWT, and any write will fail as the `anon` role with a `42501` — and if a novice trusts Postgres's own
+  error-message hint (`GRANT ... TO anon`), that opens the table to unauthenticated writes. Never do that.
+- **Supabase's default built-in email sender is test-only and WILL exhaust in production** —
+  `over_email_send_rate_limit` after a handful of sends. Any real user-facing email flow (confirmation,
+  password reset) needs custom SMTP configured before real traffic, not after.
+- **"Site URL" (Auth → URL Configuration) is a separate setting from the Redirect URLs allow-list** and
+  drives where confirmation/reset links land. Left at its `localhost` default, links are dead
+  (`otp_expired`/unreachable) even though sign-in itself and the allow-list are both correct.
+- **A DNS/SMTP setup report needs independent verification, same as a worker report.** A partner's
+  summary claimed SPF/DKIM/DMARC were all written automatically; `nslookup` against a public resolver
+  (1.1.1.1) confirmed DKIM was live but SPF was absent at the claimed hostname — always verify
+  externally-owned infra claims the same way a worker's code diff gets verified, don't take the summary
+  at face value.
 - **`npx supabase functions deploy` NEEDS `--workdir .` from this repo.** CLI 2.109.1 locates the
   project root via `supabase/config.toml`, which this repo deliberately does NOT have, so it resolves
   to the wrong directory, warns `failed to read file: ... no such file or directory`, uploads an empty
