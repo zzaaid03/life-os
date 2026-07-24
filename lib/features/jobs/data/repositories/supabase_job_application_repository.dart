@@ -40,80 +40,46 @@ class SupabaseJobApplicationRepository implements JobApplicationRepository {
         'summary': update.summary,
         'source_email_id': update.sourceEmailId,
       };
-
-      if (update.company.isNotEmpty) {
-        final existing = await _client
-            .from(_table)
-            .select('id')
-            .eq('user_id', userId)
-            .eq('company', update.company)
-            .eq('role', update.role)
-            .maybeSingle();
-
-        if (existing != null) {
-          await _client
-              .from(_table)
-              .update(values)
-              .eq('id', existing['id'] as String);
-        } else {
-          await _client.from(_table).insert({
-            'user_id': userId,
-            'company': update.company,
-            'role': update.role,
-            ...values,
-          });
-        }
-        continue;
+      final existingId = await _findExistingId(update, userId);
+      if (existingId != null) {
+        await _client.from(_table).update(values).eq('id', existingId);
+      } else {
+        await _client.from(_table).insert({
+          'user_id': userId,
+          'company': update.company.trim(),
+          'role': update.role,
+          ...values,
+        });
       }
-
-      final emailId = update.sourceEmailId;
-      if (emailId != null && emailId.isNotEmpty) {
-        final existing = await _client
-            .from(_table)
-            .select('id')
-            .eq('user_id', userId)
-            .eq('company', '')
-            .eq('source_email_id', emailId)
-            .maybeSingle();
-
-        if (existing != null) {
-          await _client
-              .from(_table)
-              .update(values)
-              .eq('id', existing['id'] as String);
-        } else {
-          await _client.from(_table).insert({
-            'user_id': userId,
-            'company': '',
-            'role': update.role,
-            ...values,
-          });
-        }
-        continue;
-      }
-
-      // No identity available — persist it anyway so the update isn't lost.
-      await _client.from(_table).insert({
-        'user_id': userId,
-        'company': '',
-        'role': update.role,
-        ...values,
-      });
     }
   }
 
   /// Returns the id of the existing row [update] refers to, using the same
   /// identity rules as [upsertFromScan], or `null` if there is no match.
   Future<String?> _findExistingId(JobUpdate update, String userId) async {
-    if (update.company.isNotEmpty) {
-      final existing = await _client
+    final company = update.company.trim();
+    if (company.isNotEmpty) {
+      // Match on company (case-insensitive), NOT role: the AI extracts
+      // inconsistent role strings across emails for the same application,
+      // which caused a duplicate instead of a status update.
+      final rows = await _client
           .from(_table)
-          .select('id')
+          .select('id, role')
           .eq('user_id', userId)
-          .eq('company', update.company)
-          .eq('role', update.role)
-          .maybeSingle();
-      return existing?['id'] as String?;
+          .ilike('company', company);
+      final list = (rows as List).cast<Map<String, dynamic>>();
+      if (list.isEmpty) return null;
+      if (list.length == 1) return list.first['id'] as String?;
+      // Multiple applications at the same company: disambiguate by role.
+      // If none matches, don't guess — return null so it's surfaced as a
+      // new card for the user to confirm, never merged into the wrong row.
+      final role = update.role.trim().toLowerCase();
+      for (final row in list) {
+        if ((row['role'] as String? ?? '').trim().toLowerCase() == role) {
+          return row['id'] as String?;
+        }
+      }
+      return null;
     }
 
     final emailId = update.sourceEmailId;
