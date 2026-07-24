@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_icons.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/features/auth/data/models/auth_state.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/auth/presentation/widgets/auth_error_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -49,13 +51,20 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     });
 
     try {
+      final email = _emailController.text.trim();
       await ref
           .read(authProvider.notifier)
           .signUpWithEmailAndPassword(
-            email: _emailController.text.trim(),
+            email: email,
             password: _passwordController.text,
             displayName: _nameController.text.trim(),
           );
+
+      if (mounted &&
+          ref.read(authProvider).status ==
+              AuthStatus.emailConfirmationPending) {
+        context.go(AppRoutes.checkEmail, extra: email);
+      }
     } on AuthException catch (e) {
       _showError(_mapError(e));
     } catch (e) {

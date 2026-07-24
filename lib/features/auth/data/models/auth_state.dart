@@ -15,6 +15,9 @@ enum AuthStatus {
 
   /// User is not authenticated.
   unauthenticated,
+
+  /// User signed up but has not yet confirmed their email; no session exists.
+  emailConfirmationPending,
 }
 
 /// Represents the full authentication state.

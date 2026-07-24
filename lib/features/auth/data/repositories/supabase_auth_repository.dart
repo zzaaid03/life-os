@@ -96,6 +96,15 @@ class SupabaseAuthRepository implements AuthRepository {
       return const AuthState(status: AuthStatus.unauthenticated);
     }
 
+    if (response.session == null) {
+      return AuthState(
+        status: AuthStatus.emailConfirmationPending,
+        userId: user.id,
+        email: user.email,
+        displayName: displayName,
+      );
+    }
+
     return AuthState(
       status: AuthStatus.authenticated,
       userId: user.id,

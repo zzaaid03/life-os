@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/auth/presentation/screens/check_email_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/login_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/sign_up_screen.dart';
@@ -41,6 +42,7 @@ abstract final class AppRoutes {
   static const String login = '/login';
   static const String signUp = '/sign-up';
   static const String forgotPassword = '/forgot-password';
+  static const String checkEmail = '/check-email';
 
   // Onboarding flow (post-auth)
   static const String createProfile = '/create-profile';
@@ -89,7 +91,8 @@ GoRouter createRouter(Ref ref) {
           location == AppRoutes.login ||
           location == AppRoutes.signUp ||
           location == AppRoutes.forgotPassword ||
-          location == AppRoutes.welcome;
+          location == AppRoutes.welcome ||
+          location == AppRoutes.checkEmail;
       final isSplash = location == AppRoutes.splash;
 
       // Onboarding screens
@@ -151,6 +154,12 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.forgotPassword,
         name: 'forgotPassword',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.checkEmail,
+        name: 'checkEmail',
+        builder: (context, state) =>
+            CheckEmailScreen(email: state.extra as String?),
       ),
 
       // Onboarding
