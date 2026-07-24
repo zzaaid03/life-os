@@ -29,7 +29,7 @@ class TaskCheckbox extends StatelessWidget {
         onTap: onChanged != null ? () => onChanged!(!value) : null,
         behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 350),
           curve: Curves.easeOut,
           width: 24,
           height: 24,
@@ -44,7 +44,7 @@ class TaskCheckbox extends StatelessWidget {
             ),
           ),
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 150),
+            duration: const Duration(milliseconds: 250),
             child: value
                 ? Icon(
                     Icons.check_rounded,

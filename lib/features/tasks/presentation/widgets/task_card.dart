@@ -92,9 +92,10 @@ class TaskCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        task.title,
-                        style: theme.textTheme.bodyLarge?.copyWith(
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeOut,
+                        style: theme.textTheme.bodyLarge!.copyWith(
                           decoration: isCompleted
                               ? TextDecoration.lineThrough
                               : TextDecoration.none,
@@ -105,6 +106,7 @@ class TaskCard extends StatelessWidget {
                               : theme.colorScheme.onSurface,
                           fontWeight: FontWeight.w500,
                         ),
+                        child: Text(task.title),
                       ),
                       if (task.description != null &&
                           task.description!.isNotEmpty) ...[
