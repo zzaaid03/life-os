@@ -14,12 +14,14 @@ import 'package:life_os/features/auth/presentation/screens/login_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/splash_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/welcome_screen.dart';
+import 'package:life_os/features/demo/demo_mode.dart';
 import 'package:life_os/features/goals/presentation/screens/goal_breakdown_screen.dart';
 import 'package:life_os/features/goals/presentation/screens/goals_screen.dart';
 import 'package:life_os/features/home/presentation/screens/home_screen.dart';
 import 'package:life_os/features/inbox/presentation/screens/inbox_scan_screen.dart';
 import 'package:life_os/features/jobs/presentation/screens/job_applications_screen.dart';
 import 'package:life_os/features/life/presentation/screens/life_screen.dart';
+import 'package:life_os/features/onboarding/domain/onboarding_provider.dart';
 import 'package:life_os/features/permissions/presentation/screens/calendar_permission_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/files_permission_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/notification_permission_screen.dart';
@@ -73,6 +75,7 @@ GoRouter createRouter(Ref ref) {
   final refresh = ValueNotifier<int>(0);
   ref.listen(authProvider, (_, _) => refresh.value++);
   ref.listen(profileProvider, (_, _) => refresh.value++);
+  ref.listen(onboardingProvider, (_, _) => refresh.value++);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
@@ -82,7 +85,8 @@ GoRouter createRouter(Ref ref) {
 
     redirect: (context, state) {
       final authState = ref.read(authProvider);
-      final profileState = ref.read(profileProvider);
+      final onboarding = ref.read(onboardingProvider);
+      final isDemo = ref.read(isDemoModeProvider);
       final isAuthenticated = authState.isAuthenticated;
       final location = state.matchedLocation;
 
@@ -115,11 +119,12 @@ GoRouter createRouter(Ref ref) {
         return AppRoutes.welcome;
       }
 
-      // Authenticated but no profile → create profile
+      // Authenticated but onboarding not completed → create profile
       if (isAuthenticated &&
+          !isDemo &&
           !isOnboarding &&
-          profileState.profile == null &&
-          profileState.status != ProfileStatus.loading &&
+          onboarding.loaded &&
+          !onboarding.completed &&
           location != AppRoutes.createProfile &&
           !location.startsWith('/permissions')) {
         return AppRoutes.createProfile;

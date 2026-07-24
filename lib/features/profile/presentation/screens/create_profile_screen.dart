@@ -13,6 +13,7 @@ import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/onboarding/domain/onboarding_provider.dart';
 import 'package:life_os/features/profile/data/models/profile.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 
@@ -73,6 +74,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
       );
 
       await ref.read(profileProvider.notifier).upsertProfile(profile);
+      await ref.read(onboardingProvider.notifier).markCompleted(userId);
 
       if (mounted) {
         setState(() => _isLoading = false);
