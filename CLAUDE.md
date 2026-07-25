@@ -18,7 +18,69 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-24) — `main` AND `staging` @ `a48e5b5` — SIGN-UP FUNNEL HARDENED, BRAND ICON SHIPPED
+## Current state (2026-07-25) — `main` AND `staging` @ `7b3a73e` — ONBOARDING GATE FIXED, JOB-DUPLICATE BUG FIXED
+**Both branches pushed, clean, no divergence.** Merged to `main` and confirmed LIVE — `curl` against
+`https://lifeos.deadthrone.dev` verified the served bundle is `flutter_bootstrap.js?v=7b3a73e`, not
+just a green CI run. Zaid device-tested after deploy (web + iPhone) and confirmed everything works:
+demo mode, sign-in, no onboarding loop. Ibrahim rebuilt the iPhone via free Xcode provisioning on
+`main`@`7b3a73e` per `docs/IOS_BUILD.md` — confirmed working. **This round closes BOTH open findings
+from the previous handoff (see SUPERSEDED block below) plus a new bug Zaid hit live.**
+
+**1. New users skipping `/create-profile` — FIXED (`6fc2a39`).** Root cause was confirmed exactly as
+suspected: `handle_new_user()` (migration 001, unchanged) auto-creates a `profiles` row synchronously
+at signup, so the router's `profile == null` gate never fired. **Also code-confirmed the Google
+sub-case was real** (not just suspected): the trigger's `COALESCE` only checks `display_name`, Google
+populates `full_name`/`name`, so Google signups got a `profiles.display_name` = email-prefix — junk,
+silently never corrected. **Fix:** new `lib/features/onboarding/domain/onboarding_provider.dart` —
+`onboardingProvider`, a per-user-ID SharedPreferences flag (`onboarding_completed_$userId`) mirroring
+the existing `announcements_provider.dart` pattern (same `loaded`-guard idiom, race-guarded on
+`state.userId != userId` after each await). Router's create-profile gate
+(`app_router.dart`) now reads `onboarding.loaded && !onboarding.completed`, **critically excludes demo
+mode** (`!isDemo`, checked via `isDemoModeProvider` — demo users have no flag and must never be routed
+to create-profile), instead of `profileState.profile == null`. `create_profile_screen.dart` calls
+`markCompleted(userId)` right after a successful upsert. **Decision (Zaid, this round): show
+`/create-profile` for EVERYONE (both email + Google), not just providers missing a name** — simplest,
+lowest-risk, and the upsert overwrites Google's junk fallback name as a side effect. Known
+accepted behavior: existing users see the name screen once per browser (pre-filled, harmless) —
+consistent with the already-documented "onboarding prefs are LOCAL/per-device" decision.
+2. **What's New carousel — CONFIRMED NOT A BUG, closed with no code.** Zaid retested on a fresh
+   browser with a new account and the carousel appeared correctly. The per-browser (not per-account)
+   SharedPreferences gate was exactly as diagnosed in the previous handoff — expected behavior.
+3. **NEW bug, found and fixed same round: AI job-update emails created duplicate applications
+   instead of updating status (`7b3a73e`).** Zaid hit this live: an email he'd already scanned/saved
+   got rescanned as an "update" and the app added a NEW job row instead of updating the existing one's
+   status. **Root cause, confirmed via Zaid's repro:** `_findExistingId` in
+   `supabase_job_application_repository.dart` required an EXACT, case-sensitive match on BOTH
+   `company` AND `role`. Company matched; **role did not** — the AI extracted the correct role from
+   the original "applied" email but hallucinated a different role (`"Android Developer"`) on the
+   "viewed"/update email, so the match silently failed and the update surfaced as a new Add/Dismiss
+   card instead of auto-applying. **Fix:** match on `company` only, case-insensitively (`.ilike`); if
+   multiple applications share a company, disambiguate by role, else surface as a new card rather than
+   guess-merging. **Bug-class fix, not just the one instance:** found a SECOND copy of the identical
+   exact-match logic in `upsertFromScan` (the Add-button path) — its doc-comment even claimed to use
+   "the same identity rules as `_findExistingId`", which the first fix would have silently made false.
+   Refactored `upsertFromScan` to delegate to `_findExistingId` so the two paths can no longer diverge.
+   **Manual step still open:** the duplicate "Android Developer" row created before this fix is still
+   in Zaid's real job-tracker data — needs manual deletion from the Jobs tab (not done this session,
+   not blocking).
+4. **Task-completion animation** (`a48e5b5`, from the PREVIOUS round) — already verified/committed,
+   carried forward as historical context only, no action.
+
+**No migrations, no edge-function deploys this round** — both fixes are pure client-side Dart
+(`app_router.dart`, `create_profile_screen.dart`, new `onboarding_provider.dart`,
+`supabase_job_application_repository.dart`). Merge to `main` was a straight fast-forward
+(`358e18d..7b3a73e`), no merge commit, sole author Zaid Jarrar, no AI attribution.
+
+### NEXT
+- **Delete the pre-fix duplicate job-application row** ("Android Developer") from the Jobs tab —
+  cosmetic cleanup, not urgent.
+- **Round 2 of the brand icon** (in-app header lockup: icon + "LifeOS" wordmark on the welcome
+  screen) — flagged as not-yet-started in the previous round, still not started.
+- **`remove_alpha_ios: true`** for `flutter_launcher_icons` — still not added, only matters before a
+  real App Store submission (harmless for sideloading, which is all that's happening now).
+- No other open findings. Next round starts from a clean slate.
+
+## SUPERSEDED — Current state (2026-07-24) — `main` AND `staging` @ `a48e5b5` — SIGN-UP FUNNEL HARDENED, BRAND ICON SHIPPED
 **Both branches pushed, clean, no divergence.** This round: verified/fixed the real-account sign-up
 funnel end to end (it was silently broken), shipped the LifeOS brand app icon to all three platforms,
 and slowed the task-completion animation. **Two findings are now OPEN — see "NEXT" below.**
@@ -479,7 +541,22 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
   `handle_new_user()` inserts a `profiles` row synchronously at `signUp()`, before email confirmation
   and regardless of it — so `profile == null` is NOT a reliable "needs onboarding" signal, and the
   onboarding screen it gates gets skipped. Suspect this pattern anywhere a DB trigger and app-side
-  "first time?" logic both react to the same insert.
+  "first time?" logic both react to the same insert. **FIXED 2026-07-25 (`6fc2a39`):** replaced the
+  `profile == null` gate with a local per-user-ID SharedPreferences flag (`onboarding_provider.dart`),
+  same pattern as the What's New carousel. Do not re-diagnose this — it's closed.
+- **AI-extracted fields drift across emails for the SAME real-world entity — never key an identity
+  match on more than one AI-extracted field.** The job-tracker matcher required an exact `company` AND
+  `role` match to recognize "this update is about an application I already have." The AI extracted a
+  different (hallucinated) role string on a later email for the same job, so the match silently failed
+  and a duplicate application was created instead of a status update. **Fixed 2026-07-25 (`7b3a73e`):
+  match on the more STABLE field only (company), disambiguate secondary fields in application code with
+  a fallback to "don't guess," never in the query.** Same lesson as the Daily Brief grounding fix below —
+  don't trust an LLM's output to be consistent across independent calls describing the same thing.
+- **A duplicated matching query is a bug waiting to diverge — grep for every copy before declaring a
+  fix done.** The job-tracker bug above existed in TWO places (`_findExistingId` and `upsertFromScan`),
+  with a doc-comment literally claiming they used "the same identity rules." Fixing only the first one
+  found would have left a second, now-inconsistent path live. Always grep the method/pattern name
+  across the whole file (or repo) before committing a "fixed" bug, per the bug-CLASS-not-instance rule.
 - **`response.user != null` does NOT mean authenticated — check `response.session` too.** With
   Supabase's "Confirm email" ON, `signUp()` returns a `user` but `session: null` until they click the
   link. Code that treats `user != null` as "logged in" will route someone into the app with no real
