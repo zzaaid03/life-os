@@ -1,6 +1,6 @@
 /// In-memory demo override of [GoalBreakdownService] — plays a realistic
-/// generating beat then returns a fixed, goal-agnostic breakdown. Never
-/// calls the `goal-breakdown` edge function.
+/// generating beat then returns a fixed breakdown for the demo persona's
+/// Product Manager goal. Never calls the `goal-breakdown` edge function.
 library;
 
 import 'package:life_os/features/goals/data/goal_breakdown_service.dart';
@@ -23,24 +23,35 @@ class DemoGoalBreakdownService extends GoalBreakdownService {
     final now = DateTime.now();
     return [
       SuggestedGoalTask(
-        title: 'Define what success looks like and set a clear target date',
+        title:
+            'Write a one-page story for each of your three strongest '
+            'shipped projects',
         priority: 'high',
-        suggestedDueDate: now.add(const Duration(days: 2)),
+        suggestedDueDate: now.add(const Duration(days: 3)),
       ),
       SuggestedGoalTask(
-        title: 'Break the goal into 3 weekly milestones',
+        title:
+            'Rewrite your CV so every bullet names an outcome, not a '
+            'responsibility',
+        priority: 'high',
+        suggestedDueDate: now.add(const Duration(days: 6)),
+      ),
+      SuggestedGoalTask(
+        title: 'List 15 target companies and find the hiring manager for each',
         priority: 'medium',
-        suggestedDueDate: now.add(const Duration(days: 4)),
+        suggestedDueDate: now.add(const Duration(days: 10)),
       ),
       SuggestedGoalTask(
-        title: 'Identify the first concrete action and schedule it this week',
-        priority: 'high',
-        suggestedDueDate: now.add(const Duration(days: 1)),
+        title:
+            'Practise the product-sense and metrics questions out loud '
+            'twice a week',
+        priority: 'medium',
+        suggestedDueDate: now.add(const Duration(days: 14)),
       ),
       SuggestedGoalTask(
-        title: 'Set a weekly check-in to review progress',
+        title: 'Ask two PMs already in the role for a 20-minute conversation',
         priority: 'low',
-        suggestedDueDate: now.add(const Duration(days: 7)),
+        suggestedDueDate: now.add(const Duration(days: 20)),
       ),
     ];
   }

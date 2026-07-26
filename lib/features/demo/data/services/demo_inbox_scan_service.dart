@@ -26,25 +26,36 @@ class DemoInboxScanService extends InboxScanService {
       scannedAccount: 'alex.demo@gmail.com',
       tasks: [
         SuggestedTask(
-          title: 'Reply to Cascade Robotics recruiter about availability',
+          title: 'Reply to Beacon Software to confirm your interview time',
           dueDateHint: dueHint(1),
           priority: 'high',
-          sourceEmailId: 'demo-email-cascade-recruiter',
+          sourceEmailId: 'demo-email-beacon-interview',
         ),
         SuggestedTask(
-          title: 'Complete coding challenge for Beacon Software',
+          title: 'Send the signed rental contract back to the landlord',
           dueDateHint: dueHint(3),
           priority: 'medium',
-          sourceEmailId: 'demo-email-beacon-challenge',
+          sourceEmailId: 'demo-email-landlord-contract',
         ),
       ],
       jobUpdates: const [
         JobUpdate(
+          company: 'Beacon Software',
+          role: 'Product Manager',
+          status: 'interview',
+          summary:
+              'Beacon Software invited you to a first-round interview for '
+              'the Product Manager role.',
+          sourceEmailId: 'demo-email-beacon-interview',
+        ),
+        JobUpdate(
           company: 'Cascade Robotics',
-          role: 'Software PM',
-          status: 'applied',
-          summary: 'Recruiter reached out about a PM opening.',
-          sourceEmailId: 'demo-email-cascade-recruiter',
+          role: 'Associate Product Manager',
+          status: 'rejected',
+          summary:
+              'Cascade Robotics is not moving forward with your application '
+              'for the Associate Product Manager role.',
+          sourceEmailId: 'demo-email-cascade-decision',
         ),
       ],
     );
