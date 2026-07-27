@@ -18,7 +18,126 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-27, late) — `staging` @ `f386c3e`, `main` @ `8d925c7` — SLICE 2a SHIPPED, SLICE 1 DIAGNOSED
+## Current state (2026-07-27, night) — `main` AND `staging` @ `dfa29b6` — V2 SLICES 1 AND 2 ALL CLOSED, MERGED TO STABLE
+
+**Both branches at `dfa29b6`, pushed, clean, NO divergence. Merge to `main` was a straight
+fast-forward (`8d925c7..dfa29b6`, 15 commits, sole author Zaid Jarrar, no agent attribution).**
+Production verified by fetching the page, not by trusting CI: `https://lifeos.deadthrone.dev`
+serves `flutter_bootstrap.js?v=dfa29b6` (~140s after push). **Nothing is in flight. The next round
+starts from a genuinely clean slate.**
+
+**Two production changes this round, both live for all 8 accounts:** migration `015_user_files_note.sql`
+applied, and a NEW edge function `label-file` deployed. Verified from outside: `migration list --linked`
+shows 015 on both sides, and an unauthenticated POST to `label-file` returns **401** (a missing
+function returns 404, so this proves it exists AND is gated).
+
+### ✅ THE HIGHEST-STAKES OPEN ITEM IS CLOSED — RLS confirmed by two real accounts
+**Zaid tested both directions and reported "RLS is working 100%, no one can see others' files."**
+Account A uploaded and could not be seen by account B; account B uploaded and could not be seen by
+account A. This was the last thing gating real documents. **Friends can now store real files.**
+
+**⚠️ READ THIS BEFORE TRUSTING A SIMILAR TEST AGAIN.** Zaid's FIRST attempt at this test was
+worthless and looked like a pass. He reported "I can't see any file on my other account" — but at
+that moment **no screen in the app listed files at all** (the Files tab had been deleted and search
+did not exist yet). The result would have been identical if RLS were completely broken. The test
+only became meaningful once slice 2b shipped a surface that *could* have shown a leak. See the new
+gotcha below.
+
+### ✅ SLICE 1 (goal-breakdown personalization) — CLOSED AS A WIN. Do not rebuild it.
+The retest returned a **non-empty `usedContext`**: `["tracking 36 job applications", "1 open task:
+Pay outstanding balance to McFIT"]`, and the **first generated task was "Pay outstanding balance to
+McFIT" at high priority**, with another reasoning about "the busy job application schedule". That is
+last round's exact failure, reversed. **The prompt rewrite (`dbb3ad8`) was the lever.**
+
+**Zaid had already chosen "assemble the breakdown in code" before seeing this result, and that
+decision was CANCELLED on purpose.** `daily-brief` works in code because it REPORTS rows that
+already exist; goal breakdown INVENTS tasks that do not. A template engine would have produced more
+generic output, not less. **Do not revive this.**
+
+Known cosmetic wart, deliberately not fixed: it still emitted "Find a suitable gym or workout
+location" alongside the McFIT task. It used the context and still added a mildly contradicting task.
+Not worth a round.
+
+### ✅ SLICE 2b (make files findable) — SHIPPED, all six test items confirmed 100% by Zaid
+Two commits: `eaff391` (planner-written shared contract) then `dfa29b6` (three parallel worker lanes
+plus planner fixes).
+
+- **SEARCH DID NOT EXIST.** The previous handoff said 2b would "wire files into the EXISTING
+  `search_screen.dart`". That screen was an 83-line **shell**: the `TextField` had no `onChanged`,
+  no query, no state, no results. 2b had to BUILD search, not extend it. It now searches **files,
+  tasks and goals**.
+- Tasks and goals filter **in memory** from `taskListProvider` / `goalListProvider` (no new network
+  calls). Files hit the server, **debounced 300ms and serialised by request id** so a fast typist
+  cannot leave a stale response on screen.
+- **Delete lives on the file's search result** (confirm dialog → repository `delete()` → row
+  soft-deleted AND storage object removed). Search is still the ONLY route to a file, so it is also
+  the only place one can be removed.
+- **Uploads now REQUIRE a one-line note** (`user_note`). Zaid chose "required for every upload" over
+  optional. This is load-bearing, not UX polish: see the AI decision below.
+- Thumbnails still render only from `thumbnail_base64` on the row via `Image.memory`. **There is no
+  `Image.network` anywhere in the search screen.**
+- `fileListProvider` **has been deleted** (`eaff391`). It had lost its only consumer, so its notifier
+  was never created and `upload()` would have thrown. That trap is gone, not worked around.
+
+**AI labelling decision — CHANGED MID-ROUND, and the reasoning matters.** Zaid first approved
+"extract text from PDFs so contracts get real labels". Once he made the note REQUIRED, that stopped
+being worth its cost and was dropped. **`label-file` never sees file contents and never downloads
+the object.** It receives only the file name and the user's note, and expands that note into search
+synonyms ("my flat lease" also answers to "tenancy", "rental contract"). Consequences: no heavy Dart
+PDF dependency, no extra egress, and the per-file private toggle is trivially honoured because a
+private file returns early **without calling Groq at all**. PDF text extraction remains available as
+its own future slice if search ever feels weak — but only with evidence, not on spec.
+
+**Search is `ILIKE '%term%'`, NOT Postgres full-text search**, overriding the FTS choice written in
+`_planning/V2_SCOPE.md`. FTS stems words and will not match a half-typed one, so "contr" would fail
+to find "contract" in a search-as-you-type box. Migration 015 adds no index on purpose: a btree
+cannot serve a leading-wildcard `ILIKE`, and these tables hold a few dozen rows per user.
+
+### Planner review caught two real defects the workers' clean reports did not
+All three lanes reported honestly and `flutter analyze` clean. The diffs still contained:
+1. **The upload sheet hung on the AI call.** `requestLabel` was `await`ed before the sheet closed,
+   so the user watched a spinner through a Groq round trip after their file had already uploaded.
+   Now fired with `unawaited(... .catchError(...))` — deliberately NOT a try/catch around an
+   unawaited Future, which would be dead code and would leak an unhandled async error.
+2. **A failed Groq call blanked an existing label.** The function wrote `ai_label = null` on any
+   failure, silently narrowing what search could find with no way to notice. It now writes nothing
+   when it has nothing to add.
+
+**Verification actually performed:** `deno check --reload` on `label-file` AND on untouched
+`daily-brief` as a control; `migration list --linked` plus `db push --dry-run` (confirmed exactly one
+pending file) BEFORE the push; external 401/404 probe after; `flutter analyze` clean at every stage.
+
+### The zaidj.tech lab site was ALSO updated this round (different repo)
+`C:\Users\Zaid\Desktop\zaidj.tech`, repo `zzaaid03/zaidj-tech`, now at `main` @ `45c078c`, pushed
+and verified live at `https://lab.zaidj.tech/specimen/life-os/`. The specimen writeup now covers file
+storage and search, and **a factual error already on the live site was fixed** (it claimed two
+server-side functions call the model; there are three, with `daily-brief` still the one that does
+not). `pnpm build` 9 pages clean, `pnpm test` 33/33, zero em/en dashes verified by code point.
+
+**KNOWN GAP, left on purpose:** the lab's `packages/demos/src/life-os/` is a separate hand-written
+React port that still runs its original five screens (Connect Gmail, Scan Inbox, Scanning, Results,
+Task added) and has **no files and no search**. Updating it is its own round in THAT repo, not a copy
+edit. That repo's `CLAUDE.md` is **gitignored** (unlike this one) and carries a dated note about it.
+
+### NEXT: the learning system — the half of v2 that is still entirely unbuilt
+v2 was defined as (1) an AI that learns Zaid's habits and lifestyle, (2) file storage. **File storage
+is now DONE end to end.** Nothing of the learning system exists: no tables, no inference storage, and
+no "What Life knows about you" read-only mirror in Settings (locked decision #1 in
+`_planning/V2_SCOPE.md`). Slice 1 proved personalization from data we ALREADY have works; the
+learning system is about generating new data. **Read `_planning/V2_SCOPE.md` before planning it, and
+note the privacy surface flagged there: every tester now has their own Gmail refresh token, so
+"scan ALL emails" would read other people's real inboxes. Raise that with Zaid explicitly.**
+
+### Open items (none urgent, none blocking)
+- **Ibrahim's iPhone rebuild prompt was written this session and given to Zaid** — check whether he
+  actually sent it. Build from `main` @ `dfa29b6`; free provisioning expires ~7 days.
+- Delete the pre-fix duplicate "Android Developer" job row from the Jobs tab (manual, cosmetic).
+- Brand icon round 2 (in-app header lockup on the welcome screen) — still never started.
+- `remove_alpha_ios: true` before any App Store submission.
+- Roadmap item 5, Google OAuth verification — still the long pole to public launch.
+- The lab's Life OS demo gap described above.
+
+## SUPERSEDED — Current state (2026-07-27, late) — `staging` @ `f386c3e`, `main` @ `8d925c7` — SLICE 2a SHIPPED, SLICE 1 DIAGNOSED
 
 **`staging` is 10 commits ahead of `main`, pushed, clean. Everything below is staging-only.**
 **Two production changes were made this round and are LIVE for all 8 accounts: the `goal-breakdown`
@@ -684,6 +803,45 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **A NEGATIVE test proves nothing unless a POSITIVE result could have shown up.** Zaid checked
+  file isolation by signing into his second account and reporting "I can't see any file." It read
+  like a clean pass. It was worthless: at that moment **no screen in the app listed files at all**,
+  so the answer would have been identical if RLS were completely broken. Same trap with the Supabase
+  dashboard, which is the project-owner view and bypasses RLS by design. **Before accepting "I don't
+  see it", confirm there is a surface that WOULD have shown it.** The real test only became possible
+  once slice 2b shipped search; it then passed in both directions and the item is closed.
+- **"Assemble it in code" is the right answer for REPORTING and the wrong one for GENERATING.**
+  `daily-brief` was correctly rewritten to pure TypeScript because every sentence maps to a row that
+  already exists. Goal breakdown was nearly rebuilt the same way, and it would have been a mistake:
+  it INVENTS tasks that do not exist yet, and no TypeScript turns "get fit" into five sensible
+  subtasks. A template engine would have been MORE generic than the model, not less. **Reach for
+  code when the output must be traceable to existing data; reach for the model when the output is
+  judgement.** The prompt rewrite fixed it and slice 1 closed as a win.
+- **Verify that the thing you are "wiring into" actually exists.** The handoff said slice 2b would
+  wire files into "the EXISTING `search_screen.dart`". That screen was an 83-line shell with a
+  `TextField` that had no `onChanged` and no results anywhere. Search had never worked. Ten minutes
+  of reading turned a copy-edit-sized slice into a build-it-from-scratch slice — **before** three
+  workers were launched against a false premise.
+- **When the model physically cannot perceive the input, ask the human instead of building
+  extraction.** The labelling model is text-only and can never read a photo, so a passport scan
+  named `IMG_4821.jpg` has nothing to describe. The plan was a Dart PDF text-extraction dependency.
+  Making the user's one-line note REQUIRED deleted the need for it entirely: no dependency, no extra
+  egress, no file contents leaving Supabase, and the private toggle became trivial to honour.
+  **A required human field can be worth more than an AI feature, and it cannot hallucinate.**
+- **"Fire and forget" that is `await`ed is neither.** A worker awaited the AI labelling call before
+  closing the upload sheet, so the user sat watching a spinner through a Groq round trip for
+  something purely optional that had no bearing on whether the upload succeeded. `flutter analyze`
+  was clean. **Read async code for what the USER waits on, not just for correctness.** The fix is
+  `unawaited(f.catchError(...))` — NOT a try/catch wrapped around an unawaited Future, which is dead
+  code that lets the error escape as an unhandled async error.
+- **Never blank a field on failure.** `label-file` wrote `ai_label = null` whenever Groq failed,
+  which would silently DELETE a good existing label and narrow what search could find, with no way
+  to notice from the UI. **On failure, write nothing.** Same family as the silent-degradation lesson
+  below: a safe-looking fallback that destroys data is not safe.
+- **Do not rewrite historical handoff records to "fix" stale facts.** The lab repo's `CLAUDE.md` had
+  three stale life-os SHAs, all inside dated round-record sections. Editing them would have
+  falsified what was true at the time. **Correct the CURRENT-state block and explicitly label the
+  old references as historical instead.**
 - **An empty prompt was the old bug; an IGNORED prompt is the new one. Check which you have before
   tuning wording.** Slice 1 fed `goal-breakdown` 973 characters of real context and output did not
   change at all. The instinct is to blame the data or the queries. The instrumented response proved
