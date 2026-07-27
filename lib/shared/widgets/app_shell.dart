@@ -15,6 +15,7 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/demo/demo_mode.dart';
+import 'package:life_os/features/files/presentation/widgets/add_file_sheet.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
 import 'package:life_os/shared/widgets/floating_nav_bar.dart';
@@ -167,6 +168,10 @@ class AppShell extends ConsumerWidget {
           Navigator.of(sheetContext).pop();
           context.push(AppRoutes.goalBreakdown);
         },
+        onAddFile: () {
+          Navigator.of(sheetContext).pop();
+          AddFileSheet.show(context);
+        },
       ),
     );
   }
@@ -187,10 +192,15 @@ class AppShell extends ConsumerWidget {
 
 /// Premium animated chooser sheet offering "Add Task" / "Add Goal" actions.
 class _AddChooserSheet extends StatefulWidget {
-  const _AddChooserSheet({required this.onAddTask, required this.onAddGoal});
+  const _AddChooserSheet({
+    required this.onAddTask,
+    required this.onAddGoal,
+    required this.onAddFile,
+  });
 
   final VoidCallback onAddTask;
   final VoidCallback onAddGoal;
+  final VoidCallback onAddFile;
 
   @override
   State<_AddChooserSheet> createState() => _AddChooserSheetState();
@@ -266,12 +276,20 @@ class _AddChooserSheetState extends State<_AddChooserSheet>
                         onTap: widget.onAddTask,
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.lg),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: _ChooserTile(
                         icon: Icons.flag_outlined,
                         label: 'Add Goal',
                         onTap: widget.onAddGoal,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: _ChooserTile(
+                        icon: Icons.upload_file_outlined,
+                        label: 'Add File',
+                        onTap: widget.onAddFile,
                       ),
                     ),
                   ],
