@@ -7,6 +7,8 @@
 /// throw before ever reaching the repository.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/core/theme/app_radius.dart';
@@ -14,6 +16,7 @@ import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/files/data/models/picked_file.dart';
 import 'package:life_os/features/files/data/repositories/file_repository.dart';
+import 'package:life_os/features/files/data/services/file_labelling_service.dart';
 import 'package:life_os/features/files/data/services/file_picker_service.dart';
 
 String _formatBytes(int bytes) {
@@ -47,11 +50,19 @@ class _AddFileSheetState extends ConsumerState<AddFileSheet> {
   bool _isPrivate = false;
   bool _isUploading = false;
   bool _isPicking = true;
+  final _noteController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _pick());
+    _noteController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
   }
 
   Future<void> _pick() async {
@@ -79,9 +90,11 @@ class _AddFileSheetState extends ConsumerState<AddFileSheet> {
     }
   }
 
+  bool get _noteIsValid => _noteController.text.trim().isNotEmpty;
+
   Future<void> _upload() async {
     final picked = _picked;
-    if (picked == null || _isUploading) return;
+    if (picked == null || _isUploading || !_noteIsValid) return;
 
     final userId = ref.read(authProvider).userId;
     if (userId == null) {
@@ -93,13 +106,29 @@ class _AddFileSheetState extends ConsumerState<AddFileSheet> {
 
     setState(() => _isUploading = true);
 
+    // Read before the upload await: afterwards this widget may already be
+    // gone, and reading a provider from a disposed State throws.
+    final labelling = ref.read(fileLabellingServiceProvider);
+
     try {
-      await ref.read(fileRepositoryProvider).upload(
+      final stored = await ref.read(fileRepositoryProvider).upload(
         userId: userId,
         file: picked,
         isPrivate: _isPrivate,
+        userNote: _noteController.text.trim(),
       );
+
+      // Labelling only widens what search matches, so it must never hold the
+      // sheet open on a second network round trip. Fire it and let it land in
+      // the background. `.catchError` rather than a try/catch around an
+      // unawaited Future: that catch would be dead code and the error would
+      // escape as an unhandled async error instead.
+      unawaited(
+        labelling.requestLabel(stored.id).catchError((Object _) {}),
+      );
+
       if (!mounted) return;
+      if (!context.mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('File added.')),
@@ -201,6 +230,23 @@ class _AddFileSheetState extends ConsumerState<AddFileSheet> {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
+              TextField(
+                controller: _noteController,
+                enabled: !_isUploading,
+                textCapitalization: TextCapitalization.sentences,
+                maxLength: 120,
+                decoration: const InputDecoration(
+                  labelText: 'What is this?',
+                  hintText: 'Rental contract for the flat',
+                ),
+              ),
+              Text(
+                "This note is how you'll find the file later.",
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _isPrivate,
@@ -211,8 +257,7 @@ class _AddFileSheetState extends ConsumerState<AddFileSheet> {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                "Once you add a file you can't remove it from the app yet. Only add "
-                "something you're happy to keep.",
+                'Your files are found and managed from the Search tab.',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
@@ -229,7 +274,7 @@ class _AddFileSheetState extends ConsumerState<AddFileSheet> {
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: FilledButton(
-                      onPressed: _isUploading ? null : _upload,
+                      onPressed: (_isUploading || !_noteIsValid) ? null : _upload,
                       child: _isUploading
                           ? const SizedBox(
                               width: 20,
