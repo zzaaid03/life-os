@@ -6,6 +6,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -314,10 +315,20 @@ class _FileThumbnail extends StatelessWidget {
       return _icon(theme);
     }
 
+    Uint8List? bytes;
+    try {
+      bytes = base64Decode(thumbnail);
+    } catch (_) {
+      bytes = null;
+    }
+    if (bytes == null) {
+      return _icon(theme);
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.sm),
       child: Image.memory(
-        base64Decode(thumbnail),
+        bytes,
         width: _size,
         height: _size,
         fit: BoxFit.cover,
