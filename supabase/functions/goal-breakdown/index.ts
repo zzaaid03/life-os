@@ -209,6 +209,7 @@ Deno.serve(async (req: Request) => {
         .from("job_applications")
         .select("company, role, status", { count: "exact" })
         .eq("user_id", userId)
+        .order("updated_at", { ascending: false })
         .limit(15),
       admin
         .from("goals")
@@ -293,7 +294,28 @@ Deno.serve(async (req: Request) => {
       suggestedDueDate: suggestedDueDates[i],
     })).filter((t) => t.title.length > 0);
 
-    return jsonResponse({ tasks });
+    // Diagnostic echo. The context block is assembled from the caller's own
+    // rows and is returned only to that same caller, so nothing leaks. This
+    // exists because a failed context query degrades silently to an omitted
+    // section — without it, "the model had no data" and "the queries returned
+    // nothing" are indistinguishable from the UI.
+    return jsonResponse({
+      tasks,
+      context: {
+        block: contextBlock,
+        blockLength: contextBlock.length,
+        openTasksCount: openTasksRes.count ?? 0,
+        completedTasksCount: completedTasksRes.count ?? 0,
+        jobAppsCount: jobAppsRes.count ?? 0,
+        otherGoalsCount: otherGoals.length,
+        queryErrors: {
+          openTasks: openTasksRes.error?.message ?? null,
+          completedTasks: completedTasksRes.error?.message ?? null,
+          jobApps: jobAppsRes.error?.message ?? null,
+          otherGoals: otherGoalsRes.error?.message ?? null,
+        },
+      },
+    });
   } catch (e) {
     return jsonResponse({ error: String(e) }, 500);
   }
