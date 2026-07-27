@@ -35,20 +35,38 @@ first.
 
 Do NOT include any dates or due-date hints — dates are computed separately.
 
-You may be given a short "About this person" context block describing their
-real job applications, open tasks, recently completed tasks, and other
-goals. If present, use it to make each task specific to this person's
-actual field, situation and workload rather than generic advice. Do not
-invent any facts about the person beyond what the context block states. Do
-not produce a task that duplicates one of their existing open tasks. Never
-mention or quote the context block back at the person in a task's title or
-description — use it only to inform your choices silently.
+You may be given an "About this person" context block describing their real
+job applications, open tasks, recently completed tasks, and other goals.
+
+WHEN THAT BLOCK IS PRESENT, USING IT IS THE MOST IMPORTANT PART OF THIS
+TASK. Generic advice that ignores it is a failure. Work through it like
+this:
+
+1. First decide which facts in the block are actually relevant to THIS
+   goal. Most facts will not be. That is expected.
+2. For every relevant fact, the task you write must account for it instead
+   of giving the textbook answer. If the block shows they already have
+   something, do not tell them to go get it. If it shows they already did
+   something, do not tell them to do it again. If it shows a specific
+   field, tool, employer or constraint, name that specific thing rather
+   than the general category.
+3. Never force an irrelevant fact in. Twisting an unrelated detail into a
+   task is worse than leaving it out. If nothing in the block is relevant,
+   write the best general plan you can and return an empty usedContext.
+4. Never invent facts beyond what the block states, never quote the block
+   back at them, and never reveal that you were given it. Do not produce a
+   task that duplicates one of their existing open tasks.
 
 Each task: {title (short imperative), description (one short sentence of
 extra context, or null), priority (none|low|medium|high)}.
 
+Also return usedContext: an array of the specific facts from the block that
+you actually let change a task. Quote each fact briefly. Return an empty
+array if the block was absent or nothing in it was relevant. Be honest
+here: list only facts that genuinely changed what you wrote.
+
 Respond with ONLY a JSON object of this exact form:
-{"tasks":[{"title": string, "description": string|null, "priority": string}]}`;
+{"usedContext": string[], "tasks":[{"title": string, "description": string|null, "priority": string}]}`;
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -243,8 +261,12 @@ Deno.serve(async (req: Request) => {
       ? `Goal: ${goalTitle}\nDescription: ${goalDescription}`
       : `Goal: ${goalTitle}`;
 
+    // The context block goes AFTER the goal on purpose. It used to lead, and
+    // the model reliably ignored it: given "Pay outstanding balance to McFIT"
+    // and a fitness goal, it still answered "research local gyms". Putting it
+    // last places it closest to the point of generation.
     const userContent = contextBlock
-      ? `${contextBlock}\n\n${baseUserContent}`
+      ? `${baseUserContent}\n\n${contextBlock}`
       : baseUserContent;
 
     const groqRes = await fetch(
@@ -274,7 +296,7 @@ Deno.serve(async (req: Request) => {
     const data = await groqRes.json();
     const content = data.choices?.[0]?.message?.content ?? "{}";
 
-    let parsed: { tasks?: RawTask[] };
+    let parsed: { tasks?: RawTask[]; usedContext?: unknown };
     try {
       parsed = JSON.parse(content);
     } catch {
@@ -304,6 +326,12 @@ Deno.serve(async (req: Request) => {
       context: {
         block: contextBlock,
         blockLength: contextBlock.length,
+        // What the model claims it actually let change a task. A populated
+        // block with an empty usedContext is the failure this prompt was
+        // rewritten to fix, and it is only visible because it is echoed here.
+        usedContext: Array.isArray(parsed.usedContext)
+          ? parsed.usedContext.filter((f): f is string => typeof f === 'string')
+          : [],
         openTasksCount: openTasksRes.count ?? 0,
         completedTasksCount: completedTasksRes.count ?? 0,
         jobAppsCount: jobAppsRes.count ?? 0,
