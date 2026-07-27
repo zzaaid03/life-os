@@ -5,8 +5,10 @@
 /// list is empty and uploading fails. That is a choice, not an oversight.
 library;
 
+import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/features/files/data/models/picked_file.dart';
 import 'package:life_os/features/files/data/models/stored_file.dart';
+import 'package:life_os/features/files/data/repositories/supabase_file_repository.dart';
 import 'package:riverpod/riverpod.dart';
 
 /// Abstract repository for [StoredFile] records and their bytes.
@@ -53,12 +55,7 @@ abstract class FileRepository {
 }
 
 /// Provides the [FileRepository].
-///
-/// The Supabase implementation is supplied by the data-layer lane; until it
-/// lands this throws rather than silently returning empty results.
 final fileRepositoryProvider = Provider<FileRepository>((ref) {
-  throw UnimplementedError(
-    'FileRepository has no implementation yet. The data-layer lane replaces '
-    'this provider body with SupabaseFileRepository(client).',
-  );
+  final client = ref.watch(supabaseClientProvider);
+  return SupabaseFileRepository(client);
 });

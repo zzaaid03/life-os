@@ -21,6 +21,7 @@ class PickedFile {
     required this.fileName,
     required this.mimeType,
     required this.bytes,
+    this.thumbnailBase64,
   });
 
   /// Original file name including extension, shown to the user.
@@ -32,6 +33,13 @@ class PickedFile {
 
   /// The bytes to upload.
   final Uint8List bytes;
+
+  /// A tiny base64-encoded JPEG preview, for images only, null otherwise.
+  ///
+  /// Generated here rather than in the repository because this is where the
+  /// image decoding already happens. It is stored on the metadata row so the
+  /// file list can show thumbnails without downloading the full images.
+  final String? thumbnailBase64;
 
   /// Size of [bytes].
   int get sizeBytes => bytes.length;

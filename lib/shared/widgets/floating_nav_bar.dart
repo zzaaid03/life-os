@@ -16,7 +16,7 @@ import 'package:life_os/core/theme/app_spacing.dart';
 
 /// The floating bottom navigation bar for Life OS.
 ///
-/// Displays five navigation items with icons.
+/// Displays six navigation items with icons.
 /// Active item shows a label. Inactive items show only the icon.
 /// Features glass-morphism effect with blur and soft shadow.
 class FloatingNavBar extends StatelessWidget {
@@ -69,40 +69,59 @@ class FloatingNavBar extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _NavItem(
-                  icon: AppIcons.home,
-                  filledIcon: AppIcons.homeFilled,
-                  label: 'Home',
-                  route: AppRoutes.home,
-                  isActive: currentLocation == AppRoutes.home,
+                Expanded(
+                  child: _NavItem(
+                    icon: AppIcons.home,
+                    filledIcon: AppIcons.homeFilled,
+                    label: 'Home',
+                    route: AppRoutes.home,
+                    isActive: currentLocation == AppRoutes.home,
+                  ),
                 ),
-                _NavItem(
-                  icon: AppIcons.timeline,
-                  filledIcon: AppIcons.timeline,
-                  label: 'Timeline',
-                  route: AppRoutes.timeline,
-                  isActive: currentLocation == AppRoutes.timeline,
+                Expanded(
+                  child: _NavItem(
+                    icon: AppIcons.timeline,
+                    filledIcon: AppIcons.timeline,
+                    label: 'Timeline',
+                    route: AppRoutes.timeline,
+                    isActive: currentLocation == AppRoutes.timeline,
+                  ),
                 ),
-                _NavItem(
-                  icon: AppIcons.life,
-                  filledIcon: AppIcons.lifeFilled,
-                  label: 'Life',
-                  route: AppRoutes.life,
-                  isActive: currentLocation == AppRoutes.life,
+                Expanded(
+                  child: _NavItem(
+                    icon: AppIcons.life,
+                    filledIcon: AppIcons.lifeFilled,
+                    label: 'Life',
+                    route: AppRoutes.life,
+                    isActive: currentLocation == AppRoutes.life,
+                  ),
                 ),
-                _NavItem(
-                  icon: AppIcons.search,
-                  filledIcon: AppIcons.search,
-                  label: 'Search',
-                  route: AppRoutes.search,
-                  isActive: currentLocation == AppRoutes.search,
+                Expanded(
+                  child: _NavItem(
+                    icon: AppIcons.files,
+                    filledIcon: AppIcons.filesFilled,
+                    label: 'Files',
+                    route: AppRoutes.files,
+                    isActive: currentLocation == AppRoutes.files,
+                  ),
                 ),
-                _NavItem(
-                  icon: AppIcons.settings,
-                  filledIcon: AppIcons.settingsFilled,
-                  label: 'Settings',
-                  route: AppRoutes.settings,
-                  isActive: currentLocation == AppRoutes.settings,
+                Expanded(
+                  child: _NavItem(
+                    icon: AppIcons.search,
+                    filledIcon: AppIcons.search,
+                    label: 'Search',
+                    route: AppRoutes.search,
+                    isActive: currentLocation == AppRoutes.search,
+                  ),
+                ),
+                Expanded(
+                  child: _NavItem(
+                    icon: AppIcons.settings,
+                    filledIcon: AppIcons.settingsFilled,
+                    label: 'Settings',
+                    route: AppRoutes.settings,
+                    isActive: currentLocation == AppRoutes.settings,
+                  ),
                 ),
               ],
             ),
@@ -139,44 +158,43 @@ class _NavItem extends StatelessWidget {
         label: label,
         selected: isActive,
         button: true,
-        child: SizedBox(
-          width: 64,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-                padding: EdgeInsets.only(
-                  top: isActive ? 12 : 16,
-                  bottom: isActive ? 0 : 4,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isActive ? filledIcon : icon,
-                      size: 24,
-                      color: isActive
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface.withValues(alpha: 0.35),
-                    ),
-                    if (isActive) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        label,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(
+                top: isActive ? 12 : 16,
+                bottom: isActive ? 0 : 4,
               ),
-            ],
-          ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isActive ? filledIcon : icon,
+                    size: 24,
+                    color: isActive
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  ),
+                  if (isActive) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

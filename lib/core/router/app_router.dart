@@ -15,6 +15,7 @@ import 'package:life_os/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/splash_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/welcome_screen.dart';
 import 'package:life_os/features/demo/demo_mode.dart';
+import 'package:life_os/features/files/presentation/screens/files_screen.dart';
 import 'package:life_os/features/goals/presentation/screens/goal_breakdown_screen.dart';
 import 'package:life_os/features/goals/presentation/screens/goals_screen.dart';
 import 'package:life_os/features/home/presentation/screens/home_screen.dart';
@@ -60,6 +61,7 @@ abstract final class AppRoutes {
   static const String settings = '/settings';
   static const String tasks = '/tasks';
   static const String taskDetail = '/tasks/:id';
+  static const String files = '/files';
 
   // AI inbox assistant
   static const String inboxScan = '/inbox-scan';
@@ -222,6 +224,11 @@ GoRouter createRouter(Ref ref) {
             path: AppRoutes.tasks,
             name: 'tasks',
             builder: (context, state) => const TaskListScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.files,
+            name: 'files',
+            builder: (context, state) => const FilesScreen(),
           ),
         ],
       ),

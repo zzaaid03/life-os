@@ -11,13 +11,17 @@ import 'package:flutter/foundation.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/demo/data/repositories/demo_auth_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_daily_brief_notifier.dart';
+import 'package:life_os/features/demo/data/repositories/demo_file_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_goal_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_job_application_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_processed_emails_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_profile_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_task_repository.dart';
+import 'package:life_os/features/demo/data/services/demo_file_picker_service.dart';
 import 'package:life_os/features/demo/data/services/demo_goal_breakdown_service.dart';
 import 'package:life_os/features/demo/data/services/demo_inbox_scan_service.dart';
+import 'package:life_os/features/files/data/repositories/file_repository.dart';
+import 'package:life_os/features/files/data/services/file_picker_service.dart';
 import 'package:life_os/features/goals/data/goal_breakdown_service.dart';
 import 'package:life_os/features/goals/data/repositories/supabase_goal_repository.dart';
 import 'package:life_os/features/home/domain/daily_brief_provider.dart';
@@ -63,6 +67,8 @@ List<Override> buildDemoOverrides() {
     goalBreakdownServiceProvider.overrideWithValue(
       DemoGoalBreakdownService(),
     ),
+    fileRepositoryProvider.overrideWithValue(DemoFileRepository()),
+    filePickerServiceProvider.overrideWithValue(DemoFilePickerService()),
     isDemoModeProvider.overrideWithValue(true),
   ];
 }

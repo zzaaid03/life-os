@@ -35,6 +35,12 @@ abstract final class AppIcons {
   /// Settings tab filled icon.
   static const IconData settingsFilled = Icons.settings_rounded;
 
+  /// Files tab icon.
+  static const IconData files = Icons.folder_outlined;
+
+  /// Files tab filled icon.
+  static const IconData filesFilled = Icons.folder_rounded;
+
   // --- Actions ---
 
   /// Add / create action.

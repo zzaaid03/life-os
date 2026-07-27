@@ -7,6 +7,7 @@
 library;
 
 import 'package:life_os/features/files/data/models/picked_file.dart';
+import 'package:life_os/features/files/data/services/platform_file_picker_service.dart';
 import 'package:riverpod/riverpod.dart';
 
 /// Thrown when the user picked something that cannot be uploaded.
@@ -32,12 +33,6 @@ abstract class FilePickerService {
 }
 
 /// Provides the [FilePickerService].
-///
-/// The real implementation is supplied by the upload lane; until it lands
-/// this throws rather than silently doing nothing.
 final filePickerServiceProvider = Provider<FilePickerService>((ref) {
-  throw UnimplementedError(
-    'FilePickerService has no implementation yet. The upload lane replaces '
-    'this provider body with the real picker.',
-  );
+  return PlatformFilePickerService();
 });

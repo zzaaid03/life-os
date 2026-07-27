@@ -29,6 +29,14 @@ CREATE TABLE IF NOT EXISTS public.user_files (
   -- set for a row where is_private is true.
   ai_label TEXT,
 
+  -- A tiny base64 JPEG preview (~2 KB) for image files, generated on the
+  -- client at upload time. It lives in the row on purpose: the list view
+  -- renders straight from data it has already fetched, so showing thumbnails
+  -- costs no extra requests and no storage egress. Downloading full-size
+  -- images to paint 44px squares would burn the shared monthly egress
+  -- allowance in a single scroll. NULL for non-images.
+  thumbnail_base64 TEXT,
+
   -- Optional attachment to another entity. Kept as a loose type+id pair
   -- rather than two nullable FKs so a third attachable type does not need a
   -- schema change.

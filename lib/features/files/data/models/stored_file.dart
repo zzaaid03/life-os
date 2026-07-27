@@ -56,6 +56,7 @@ class StoredFile extends Equatable {
     required this.sizeBytes,
     required this.isPrivate,
     this.aiLabel,
+    this.thumbnailBase64,
     this.attachedEntityType,
     this.attachedEntityId,
     required this.createdAt,
@@ -74,6 +75,7 @@ class StoredFile extends Equatable {
       sizeBytes: (json['size_bytes'] as num?)?.toInt() ?? 0,
       isPrivate: json['is_private'] as bool? ?? false,
       aiLabel: json['ai_label'] as String?,
+      thumbnailBase64: json['thumbnail_base64'] as String?,
       attachedEntityType: fileAttachmentTypeFromDb(
         json['attached_entity_type'] as String?,
       ),
@@ -114,6 +116,15 @@ class StoredFile extends Equatable {
   /// where [isPrivate] is true.
   final String? aiLabel;
 
+  /// A tiny base64-encoded JPEG preview for image files, null otherwise.
+  ///
+  /// Deliberately carried in the row rather than fetched: list views render
+  /// straight from this, so thumbnails cost no extra request and no storage
+  /// egress. Note that `cacheWidth` on a network image does NOT avoid this
+  /// cost, it only shrinks the decode after the full bytes have already been
+  /// downloaded.
+  final String? thumbnailBase64;
+
   /// What this file is attached to, or null if it stands alone.
   final FileAttachmentType? attachedEntityType;
 
@@ -147,6 +158,7 @@ class StoredFile extends Equatable {
       'size_bytes': sizeBytes,
       'is_private': isPrivate,
       'ai_label': aiLabel,
+      'thumbnail_base64': thumbnailBase64,
       'attached_entity_type': fileAttachmentTypeToDb(attachedEntityType),
       'attached_entity_id': attachedEntityId,
       'deleted_at': deletedAt?.toUtc().toIso8601String(),
@@ -163,6 +175,7 @@ class StoredFile extends Equatable {
     int? sizeBytes,
     bool? isPrivate,
     String? aiLabel,
+    String? thumbnailBase64,
     FileAttachmentType? attachedEntityType,
     String? attachedEntityId,
     DateTime? createdAt,
@@ -178,6 +191,7 @@ class StoredFile extends Equatable {
       sizeBytes: sizeBytes ?? this.sizeBytes,
       isPrivate: isPrivate ?? this.isPrivate,
       aiLabel: aiLabel ?? this.aiLabel,
+      thumbnailBase64: thumbnailBase64 ?? this.thumbnailBase64,
       attachedEntityType: attachedEntityType ?? this.attachedEntityType,
       attachedEntityId: attachedEntityId ?? this.attachedEntityId,
       createdAt: createdAt ?? this.createdAt,
@@ -196,6 +210,7 @@ class StoredFile extends Equatable {
     sizeBytes,
     isPrivate,
     aiLabel,
+    thumbnailBase64,
     attachedEntityType,
     attachedEntityId,
     createdAt,
