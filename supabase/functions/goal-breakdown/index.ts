@@ -35,6 +35,15 @@ first.
 
 Do NOT include any dates or due-date hints — dates are computed separately.
 
+You may be given a short "About this person" context block describing their
+real job applications, open tasks, recently completed tasks, and other
+goals. If present, use it to make each task specific to this person's
+actual field, situation and workload rather than generic advice. Do not
+invent any facts about the person beyond what the context block states. Do
+not produce a task that duplicates one of their existing open tasks. Never
+mention or quote the context block back at the person in a task's title or
+description — use it only to inform your choices silently.
+
 Each task: {title (short imperative), description (one short sentence of
 extra context, or null), priority (none|low|medium|high)}.
 
@@ -74,6 +83,81 @@ function computeSuggestedDueDates(count: number, targetDate: string | null): str
   return dates;
 }
 
+function truncate(s: string, max = 80): string {
+  const t = s.trim();
+  return t.length > max ? t.slice(0, max) : t;
+}
+
+/// Assembles a plain-text "About this person" context block from the
+/// caller's own rows, for tailoring the goal breakdown. Returns "" if
+/// there's nothing to say (all four lists empty).
+function buildContextBlock(
+  openTasks: { title?: string | null }[],
+  openTasksCount: number,
+  completedTasks: { title?: string | null }[],
+  completedTasksCount: number,
+  jobApps: { company?: string | null; role?: string | null; status?: string | null }[],
+  jobAppsCount: number,
+  otherGoals: { title?: string | null; status?: string | null }[],
+): string {
+  const lines: string[] = [];
+
+  if (jobApps.length > 0) {
+    const items = jobApps
+      .slice(0, 15)
+      .map((j) => {
+        const company = truncate(j.company ?? "Unknown");
+        const role = j.role ? ` - ${truncate(j.role, 40)}` : "";
+        const status = j.status ? ` (${truncate(j.status, 20)})` : "";
+        return `${company}${role}${status}`;
+      })
+      .filter((s) => s.length > 0);
+    if (items.length > 0) {
+      lines.push(
+        `Currently tracking ${jobAppsCount} job application${jobAppsCount === 1 ? "" : "s"}: ${items.join(", ")}`,
+      );
+    }
+  }
+
+  if (openTasks.length > 0) {
+    const examples = openTasks
+      .slice(0, 6)
+      .map((t) => truncate(t.title ?? ""))
+      .filter((s) => s.length > 0);
+    if (examples.length > 0) {
+      lines.push(
+        `They have ${openTasksCount} open task${openTasksCount === 1 ? "" : "s"}. Recent examples: ${examples.join(", ")}`,
+      );
+    }
+  }
+
+  if (completedTasksCount > 0) {
+    lines.push(
+      `They completed ${completedTasksCount} task${completedTasksCount === 1 ? "" : "s"} in the last 30 days.`,
+    );
+  }
+
+  if (otherGoals.length > 0) {
+    const examples = otherGoals
+      .slice(0, 5)
+      .map((g) => truncate(g.title ?? ""))
+      .filter((s) => s.length > 0);
+    if (examples.length > 0) {
+      lines.push(`Their other active goals: ${examples.join(", ")}`);
+    }
+  }
+
+  if (lines.length === 0) return "";
+
+  let block = "About this person, for tailoring only:\n" + lines.join("\n");
+  if (block.length > 2000) {
+    const kept = block.slice(0, 2000).split("\n");
+    kept.pop(); // drop a possibly-partial trailing line
+    block = kept.join("\n");
+  }
+  return block;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -100,9 +184,67 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "goalTitle is required" }, 400);
     }
 
-    const userContent = goalDescription
+    const userId = userData.user.id;
+    const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [openTasksRes, completedTasksRes, jobAppsRes, otherGoalsRes] = await Promise.all([
+      admin
+        .from("tasks")
+        .select("title", { count: "exact" })
+        .eq("user_id", userId)
+        .is("deleted_at", null)
+        .neq("status", "completed")
+        .neq("status", "archived")
+        .order("created_at", { ascending: false })
+        .limit(20),
+      admin
+        .from("tasks")
+        .select("title", { count: "exact" })
+        .eq("user_id", userId)
+        .is("deleted_at", null)
+        .eq("status", "completed")
+        .gte("updated_at", thirtyDaysAgoIso)
+        .limit(50),
+      admin
+        .from("job_applications")
+        .select("company, role, status", { count: "exact" })
+        .eq("user_id", userId)
+        .limit(15),
+      admin
+        .from("goals")
+        .select("title, status")
+        .eq("user_id", userId)
+        .is("deleted_at", null)
+        .neq("status", "archived")
+        .limit(10),
+    ]);
+
+    const openTasks = openTasksRes.data ?? [];
+    const completedTasks = completedTasksRes.data ?? [];
+    const jobApps = jobAppsRes.data ?? [];
+    // Exclude the goal being broken down right now (it may already be saved),
+    // so "their other active goals" doesn't list this same goal back.
+    const otherGoals = (otherGoalsRes.data ?? []).filter(
+      (g) => (g.title ?? "").trim().toLowerCase() !== goalTitle.toLowerCase(),
+    );
+
+    const contextBlock = buildContextBlock(
+      openTasks,
+      openTasksRes.count ?? openTasks.length,
+      completedTasks,
+      completedTasksRes.count ?? completedTasks.length,
+      jobApps,
+      jobAppsRes.count ?? jobApps.length,
+      otherGoals,
+    );
+
+    const baseUserContent = goalDescription
       ? `Goal: ${goalTitle}\nDescription: ${goalDescription}`
       : `Goal: ${goalTitle}`;
+
+    const userContent = contextBlock
+      ? `${contextBlock}\n\n${baseUserContent}`
+      : baseUserContent;
 
     const groqRes = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
