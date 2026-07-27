@@ -18,7 +18,58 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-25) — `main` AND `staging` @ `7b3a73e` — ONBOARDING GATE FIXED, JOB-DUPLICATE BUG FIXED
+## Current state (2026-07-27) — `staging` @ `6585483`, `main` @ `8d925c7` — V2 KICKOFF, SLICE 1 LIVE
+**`staging` is 3 commits ahead of `main`, pushed, clean.** v1 is stable and feature-complete with no
+open bugs; this session started **Life OS v2** as a design round first and a build round second.
+
+**The full v2 scope, every locked decision, and every rejected idea live in `_planning/V2_SCOPE.md`
+(gitignored, planner-only). READ IT before planning anything v2.** Summary of what's decided:
+v2 = (1) the AI learns Zaid's habits/lifestyle, (2) file storage. Learning is **silent by default
+plus a read-only "What Life knows about you" mirror in Settings** (so a wrong inference is
+diagnosable, without any confirmation-card UI). Files: **AI may read them, with a per-file "private,
+never send to AI" toggle**; **client-side image re-encode before upload**; 10 MB cap; network-only;
+Files tab for browsing, **retrieval via the existing Search tab**; web+Android+iOS, camera deferred.
+
+**SLICE 1 SHIPPED AND DEPLOYED: goal breakdown is now personalized (`6585483`).** The
+`goal-breakdown` edge function's prompt only ever contained `Goal: <title>` + description, so the AI
+knew literally nothing about the user and every breakdown came out generic. It now reads the caller's
+own rows server-side (open tasks, tasks completed in last 30 days, job applications, other active
+goals) and assembles a factual context block in TypeScript, same approach as `daily-brief`.
+**Deployed to the shared project with Zaid's authorization (exit 0). No Dart changed, so no client
+rebuild and the web bundle is untouched. Demo mode unaffected.**
+
+**⚠️ SLICE 1'S RESULT IS INCONCLUSIVE AND THIS IS THE FIRST THING TO RESOLVE.** Zaid tested it:
+output quality is **unchanged**. He attributes that to the AI not knowing enough about him yet, which
+is plausible (slice 1 built the *channel*, not the *content*). **But because a failed context query
+degrades silently to an omitted section, "not enough data about me" and "the queries are returning
+nothing" are INDISTINGUISHABLE from the UI.** Zaid was asked for his open-task / job-application /
+active-goal counts to tell these apart and **had not answered when the session ended.** Get those
+numbers. If they're healthy and output still didn't change, the plumbing is broken. **Do not build
+more personalization on top of slice 1 until this is resolved.**
+
+**NEW CAPABILITY, USE IT: Deno 2.9.4 is now installed** (winget, `DenoLand.Deno`). Edge functions can
+finally be verified before they reach production: `deno check supabase/functions/<name>/index.ts`
+typechecks, and pure helper functions can be extracted to a temp file outside the repo and actually
+executed. Both were done for slice 1 and the execution test proved a claim that had only ever been
+asserted (all-empty input really does produce a byte-identical request). **Always typecheck an edge
+function before asking Zaid to authorize a deploy, and check an untouched function as a control so a
+clean result is meaningful rather than vacuous.**
+
+**NEXT: slice 2 (file storage), split 2a (storage that works) then 2b (AI labelling + search).**
+There is an OPEN AMBIGUITY on that split recorded in `_planning/V2_SCOPE.md` that must be resolved
+with Zaid first. **Slice 2a needs a migration + a Storage bucket + RLS in TWO separate places (the
+metadata table AND the bucket policies) — rehearse it on a local `npx supabase start` stack before
+touching the shared project.** RLS is now load-bearing for real: ~8 real accounts (Zaid ×2 plus 5-7
+friends, each added to the Google OAuth test-user list so each has their OWN account and user_id),
+and slice 2 stores passports and rental contracts. Zaid confirmed per-user email isolation already
+works correctly in production, which is the same machinery files will depend on.
+
+**Zaid wants to run WORKERS IN PARALLEL from here.** Parallel workers MUST be given
+non-overlapping file sets or they will clobber each other; the planner has to define the shared
+interfaces (model shape, repository signatures) up front so independent workers can build against
+them.
+
+## SUPERSEDED — Current state (2026-07-25) — `main` AND `staging` @ `7b3a73e` — ONBOARDING GATE FIXED, JOB-DUPLICATE BUG FIXED
 **Both branches pushed, clean, no divergence.** Merged to `main` and confirmed LIVE — `curl` against
 `https://lifeos.deadthrone.dev` verified the served bundle is `flutter_bootstrap.js?v=7b3a73e`, not
 just a green CI run. Zaid device-tested after deploy (web + iPhone) and confirmed everything works:
@@ -537,6 +588,28 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **Safe silent degradation makes a feature UNDIAGNOSABLE — always leave a way to tell "working but
+  weak" apart from "silently doing nothing".** Slice 1's context queries were deliberately written to
+  degrade to an omitted section on any error (good: it can't break goal breakdown). The cost only
+  showed up at test time: Zaid reported "same as before", which is the EXACT symptom of both "the AI
+  needs more data about me" and "every query returned nothing". Neither the planner nor Zaid could
+  distinguish them from the UI. Safe fallbacks are still right; just pair them with something
+  observable (a log line, a count echoed in the response, a debug surface) before shipping.
+- **An empty prompt is not a bad prompt.** Goal breakdown produced generic tasks for months. The cause
+  wasn't prompt wording, it was that the prompt contained only the goal title: the model genuinely knew
+  nothing about the user. Before tuning wording, check what data the prompt actually receives.
+- **The planner catching what the worker missed is not optional theatre.** Two consecutive workers
+  produced clean, honest, `flutter analyze`-passing reports on slice 1; planner diff review still
+  found two real grounding defects (counts read from a `.limit()`ed array so 57 open tasks were
+  reported as 20, and rows labelled "Recent" with no `ORDER BY`). Both would have shipped facts that
+  don't map to real rows, the same class as the old daily-brief "upcoming" bug. **Read the diff, every
+  time, even when the report looks perfect.**
+- **Use a control when you verify.** When `deno check` passed on the changed edge function, it was run
+  again on an untouched one to prove the toolchain was actually exercising anything. A green result
+  with no control is not evidence.
+- **Statements derived from a `.limit()`ed query are unfounded.** If code says "you have N X" and N
+  comes from `rows.length` on a limited query, N is wrong for exactly the users who have the most
+  data. Use `{ count: "exact" }` and keep the limit for the examples only.
 - **A DB trigger that auto-creates a row at signup time can silently defeat an "is this new?" check.**
   `handle_new_user()` inserts a `profiles` row synchronously at `signUp()`, before email confirmation
   and regardless of it — so `profile == null` is NOT a reliable "needs onboarding" signal, and the
