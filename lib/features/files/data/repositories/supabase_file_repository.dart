@@ -45,6 +45,45 @@ class SupabaseFileRepository implements FileRepository {
         .toList();
   }
 
+  /// Finds this user's live files whose note, name or AI label contains
+  /// [query], newest first.
+  @override
+  Future<List<StoredFile>> search(String userId, String query) async {
+    final term = _sanitizeSearchTerm(query);
+    if (term.isEmpty) return const [];
+
+    final response = await _client
+        .from(_table)
+        .select()
+        .eq('user_id', userId)
+        .isFilter('deleted_at', null)
+        .or(
+          'user_note.ilike.%$term%,'
+          'file_name.ilike.%$term%,'
+          'ai_label.ilike.%$term%',
+        )
+        .order('created_at', ascending: false);
+    return (response as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(StoredFile.fromJson)
+        .toList();
+  }
+
+  /// Strips characters that would change the meaning of a PostgREST `or`
+  /// filter rather than be matched literally.
+  ///
+  /// Commas separate conditions and parentheses group them, so a query
+  /// containing either would silently become a different query instead of
+  /// simply finding nothing. `%` and `_` are SQL wildcards and are removed so
+  /// a typed `%` does not match everything.
+  String _sanitizeSearchTerm(String query) {
+    return query
+        .trim()
+        .replaceAll(RegExp(r'[,()%_\\]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
   /// Uploads [file]'s bytes first, then inserts its metadata row.
   ///
   /// If the row insert fails after a successful upload, the just-uploaded
@@ -56,6 +95,7 @@ class SupabaseFileRepository implements FileRepository {
     required String userId,
     required PickedFile file,
     required bool isPrivate,
+    String userNote = '',
     FileAttachmentType? attachedEntityType,
     String? attachedEntityId,
   }) async {
@@ -80,6 +120,7 @@ class SupabaseFileRepository implements FileRepository {
             'mime_type': file.mimeType,
             'size_bytes': file.sizeBytes,
             'is_private': isPrivate,
+            'user_note': userNote.trim(),
             'thumbnail_base64': file.thumbnailBase64,
             'attached_entity_type': fileAttachmentTypeToDb(
               attachedEntityType,

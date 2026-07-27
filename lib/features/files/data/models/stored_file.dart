@@ -55,6 +55,7 @@ class StoredFile extends Equatable {
     required this.mimeType,
     required this.sizeBytes,
     required this.isPrivate,
+    this.userNote = '',
     this.aiLabel,
     this.thumbnailBase64,
     this.attachedEntityType,
@@ -74,6 +75,7 @@ class StoredFile extends Equatable {
       mimeType: json['mime_type'] as String? ?? 'application/octet-stream',
       sizeBytes: (json['size_bytes'] as num?)?.toInt() ?? 0,
       isPrivate: json['is_private'] as bool? ?? false,
+      userNote: json['user_note'] as String? ?? '',
       aiLabel: json['ai_label'] as String?,
       thumbnailBase64: json['thumbnail_base64'] as String?,
       attachedEntityType: fileAttachmentTypeFromDb(
@@ -112,8 +114,20 @@ class StoredFile extends Equatable {
   /// When true the file is never sent to the AI for labelling or search.
   final bool isPrivate;
 
-  /// AI-generated label. Always null until slice 2b; never set for a file
-  /// where [isPrivate] is true.
+  /// The one-line "what is this?" description the user typed at upload.
+  ///
+  /// This is the primary search key, and it is the only one that works for a
+  /// file the AI cannot understand: a photo has no text layer, so a passport
+  /// scan named `IMG_4821.jpg` is findable by this and nothing else. The
+  /// upload UI requires it. It defaults to empty here only so rows written
+  /// before this column existed still parse.
+  final String userNote;
+
+  /// AI-generated search synonyms for [userNote], comma-separated.
+  ///
+  /// Never set for a file where [isPrivate] is true. The AI is given the
+  /// note and the file name ONLY: file contents are never transmitted, which
+  /// is what makes the private toggle cheap to honour.
   final String? aiLabel;
 
   /// A tiny base64-encoded JPEG preview for image files, null otherwise.
@@ -157,6 +171,7 @@ class StoredFile extends Equatable {
       'mime_type': mimeType,
       'size_bytes': sizeBytes,
       'is_private': isPrivate,
+      'user_note': userNote,
       'ai_label': aiLabel,
       'thumbnail_base64': thumbnailBase64,
       'attached_entity_type': fileAttachmentTypeToDb(attachedEntityType),
@@ -174,6 +189,7 @@ class StoredFile extends Equatable {
     String? mimeType,
     int? sizeBytes,
     bool? isPrivate,
+    String? userNote,
     String? aiLabel,
     String? thumbnailBase64,
     FileAttachmentType? attachedEntityType,
@@ -190,6 +206,7 @@ class StoredFile extends Equatable {
       mimeType: mimeType ?? this.mimeType,
       sizeBytes: sizeBytes ?? this.sizeBytes,
       isPrivate: isPrivate ?? this.isPrivate,
+      userNote: userNote ?? this.userNote,
       aiLabel: aiLabel ?? this.aiLabel,
       thumbnailBase64: thumbnailBase64 ?? this.thumbnailBase64,
       attachedEntityType: attachedEntityType ?? this.attachedEntityType,
@@ -209,6 +226,7 @@ class StoredFile extends Equatable {
     mimeType,
     sizeBytes,
     isPrivate,
+    userNote,
     aiLabel,
     thumbnailBase64,
     attachedEntityType,

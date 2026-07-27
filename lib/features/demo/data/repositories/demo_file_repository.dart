@@ -25,11 +25,30 @@ class DemoFileRepository implements FileRepository {
     );
   }
 
+  /// Searches the in-memory seed. Stays entirely local: the demo makes no
+  /// network calls of any kind, which is a guarantee, not an optimisation.
+  @override
+  Future<List<StoredFile>> search(String userId, String query) async {
+    final term = query.trim().toLowerCase();
+    if (term.isEmpty) return const [];
+    return _files
+        .where(
+          (f) =>
+              f.deletedAt == null &&
+              (f.userNote.toLowerCase().contains(term) ||
+                  f.fileName.toLowerCase().contains(term) ||
+                  (f.aiLabel?.toLowerCase().contains(term) ?? false)),
+        )
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
   @override
   Future<StoredFile> upload({
     required String userId,
     required PickedFile file,
     required bool isPrivate,
+    String userNote = '',
     FileAttachmentType? attachedEntityType,
     String? attachedEntityId,
   }) async {
@@ -42,6 +61,7 @@ class DemoFileRepository implements FileRepository {
       mimeType: file.mimeType,
       sizeBytes: file.sizeBytes,
       isPrivate: isPrivate,
+      userNote: userNote.trim(),
       thumbnailBase64: file.thumbnailBase64,
       attachedEntityType: attachedEntityType,
       attachedEntityId: attachedEntityId,
