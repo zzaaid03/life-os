@@ -18,7 +18,103 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-27) — `staging` @ `6585483`, `main` @ `8d925c7` — V2 KICKOFF, SLICE 1 LIVE
+## Current state (2026-07-27, late) — `staging` @ `f386c3e`, `main` @ `8d925c7` — SLICE 2a SHIPPED, SLICE 1 DIAGNOSED
+
+**`staging` is 10 commits ahead of `main`, pushed, clean. Everything below is staging-only.**
+**Two production changes were made this round and are LIVE for all 8 accounts: the `goal-breakdown`
+edge function was deployed twice, and migrations 013 + 014 were applied.** No merge to `main`.
+
+### ⚠️ ZAID'S STANDING WORKFLOW PREFERENCES — apply these from your first message
+- **He wants workers running IN PARALLEL, always.** Give each a DISJOINT file set, say so explicitly
+  in the prompt, and write any shared contract (model shape, repository signature) VERBATIM into
+  every prompt that touches it. This round ran 4 parallel lanes, then 4 parallel fixes, then 2 more.
+  It worked: zero clobbering across 10 worker runs. **If something genuinely cannot be split, say so
+  and keep it serial** rather than forcing it.
+- **Live/device testing happens AT THE END, not per slice.** Do not block a round waiting for him to
+  test on a phone. Build, verify by reading diffs, commit, and batch the manual testing.
+- He is direct about UX ("the nav bar looks like shit"). Treat that as precise signal, not venting.
+
+### SLICE 1 (goal-breakdown personalization) — DIAGNOSED, FIX DEPLOYED, AWAITING RETEST
+**Full detail is in `_planning/V2_SCOPE.md` under "SLICE 1 VERDICT". Read it. Summary:**
+The plumbing was never broken. Instrumenting the function (echoing the assembled block + counts +
+per-query errors) proved it with real data: `jobAppsCount: 36`, `blockLength: 973`, all
+`queryErrors` null. **The MODEL was ignoring the context.** It was handed an open task reading
+`Pay outstanding balance to McFIT` (a gym) next to a fitness goal and still answered "Research
+local gyms near your location".
+
+**Deployed fix (`dbb3ad8`, LIVE):** context block moved AFTER the goal, the soft "use it silently"
+aside replaced with a numbered procedure stating generic advice is a failure, plus a required
+`usedContext` field listing which facts the model actually let change a task.
+
+**➡️ FIRST ACTION FOR THE SUCCESSOR: Zaid has the retest result. Ask for `context.usedContext`.**
+- Non-empty (e.g. names the McFIT task) → prompt was the lever, slice 1 CLOSED as a win.
+- Empty against a ~973-char block → **STOP tuning prompt wording.** The honest conclusion is the
+  model can't be conditioned this way. Options are a stronger model, or assembling the breakdown in
+  code the way `daily-brief` was rewritten. **Do not spend more than one further round on wording.**
+
+**An early diagnostic run showed `jobAppsCount: 0` and looked like a broken query. It was Zaid's
+OTHER account, which genuinely has no applications. He has two. Always confirm WHICH ACCOUNT a
+diagnostic came from before believing it.**
+
+### SLICE 2a (file storage) — BUILT, MIGRATIONS APPLIED TO PRODUCTION
+Upload a file, re-encode images client-side, store it, mark it private. **There is deliberately NO
+browse list and NO Files tab** — see the UX reversal below.
+- **Schema is LIVE on the shared project:** `013_user_files.sql` (metadata table, 4 RLS policies,
+  grants to `authenticated, service_role`, indexes, `updated_at` trigger) and
+  `014_user_files_bucket.sql` (private `user-files` bucket, 10 MB server-side cap, 4 policies on
+  `storage.objects` matching `(storage.foldername(name))[1] = auth.uid()::text`).
+- **Verified before push** on a throwaway local stack (`supabase start` in a TEMP dir, NOT the repo,
+  so no `config.toml` was added): 15 assertions across two users covering read isolation both ways,
+  cross-user insert/delete, upload under another user's prefix, reading a known path, and the
+  attachment check constraint. Both migrations re-apply cleanly.
+- **Verified after push against production:** `user_files` returns `42501 permission denied` to
+  `anon` (proves the table exists AND anon is locked out — a missing table returns `42P01`); the
+  public storage endpoint refuses the bucket while an authenticated list returns `200 []` (proves
+  the bucket exists AND is private). **Do not follow Postgres's hint to `GRANT ... TO anon`.**
+- **Thumbnails are a ~2 KB base64 JPEG stored ON THE ROW** (`thumbnail_base64`), generated
+  client-side at pick time. This is an EGRESS decision, not a style one: `Image.network` with
+  `cacheWidth` downloads the FULL image and only shrinks the decode, so list thumbnails from signed
+  URLs would have pulled tens of MB per load against 5 GB/month shared across all testers.
+- Files are network-only (no Drift, no offline sync), same deliberate choice as goals.
+
+### ⚠️ UX REVERSAL MID-ROUND — do not rebuild the old design
+Zaid tested slice 2a and **rejected the browse list**: "the user adds the file and if he wants it he
+has to use the search to see it". He also rejected the six-item nav bar (the centre-docked (+) FAB
+covered two tabs). **Both were fixed in `f386c3e`:** the Files tab and `files_screen.dart` are gone,
+the nav bar is byte-identical to its five-item form (verified: `git diff 190a05f` on that file is
+empty), and uploading is now the third entry in the (+) chooser via `add_file_sheet.dart`.
+**`_planning/V2_SCOPE.md` decision #3 has been rewritten to match.**
+
+**CONSEQUENCE: there is currently NO way to see or delete an uploaded file.** The upload sheet says
+so: "Once you add a file you can't remove it from the app yet. Only add something you're happy to
+keep." Zaid accepted this knowingly. **Delete belongs on the file's search result in 2b.**
+
+**GOTCHA the successor will hit:** `fileListProvider` (`files/domain/providers/file_provider.dart`)
+now has NO consumer, so its notifier is never created and never loads a user id. **Anything calling
+`fileListProvider.notifier.upload()` will throw `Cannot upload before a user is loaded`.** The
+upload sheet correctly calls `fileRepositoryProvider.upload(...)` with `userId` from `authProvider`
+instead. Either wire that provider up in 2b or delete it.
+
+### NEXT: SLICE 2b — make files findable (REQUIRED, not optional)
+AI labels each file once at upload (respecting the per-file private toggle), results wired into the
+EXISTING `search_screen.dart`. **Add delete to the file's search result.** Search is now the only
+path to an uploaded file, so until 2b ships, uploads are write-only.
+
+### STILL UNVERIFIED, HIGHEST-STAKES ITEM
+**No two REAL accounts have confirmed they cannot see each other's files.** RLS is proven by local
+rehearsal and production probes, but not by two humans. **Before any friend stores a passport: Zaid
+uploads one file, a friend uploads one file, each confirms they see only their own.** A rehearsal
+does not substitute for this.
+
+### Smaller open items (none urgent)
+- Delete the pre-fix duplicate "Android Developer" job row from the Jobs tab (manual, cosmetic).
+- Brand icon round 2 (in-app header lockup on the welcome screen) — still never started.
+- `remove_alpha_ios: true` before any App Store submission.
+- Roadmap item 5, Google OAuth verification — still the long pole to public launch, mostly Zaid's
+  manual Cloud Console work.
+- Zaid's iPhone build expires every ~7 days on free provisioning and needs an Ibrahim rebuild.
+
+## SUPERSEDED — Current state (2026-07-27) — `staging` @ `6585483`, `main` @ `8d925c7` — V2 KICKOFF, SLICE 1 LIVE
 **`staging` is 3 commits ahead of `main`, pushed, clean.** v1 is stable and feature-complete with no
 open bugs; this session started **Life OS v2** as a design round first and a build round second.
 
@@ -588,6 +684,53 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **An empty prompt was the old bug; an IGNORED prompt is the new one. Check which you have before
+  tuning wording.** Slice 1 fed `goal-breakdown` 973 characters of real context and output did not
+  change at all. The instinct is to blame the data or the queries. The instrumented response proved
+  every query worked, and that the model was handed `Pay outstanding balance to McFIT` next to a
+  fitness goal and still said "research local gyms". **Instrument before theorising, and make the
+  model declare what it used** (the `usedContext` field) so "ignored the context" is visible from
+  outside instead of being indistinguishable from "had no context".
+- **`cacheWidth`/`cacheHeight` on `Image.network` do NOT reduce what is downloaded.** They only
+  shrink the decode after the full bytes have arrived. A list of 20 phone photos rendered as 44px
+  squares still pulls tens of MB. This shipped in a worker's code with a doc comment calling the
+  widget "egress-conscious", which is how a false claim survives review. **For list thumbnails,
+  store a tiny preview alongside the metadata; do not fetch the real file.**
+- **A `db push` against a project whose migration history is EMPTY will try to re-run everything.**
+  The shared project had zero rows in its migration history (migrations 001-012 were applied by
+  other means), so `db push --dry-run` showed it would re-apply all 14 files. Migrations 001, 002,
+  006 and 007 contain 51 unguarded `CREATE POLICY` statements between them, so it would have failed
+  on the first one. **Always run `supabase migration list --linked` and `db push --dry-run` BEFORE a
+  real push.** Fixed 2026-07-27 with `supabase migration repair --status applied` for 001-012, which
+  writes only to the history table and changes no schema. History is now correct; future pushes are
+  one clean command.
+- **Rehearse migrations in a TEMP directory, not the repo.** `supabase start` needs a
+  `config.toml`, which this repo deliberately does not have (a later `config push` could overwrite
+  hosted auth settings including the OAuth redirect allow-list). Run `supabase init` in
+  `$env:TEMP\<name>`, copy `supabase/migrations/*.sql` in, and start there. Full isolation, nothing
+  added to the repo.
+- **`SET LOCAL role` outside a transaction is SILENTLY IGNORED**, so an RLS test harness runs as
+  superuser, bypasses RLS, sees every row, and reports a policy failure that does not exist. Wrap
+  every RLS assertion in `BEGIN; ... COMMIT;`. **This failure looks exactly like a broken policy** —
+  it cost a wrong conclusion before being caught.
+- **Verify a deployed table/bucket from OUTSIDE, and pick probes whose failure modes differ.** A
+  missing table returns `42P01 relation does not exist`; an existing but protected one returns
+  `42501 permission denied`. Those two answers mean opposite things. Likewise a private bucket is
+  proven by the public endpoint refusing it AND an authenticated list returning `200 []` — either
+  probe alone cannot tell "private" from "does not exist".
+- **A provider with no consumer is never created.** Removing the only screen that watched
+  `fileListProvider` meant its notifier never initialised and never loaded a user id, so its
+  `upload()` would have thrown on the first call. **When you delete a screen, check what its
+  providers were keeping alive.**
+- **Ask which ACCOUNT a diagnostic came from before believing it.** A `jobAppsCount: 0` reading
+  looked like a broken query for a user with 36 applications. It was Zaid's second account, which
+  genuinely has none. Staging and production share one Supabase project, so the only variable that
+  can produce this is which user signed in.
+- **Parallel workers work, if the planner does its job first.** 10 worker runs this round across 4
+  simultaneous lanes with zero clobbering. What made it work: writing the shared contract as real
+  compiling files BEFORE any worker started (so every lane could pass `flutter analyze` alone), and
+  listing each lane's forbidden paths explicitly in its prompt. **Without the pre-written contract,
+  three of four lanes could not have compiled independently.**
 - **Safe silent degradation makes a feature UNDIAGNOSABLE — always leave a way to tell "working but
   weak" apart from "silently doing nothing".** Slice 1's context queries were deliberately written to
   degrade to an omitted section on any error (good: it can't break goal breakdown). The cost only
