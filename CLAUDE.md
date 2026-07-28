@@ -18,7 +18,83 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-27, night) — `main` AND `staging` @ `dfa29b6` — V2 SLICES 1 AND 2 ALL CLOSED, MERGED TO STABLE
+## Current state (2026-07-28) — `staging` @ `8a55cdb`, `main` STILL @ `2f551bd` — LEARNING SYSTEM SLICE 1 LIVE, STAGING ONLY
+
+**`staging` is 2 commits ahead of `main`, pushed, clean, verified live:** `https://staging.lifeos.deadthrone.dev`
+serves `flutter_bootstrap.js?v=8a55cdb` (confirmed by curl, ~2m13s after push, not by trusting CI green).
+**`main` is untouched — nothing here has been merged to stable. That is Zaid's call, not made yet.**
+
+**This round shipped the FIRST slice of the learning system** (v2's other headline feature, see
+`_planning/V2_SCOPE.md`): the AI now infers durable, evidence-backed facts about a user from their own
+tasks, goals, job applications and file notes, shows them read-only (with a reject option) in Settings,
+and feeds them into the already-working goal-breakdown personalization.
+
+**Three production changes this round, all live:**
+1. **Migration `016_user_facts.sql` applied** — new `user_facts` table (category/fact/evidence/fact_key,
+   RLS, grants). **Applied via the Supabase dashboard SQL editor, NOT the CLI** — see the CLI gotcha
+   below. Verified from outside exactly like file storage was: an anon probe against
+   `/rest/v1/user_facts` returns **42501 permission denied**, not `42P01 relation does not exist`,
+   proving the table exists AND is RLS-locked.
+2. **New edge function `infer-facts` deployed.** Reads the caller's own rows with `{ count: "exact" }`
+   throughout (not `.limit()`ed lengths), degrades to a no-op below a **sparse-data floor** (fewer than
+   5 gathered rows → writes nothing, calls no model) rather than padding with invented facts, validates
+   every returned fact's category/length before writing, and upserts on `(user_id, fact_key)` **without
+   ever touching `suppressed_at` or `first_seen_at`** — that's what makes a user's rejection of a wrong
+   fact permanent instead of being silently undone by the next daily run.
+3. **`goal-breakdown` redeployed** with one addition: a `user_facts` query folded into its existing
+   context block (facts only, not evidence — evidence is for the Settings screen, not the prompt). The
+   system prompt, `usedContext` field, and every other query were deliberately left untouched.
+
+Both function deploys verified from outside the same way as `label-file` last round: unauthenticated
+POST to each returns **401**, not 404.
+
+**Client side, on `staging` only (not yet merged, so not yet on anyone's phone or the production web
+bundle by default — CI already deployed the staging web bundle above):** a new Settings screen
+"What Life knows about you" (facts grouped by category, evidence always visible beneath each one, not
+hidden behind a tap — that's the whole point of the screen — with a swipe/tap-to-reject that
+permanently suppresses a wrong fact); a fire-and-forget daily trigger (`factRefreshTriggerProvider`,
+gated on a per-user-ID SharedPreferences timestamp, 24h) that calls `infer-facts` once per user per day
+and is genuinely unawaited (`unawaited(...).catchError(...)`, no dead-code try/catch around it); demo
+mode gets its own seeded facts for "Alex" so it stays network-free.
+
+**Parallel-worker round: 4 lanes, zero clobbering.** Same pattern that worked for the 10-worker file
+storage round — the model, repository interface and provider were written as real compiling files by
+the planner BEFORE any worker started, so all four lanes (`infer-facts`, the Settings screen, the daily
+trigger + demo mode, the `goal-breakdown` addition) passed `flutter analyze` independently and every
+diff matched its prompt exactly on review.
+
+### ⚠️ NEW GOTCHA — the Supabase CLI (2.110.0) cannot currently reconcile local migrations with remote
+`npx supabase migration list --linked` returned `"local":""` for **every one** of the 15 already-applied
+migrations, not just the new one — meaning it couldn't match ANY local `NNN_name.sql` file to remote
+history, despite the files verifiably existing (`ls` confirms). `db push --dry-run` then failed with
+`LegacyDbPushMissingLocalError`, and its suggested fix (`migration repair --status reverted 001..015`)
+was correctly NOT run — that would have marked 15 stable, correctly-tracked migrations as reverted in
+production's history table for no reason. `migration repair --status applied 016` alone (the safe,
+schema-inert move already used successfully for 001-012) then failed too, with
+`LegacyMigrationFileNotFoundError: glob supabase/migrations/016_*.sql: file does not exist` — for a file
+proven to exist at that exact path. **Reproduced identically both from an agent's shell AND from Zaid's
+own interactive terminal**, so this is not a sandboxing/TTY artifact. Strongly suspected: a Windows-
+specific path-glob bug in this CLI version, unrelated to our schema. **Worked around by applying
+`016_user_facts.sql` directly via the dashboard SQL editor** and verifying externally instead of via CLI
+bookkeeping. Migration 016 is written idempotently (`IF NOT EXISTS` / `DROP ... IF EXISTS` throughout),
+so if a future `db push` ever tries to "reapply" it, that's a safe no-op, not a real risk. **Unresolved
+and worth a fresh look with a pinned older CLI version** — do not re-attempt `migration repair` on a
+whim; if it's needed again, expect the same failure and go straight to the dashboard.
+
+**Known shortcut, accepted deliberately:** `infer-facts` upserts via a manual select-then-update-or-insert
+rather than a true `.upsert(..., { onConflict: 'user_id,fact_key' })`. Fine at the current cadence (once
+per user per 24h, no realistic concurrent-run race) — tighten this if the refresh interval ever shortens.
+
+### NEXT — batched device testing, then Zaid's merge decision
+**Nothing has been tested on a real account yet.** Per this round's own locked decision (Zaid: "not all
+users like me... this is not only for this question but for all questions" — do not design the learning
+system around one data profile), the test matrix that matters is: Zaid's SPARSE account, his 36-job-
+application account, and a friend's account. Check that "What Life knows about you" shows something
+sane on the rich account and a genuine, non-broken empty state ("Life hasn't worked anything out yet")
+on the sparse ones — not silence indistinguishable from a bug. Only after that should merging `staging`
+to `main` come up, and that's Zaid's call to make, not a default next step.
+
+## SUPERSEDED — Current state (2026-07-27, night) — `main` AND `staging` @ `dfa29b6` — V2 SLICES 1 AND 2 ALL CLOSED, MERGED TO STABLE
 
 **Both branches at `dfa29b6`, pushed, clean, NO divergence. Merge to `main` was a straight
 fast-forward (`8d925c7..dfa29b6`, 15 commits, sole author Zaid Jarrar, no agent attribution).**
