@@ -79,6 +79,33 @@ const List<Release> kReleases = [
       ),
     ],
   ),
+  Release(
+    version: 2,
+    slides: [
+      AnnouncementSlide(
+        icon: Icons.auto_awesome_outlined,
+        headline: 'Life is learning about you',
+        body:
+            'From your tasks, goals and files, Life quietly picks up on '
+            'patterns — like your routines and what you\'re focused on '
+            'right now.',
+      ),
+      AnnouncementSlide(
+        icon: Icons.visibility_outlined,
+        headline: 'See what it knows',
+        body:
+            'Settings → "What Life knows about you" shows every fact it '
+            'has learned, with the evidence behind it. Nothing is hidden.',
+      ),
+      AnnouncementSlide(
+        icon: Icons.close_rounded,
+        headline: 'Wrong? Remove it',
+        body:
+            'Tap the X on any fact to remove it for good — Life won\'t '
+            'infer it again.',
+      ),
+    ],
+  ),
 ];
 
 /// The most recent release version. Bumping [kReleases] with a new entry
