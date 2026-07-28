@@ -18,11 +18,15 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-28) — `staging` @ `8a55cdb`, `main` STILL @ `2f551bd` — LEARNING SYSTEM SLICE 1 LIVE, STAGING ONLY
+## Current state (2026-07-28) — `main` AND `staging` @ `a2f422b` — LEARNING SYSTEM SLICE 1 LIVE, MERGED TO STABLE
 
-**`staging` is 2 commits ahead of `main`, pushed, clean, verified live:** `https://staging.lifeos.deadthrone.dev`
-serves `flutter_bootstrap.js?v=8a55cdb` (confirmed by curl, ~2m13s after push, not by trusting CI green).
-**`main` is untouched — nothing here has been merged to stable. That is Zaid's call, not made yet.**
+**Both branches at `a2f422b`, pushed, clean, NO divergence.** Merge to `main` was a straight fast-forward
+(`2f551bd..a2f422b`, 4 commits, sole author Zaid Jarrar, no agent attribution). Production verified by
+fetching the page, not by trusting CI: `https://lifeos.deadthrone.dev` serves
+`flutter_bootstrap.js?v=a2f422b` (confirmed ~2m25s after push). **Zaid tested on real accounts before
+authorizing the merge** — his sparse account, his 36-job-application account, and a friend's — per the
+test matrix this round's own locked decision required (do not design the learning system around one
+data profile). Nothing is in flight.
 
 **This round shipped the FIRST slice of the learning system** (v2's other headline feature, see
 `_planning/V2_SCOPE.md`): the AI now infers durable, evidence-backed facts about a user from their own
@@ -48,14 +52,15 @@ and feeds them into the already-working goal-breakdown personalization.
 Both function deploys verified from outside the same way as `label-file` last round: unauthenticated
 POST to each returns **401**, not 404.
 
-**Client side, on `staging` only (not yet merged, so not yet on anyone's phone or the production web
-bundle by default — CI already deployed the staging web bundle above):** a new Settings screen
+**Client side, now on `main` and live in the production web bundle:** a new Settings screen
 "What Life knows about you" (facts grouped by category, evidence always visible beneath each one, not
 hidden behind a tap — that's the whole point of the screen — with a swipe/tap-to-reject that
 permanently suppresses a wrong fact); a fire-and-forget daily trigger (`factRefreshTriggerProvider`,
 gated on a per-user-ID SharedPreferences timestamp, 24h) that calls `infer-facts` once per user per day
 and is genuinely unawaited (`unawaited(...).catchError(...)`, no dead-code try/catch around it); demo
-mode gets its own seeded facts for "Alex" so it stays network-free.
+mode gets its own seeded facts for "Alex" so it stays network-free. A new What's New release
+(version 2 in `release_notes.dart`) announces the feature — existing users see it once on their next
+launch since their device already acked version 1, no new account or migration needed for this part.
 
 **Parallel-worker round: 4 lanes, zero clobbering.** Same pattern that worked for the 10-worker file
 storage round — the model, repository interface and provider were written as real compiling files by
@@ -85,14 +90,12 @@ whim; if it's needed again, expect the same failure and go straight to the dashb
 rather than a true `.upsert(..., { onConflict: 'user_id,fact_key' })`. Fine at the current cadence (once
 per user per 24h, no realistic concurrent-run race) — tighten this if the refresh interval ever shortens.
 
-### NEXT — batched device testing, then Zaid's merge decision
-**Nothing has been tested on a real account yet.** Per this round's own locked decision (Zaid: "not all
-users like me... this is not only for this question but for all questions" — do not design the learning
-system around one data profile), the test matrix that matters is: Zaid's SPARSE account, his 36-job-
-application account, and a friend's account. Check that "What Life knows about you" shows something
-sane on the rich account and a genuine, non-broken empty state ("Life hasn't worked anything out yet")
-on the sparse ones — not silence indistinguishable from a bug. Only after that should merging `staging`
-to `main` come up, and that's Zaid's call to make, not a default next step.
+### NEXT — nothing urgent, this round is closed
+Zaid confirmed testing across the required matrix (sparse account, 36-job-application account, a
+friend's account) before authorizing the merge — the round's own locked decision (do not design the
+learning system around one data profile) was honored, not skipped. No open items from this round.
+Smaller open items carried forward from before it (brand icon round 2, `remove_alpha_ios`, Google OAuth
+verification, the zaidj.tech demo gap) are all still exactly where they were, untouched this round.
 
 ## SUPERSEDED — Current state (2026-07-27, night) — `main` AND `staging` @ `dfa29b6` — V2 SLICES 1 AND 2 ALL CLOSED, MERGED TO STABLE
 
