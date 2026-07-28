@@ -20,6 +20,7 @@ import 'package:life_os/features/goals/presentation/screens/goals_screen.dart';
 import 'package:life_os/features/home/presentation/screens/home_screen.dart';
 import 'package:life_os/features/inbox/presentation/screens/inbox_scan_screen.dart';
 import 'package:life_os/features/jobs/presentation/screens/job_applications_screen.dart';
+import 'package:life_os/features/learning/presentation/screens/known_facts_screen.dart';
 import 'package:life_os/features/life/presentation/screens/life_screen.dart';
 import 'package:life_os/features/onboarding/domain/onboarding_provider.dart';
 import 'package:life_os/features/permissions/presentation/screens/calendar_permission_screen.dart';
@@ -58,6 +59,7 @@ abstract final class AppRoutes {
   static const String life = '/life';
   static const String search = '/search';
   static const String settings = '/settings';
+  static const String knownFacts = '/known-facts';
   static const String tasks = '/tasks';
   static const String taskDetail = '/tasks/:id';
 
@@ -256,6 +258,11 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.goalBreakdown,
         name: 'goalBreakdown',
         builder: (context, state) => const GoalBreakdownScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.knownFacts,
+        name: 'knownFacts',
+        builder: (context, state) => const KnownFactsScreen(),
       ),
     ],
 

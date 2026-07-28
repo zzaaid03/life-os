@@ -117,6 +117,7 @@ function buildContextBlock(
   jobApps: { company?: string | null; role?: string | null; status?: string | null }[],
   jobAppsCount: number,
   otherGoals: { title?: string | null; status?: string | null }[],
+  userFacts: { category?: string | null; fact?: string | null }[],
 ): string {
   const lines: string[] = [];
 
@@ -165,6 +166,16 @@ function buildContextBlock(
     }
   }
 
+  if (userFacts.length > 0) {
+    const examples = userFacts
+      .slice(0, 15)
+      .map((f) => truncate(f.fact ?? ""))
+      .filter((s) => s.length > 0);
+    if (examples.length > 0) {
+      lines.push(`Known facts about them: ${examples.join(", ")}`);
+    }
+  }
+
   if (lines.length === 0) return "";
 
   let block = "About this person, for tailoring only:\n" + lines.join("\n");
@@ -205,7 +216,7 @@ Deno.serve(async (req: Request) => {
     const userId = userData.user.id;
     const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const [openTasksRes, completedTasksRes, jobAppsRes, otherGoalsRes] = await Promise.all([
+    const [openTasksRes, completedTasksRes, jobAppsRes, otherGoalsRes, userFactsRes] = await Promise.all([
       admin
         .from("tasks")
         .select("title", { count: "exact" })
@@ -236,6 +247,13 @@ Deno.serve(async (req: Request) => {
         .is("deleted_at", null)
         .neq("status", "archived")
         .limit(10),
+      admin
+        .from("user_facts")
+        .select("category, fact")
+        .eq("user_id", userId)
+        .is("suppressed_at", null)
+        .order("last_confirmed_at", { ascending: false })
+        .limit(15),
     ]);
 
     const openTasks = openTasksRes.data ?? [];
@@ -246,6 +264,7 @@ Deno.serve(async (req: Request) => {
     const otherGoals = (otherGoalsRes.data ?? []).filter(
       (g) => (g.title ?? "").trim().toLowerCase() !== goalTitle.toLowerCase(),
     );
+    const userFacts = userFactsRes.data ?? [];
 
     const contextBlock = buildContextBlock(
       openTasks,
@@ -255,6 +274,7 @@ Deno.serve(async (req: Request) => {
       jobApps,
       jobAppsRes.count ?? jobApps.length,
       otherGoals,
+      userFacts,
     );
 
     const baseUserContent = goalDescription
@@ -341,6 +361,7 @@ Deno.serve(async (req: Request) => {
           completedTasks: completedTasksRes.error?.message ?? null,
           jobApps: jobAppsRes.error?.message ?? null,
           otherGoals: otherGoalsRes.error?.message ?? null,
+          userFacts: userFactsRes.error?.message ?? null,
         },
       },
     });

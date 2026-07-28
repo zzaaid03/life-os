@@ -50,6 +50,11 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: email.isNotEmpty ? email : null,
                 onTap: () => _editDisplayName(context, ref, displayName),
               ),
+              _SettingsTile(
+                icon: Icons.auto_awesome_outlined,
+                title: 'What Life knows about you',
+                onTap: () => context.push(AppRoutes.knownFacts),
+              ),
             ],
           ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
 

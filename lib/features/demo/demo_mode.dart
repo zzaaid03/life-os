@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/demo/data/demo_fact_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_auth_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_daily_brief_notifier.dart';
 import 'package:life_os/features/demo/data/repositories/demo_file_repository.dart';
@@ -28,6 +29,7 @@ import 'package:life_os/features/home/domain/daily_brief_provider.dart';
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/inbox/data/processed_emails_repository.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
+import 'package:life_os/features/learning/data/repositories/fact_repository.dart';
 import 'package:life_os/features/profile/data/repositories/supabase_profile_repository.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:riverpod/riverpod.dart';
@@ -69,6 +71,7 @@ List<Override> buildDemoOverrides() {
     ),
     fileRepositoryProvider.overrideWithValue(DemoFileRepository()),
     filePickerServiceProvider.overrideWithValue(DemoFilePickerService()),
+    factRepositoryProvider.overrideWithValue(DemoFactRepository()),
     isDemoModeProvider.overrideWithValue(true),
   ];
 }

@@ -21,6 +21,7 @@ import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/auth/domain/providers/oauth_tab_dismiss_provider.dart';
 import 'package:life_os/features/demo/demo_mode.dart';
 import 'package:life_os/features/inbox/data/google_credentials_repository.dart';
+import 'package:life_os/features/learning/data/services/fact_refresh_service.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -117,6 +118,9 @@ class _LifeOSAppState extends ConsumerState<LifeOSApp> {
     // Closes the native Google sign-in browser tab once the OAuth deep link
     // completes, so the user isn't left tapping X manually.
     ref.read(oauthTabDismissProvider);
+
+    // Triggers the `infer-facts` Edge Function at most once a day per user.
+    ref.read(factRefreshTriggerProvider);
 
     // Load profile when auth state becomes authenticated
     ref.listenManual(authProvider, (previous, next) {
