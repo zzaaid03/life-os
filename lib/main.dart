@@ -22,6 +22,7 @@ import 'package:life_os/features/auth/domain/providers/oauth_tab_dismiss_provide
 import 'package:life_os/features/demo/demo_mode.dart';
 import 'package:life_os/features/inbox/data/google_credentials_repository.dart';
 import 'package:life_os/features/learning/data/services/fact_refresh_service.dart';
+import 'package:life_os/features/notifications/domain/providers/reminder_sync_provider.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -121,6 +122,10 @@ class _LifeOSAppState extends ConsumerState<LifeOSApp> {
 
     // Triggers the `infer-facts` Edge Function at most once a day per user.
     ref.read(factRefreshTriggerProvider);
+
+    // Keeps scheduled task reminders in step with the task list and the
+    // user's preference. No-op on web, which has no local notifications.
+    ref.read(reminderSyncProvider);
 
     // Load profile when auth state becomes authenticated
     ref.listenManual(authProvider, (previous, next) {

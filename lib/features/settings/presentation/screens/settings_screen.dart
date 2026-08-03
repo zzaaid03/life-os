@@ -10,6 +10,7 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/theme/theme_mode_provider.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/notifications/domain/providers/reminder_settings_provider.dart';
 import 'package:life_os/features/onboarding/domain/release_notes.dart';
 import 'package:life_os/features/onboarding/presentation/announcements_sheet.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
@@ -72,10 +73,20 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 onTap: () => _pickThemeMode(context, ref),
               ),
-              _SettingsTile(
+              _SettingsSwitchTile(
                 icon: Icons.notifications_outlined,
-                title: 'Notifications',
-                onTap: () => _showComingSoon(context, 'Notifications'),
+                title: 'Task reminders',
+                subtitle:
+                    'Remind me the evening before and the morning a task is due',
+                value: ref.watch(reminderSettingsProvider).enabled,
+                onChanged: () {
+                  final userId = ref.read(authProvider).userId;
+                  if (userId == null) return;
+                  final current = ref.read(reminderSettingsProvider).enabled;
+                  ref
+                      .read(reminderSettingsProvider.notifier)
+                      .setEnabled(userId, !current);
+                },
               ),
               _SettingsTile(
                 icon: Icons.language_rounded,
@@ -345,6 +356,77 @@ class _SettingsGroup extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SettingsSwitchTile extends StatelessWidget {
+  const _SettingsSwitchTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onChanged,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Switch(value: value, onChanged: (_) => onChanged()),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
