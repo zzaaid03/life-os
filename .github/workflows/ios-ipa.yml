@@ -1,0 +1,107 @@
+name: Build iOS IPA (unsigned)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Must ship Dart >= 3.12.2 to satisfy pubspec's `sdk: ^3.12.2`.
+          # 3.44.0 bundles Dart 3.12.0 and fails dependency resolution.
+          flutter-version: "3.44.7"
+          channel: stable
+
+      # Fail fast on a missing secret. Without this, .env is written with an
+      # empty value and the build still succeeds, so the .ipa installs fine
+      # and then fails to reach Supabase at runtime, with nothing in the CI
+      # log to explain it.
+      - name: Verify required secrets are present
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        run: |
+          missing=0
+          for key in SUPABASE_URL SUPABASE_PUBLISHABLE_KEY GOOGLE_CLIENT_ID; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Repository secret $key is not set."
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+      - name: Write .env
+        run: |
+          cat > .env <<EOF
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY=${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          EOF
+
+      - name: Set the sideload bundle identifier
+        # Anchored on the trailing semicolon so this matches only the 3 app
+        # targets (Debug/Release/Profile PRODUCT_BUNDLE_IDENTIFIER lines) and
+        # can never match the 3 `com.lifeos.app.RunnerTests;` lines. This is a
+        # CI-only sideload identifier, never written back to the repo.
+        # ios/Runner/Info.plist is deliberately NOT touched: its OAuth URL
+        # scheme must stay com.lifeos.app or Google sign-in breaks.
+        #
+        # The count assertion is load-bearing. `sed` exits 0 when it matches
+        # nothing, so if the repo's bundle id ever changes this step would
+        # silently no-op and we would ship an .ipa under com.lifeos.app, an
+        # id that is NOT registered to Zaid's Apple ID and is already claimed
+        # globally. SideStore would then fail to install it for a reason
+        # nothing in this log would explain. Fail here instead.
+        run: |
+          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = com.lifeos.app;/PRODUCT_BUNDLE_IDENTIFIER = com.lifeos.app.zaid;/g' ios/Runner.xcodeproj/project.pbxproj
+          grep -n 'PRODUCT_BUNDLE_IDENTIFIER' ios/Runner.xcodeproj/project.pbxproj
+          # `|| true` because grep -c exits 1 on zero matches, and the default
+          # `bash -e` would kill the step before the diagnostic below prints.
+          renamed=$(grep -c 'PRODUCT_BUNDLE_IDENTIFIER = com.lifeos.app.zaid;' ios/Runner.xcodeproj/project.pbxproj || true)
+          if [ "$renamed" -ne 3 ]; then
+            echo "::error::Expected 3 app targets on com.lifeos.app.zaid, found $renamed. The bundle id in project.pbxproj has changed; update this sed."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package IPA
+        run: |
+          set -e
+          if [ ! -d "build/ios/iphoneos/Runner.app" ]; then
+            echo "::error::build/ios/iphoneos/Runner.app not found. The build must have failed silently."
+            exit 1
+          fi
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -r LifeOS.ipa Payload
+
+      - name: Compute short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-${{ github.run_number }}
+          name: LifeOS iOS build ${{ steps.sha.outputs.short }}
+          body: |
+            Unsigned iOS build (`.ipa`), intended for SideStore import only.
+            Not signed with any Apple certificate or provisioning profile.
+            Built from commit ${{ github.sha }}.
+          files: LifeOS.ipa
