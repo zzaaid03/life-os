@@ -187,6 +187,7 @@ class Task extends Equatable implements Entity {
     SyncStatus? syncStatus,
     int? version,
     bool clearRecurrence = false,
+    bool clearCompletedAt = false,
   }) {
     return Task(
       id: id ?? this.id,
@@ -194,7 +195,9 @@ class Task extends Equatable implements Entity {
       title: title ?? this.title,
       description: description ?? this.description,
       dueDate: dueDate ?? this.dueDate,
-      completedAt: completedAt ?? this.completedAt,
+      // Same "clear" idiom as clearRecurrence below: un-completing a task
+      // needs to null out completedAt, which `?? this.x` alone can't express.
+      completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
       priority: priority ?? this.priority,
       status: status ?? this.status,
       parentTaskId: parentTaskId ?? this.parentTaskId,

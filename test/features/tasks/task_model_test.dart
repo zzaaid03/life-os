@@ -43,6 +43,38 @@ void main() {
       expect(updated.userId, equals(task.userId));
     });
 
+    test('copyWith clearCompletedAt clears completedAt', () {
+      final task = Task(
+        id: 't1',
+        userId: 'u1',
+        title: 'Done task',
+        status: TaskStatus.completed,
+        completedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final updated = task.copyWith(clearCompletedAt: true);
+
+      expect(updated.completedAt, isNull);
+    });
+
+    test('copyWith with no arguments leaves completedAt untouched', () {
+      final task = Task(
+        id: 't1',
+        userId: 'u1',
+        title: 'Done task',
+        status: TaskStatus.completed,
+        completedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final updated = task.copyWith();
+
+      expect(updated.completedAt, equals(now));
+    });
+
     test('completed task has correct status', () {
       final task = Task(
         id: 't1',

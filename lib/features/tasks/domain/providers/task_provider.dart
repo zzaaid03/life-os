@@ -279,6 +279,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       completedAt: isCompleted ? null : now,
       updatedAt: now,
       clearRecurrence: !isCompleted,
+      clearCompletedAt: isCompleted,
     );
 
     final next = isCompleted
