@@ -53,7 +53,7 @@ const List<Release> kReleases = [
         icon: Icons.mark_email_read_outlined,
         headline: 'AI reads your inbox',
         body:
-            'Turn recent emails into tasks and job-application updates — '
+            'Turn recent emails into tasks and job-application updates, '
             'automatically.',
       ),
       AnnouncementSlide(
@@ -87,7 +87,7 @@ const List<Release> kReleases = [
         headline: 'Life is learning about you',
         body:
             'From your tasks, goals and files, Life quietly picks up on '
-            'patterns — like your routines and what you\'re focused on '
+            'patterns: your routines, and what you\'re focused on '
             'right now.',
       ),
       AnnouncementSlide(
@@ -101,8 +101,27 @@ const List<Release> kReleases = [
         icon: Icons.close_rounded,
         headline: 'Wrong? Remove it',
         body:
-            'Tap the X on any fact to remove it for good — Life won\'t '
+            'Tap the X on any fact to remove it for good. Life won\'t '
             'infer it again.',
+      ),
+    ],
+  ),
+  Release(
+    version: 3,
+    slides: [
+      AnnouncementSlide(
+        icon: Icons.repeat_rounded,
+        headline: 'Tasks that repeat',
+        body:
+            'Set a task to repeat daily, weekly or monthly. Complete it '
+            'and the next one is created automatically.',
+      ),
+      AnnouncementSlide(
+        icon: Icons.edit_calendar_outlined,
+        headline: 'Set it once',
+        body:
+            'Pick "Repeats" in the task editor and Life OS keeps the '
+            'schedule going, no need to re-add the task each time.',
       ),
     ],
   ),
