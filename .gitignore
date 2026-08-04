@@ -67,3 +67,5 @@ supabase/.temp/
 
 # Planning / handoff notes (working notes, not product docs)
 _planning/
+
+android/build/
