@@ -195,8 +195,8 @@ async function fetchRecentEmails(accessToken: string, maxResults: number) {
 async function resolveAccessToken(
   req: Request,
   bodyToken: string | undefined,
-): Promise<{ token?: string; error?: Response }> {
-  // Test path: token passed directly.
+): Promise<{ token?: string; userId?: string; error?: Response }> {
+  // Test path: token passed directly. No JWT, so no user id is available.
   if (bodyToken) return { token: bodyToken };
 
   // App path: identify the user from their Supabase JWT, load stored refresh token.
@@ -206,18 +206,74 @@ async function resolveAccessToken(
   if (userErr || !userData?.user) {
     return { error: jsonResponse({ error: "unauthorized" }, 401) };
   }
+  const userId = userData.user.id;
   const { data: cred } = await admin
     .from("google_credentials")
     .select("refresh_token")
-    .eq("user_id", userData.user.id)
+    .eq("user_id", userId)
     .maybeSingle();
   if (!cred?.refresh_token) {
     return { error: jsonResponse({ error: "gmail_not_connected" }, 200) };
   }
   try {
-    return { token: await accessTokenFromRefresh(cred.refresh_token) };
+    return { token: await accessTokenFromRefresh(cred.refresh_token), userId };
   } catch (e) {
     return { error: jsonResponse({ error: "token_refresh_failed", detail: String(e) }, 502) };
+  }
+}
+
+function truncate(s: string, max = 80): string {
+  const t = s.trim();
+  return t.length > max ? t.slice(0, max) : t;
+}
+
+/// Assembles a short "About this user" block from user_facts, for the model's
+/// background only. Returns "" on no user id, a query error, or zero facts —
+/// a facts problem must never change what's sent to Groq beyond this block.
+async function buildFactsBlock(
+  userId: string | undefined,
+): Promise<{ block: string; factsCount: number }> {
+  const EMPTY = { block: "", factsCount: 0 };
+  if (!userId) return EMPTY;
+
+  try {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { data, error } = await admin
+      .from("user_facts")
+      .select("category, fact")
+      .eq("user_id", userId)
+      .is("suppressed_at", null)
+      .order("last_confirmed_at", { ascending: false })
+      .limit(15);
+
+    if (error || !data || data.length === 0) return EMPTY;
+
+    const lines = data
+      .map((f) => `- ${truncate(f.category ?? "", 30)}: ${truncate(f.fact ?? "", 100)}`)
+      .filter((l) => l !== "- : ");
+    if (lines.length === 0) return EMPTY;
+
+    // Budget the LINES rather than trimming the finished string, so the
+    // reported count always matches what the model was actually shown. A
+    // diagnostic that over-reports is worse than no diagnostic: it makes
+    // "the facts were cut" look like "the model ignored them".
+    const header =
+      "About this user (background only — these are NOT tasks and must never be extracted as tasks):";
+    const kept: string[] = [];
+    let length = header.length;
+    for (const line of lines) {
+      if (length + 1 + line.length > 1200) break;
+      kept.push(line);
+      length += 1 + line.length;
+    }
+    if (kept.length === 0) return EMPTY;
+
+    return { block: `${header}\n${kept.join("\n")}`, factsCount: kept.length };
+  } catch (_) {
+    // A facts problem must never break an inbox scan. The Supabase client
+    // returns {error} for query failures, but a transport-level fault still
+    // throws, and that would 500 the whole scan over an optional extra.
+    return EMPTY;
   }
 }
 
@@ -235,7 +291,7 @@ Deno.serve(async (req: Request) => {
     const maxResults = Math.min(Math.max(Number(body?.maxResults) || 10, 1), 20);
     const debug = body?.debug === true;
 
-    const { token: accessToken, error: tokenError } = await resolveAccessToken(
+    const { token: accessToken, userId, error: tokenError } = await resolveAccessToken(
       req,
       body?.accessToken,
     );
@@ -254,6 +310,11 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ tasks: [], jobUpdates: [], scannedAccount: account });
     }
 
+    const { block: factsBlock, factsCount } = await buildFactsBlock(userId);
+    const userContent = factsBlock
+      ? `${factsBlock}\n\nEmails:\n${JSON.stringify(emails)}`
+      : "Emails:\n" + JSON.stringify(emails);
+
     const groqRes = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
       {
@@ -268,7 +329,7 @@ Deno.serve(async (req: Request) => {
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: "Emails:\n" + JSON.stringify(emails) },
+            { role: "user", content: userContent },
           ],
         }),
       },
@@ -297,6 +358,7 @@ Deno.serve(async (req: Request) => {
             _debug: {
               fetchedSubjects: emails.map((e: { subject: string }) => e.subject),
               rawModel: content,
+              factsCount,
             },
           }
         : {}),
