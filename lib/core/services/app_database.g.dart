@@ -110,6 +110,17 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskEntry> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _recurrenceMeta = const VerificationMeta(
+    'recurrence',
+  );
+  @override
+  late final GeneratedColumn<String> recurrence = GeneratedColumn<String>(
+    'recurrence',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -202,6 +213,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskEntry> {
     status,
     parentTaskId,
     goalId,
+    recurrence,
     sortOrder,
     syncedAt,
     createdAt,
@@ -292,6 +304,12 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskEntry> {
       context.handle(
         _goalIdMeta,
         goalId.isAcceptableOrUnknown(data['goal_id']!, _goalIdMeta),
+      );
+    }
+    if (data.containsKey('recurrence')) {
+      context.handle(
+        _recurrenceMeta,
+        recurrence.isAcceptableOrUnknown(data['recurrence']!, _recurrenceMeta),
       );
     }
     if (data.containsKey('sort_order')) {
@@ -389,6 +407,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskEntry> {
         DriftSqlType.string,
         data['${effectivePrefix}goal_id'],
       ),
+      recurrence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence'],
+      ),
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}sort_order'],
@@ -437,6 +459,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
   final String status;
   final String? parentTaskId;
   final String? goalId;
+  final String? recurrence;
   final double sortOrder;
   final DateTime? syncedAt;
   final DateTime createdAt;
@@ -455,6 +478,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     required this.status,
     this.parentTaskId,
     this.goalId,
+    this.recurrence,
     required this.sortOrder,
     this.syncedAt,
     required this.createdAt,
@@ -485,6 +509,9 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     }
     if (!nullToAbsent || goalId != null) {
       map['goal_id'] = Variable<String>(goalId);
+    }
+    if (!nullToAbsent || recurrence != null) {
+      map['recurrence'] = Variable<String>(recurrence);
     }
     map['sort_order'] = Variable<double>(sortOrder);
     if (!nullToAbsent || syncedAt != null) {
@@ -522,6 +549,9 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
       goalId: goalId == null && nullToAbsent
           ? const Value.absent()
           : Value(goalId),
+      recurrence: recurrence == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrence),
       sortOrder: Value(sortOrder),
       syncedAt: syncedAt == null && nullToAbsent
           ? const Value.absent()
@@ -552,6 +582,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
       status: serializer.fromJson<String>(json['status']),
       parentTaskId: serializer.fromJson<String?>(json['parentTaskId']),
       goalId: serializer.fromJson<String?>(json['goalId']),
+      recurrence: serializer.fromJson<String?>(json['recurrence']),
       sortOrder: serializer.fromJson<double>(json['sortOrder']),
       syncedAt: serializer.fromJson<DateTime?>(json['syncedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -575,6 +606,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
       'status': serializer.toJson<String>(status),
       'parentTaskId': serializer.toJson<String?>(parentTaskId),
       'goalId': serializer.toJson<String?>(goalId),
+      'recurrence': serializer.toJson<String?>(recurrence),
       'sortOrder': serializer.toJson<double>(sortOrder),
       'syncedAt': serializer.toJson<DateTime?>(syncedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -596,6 +628,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     String? status,
     Value<String?> parentTaskId = const Value.absent(),
     Value<String?> goalId = const Value.absent(),
+    Value<String?> recurrence = const Value.absent(),
     double? sortOrder,
     Value<DateTime?> syncedAt = const Value.absent(),
     DateTime? createdAt,
@@ -614,6 +647,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     status: status ?? this.status,
     parentTaskId: parentTaskId.present ? parentTaskId.value : this.parentTaskId,
     goalId: goalId.present ? goalId.value : this.goalId,
+    recurrence: recurrence.present ? recurrence.value : this.recurrence,
     sortOrder: sortOrder ?? this.sortOrder,
     syncedAt: syncedAt.present ? syncedAt.value : this.syncedAt,
     createdAt: createdAt ?? this.createdAt,
@@ -640,6 +674,9 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
           ? data.parentTaskId.value
           : this.parentTaskId,
       goalId: data.goalId.present ? data.goalId.value : this.goalId,
+      recurrence: data.recurrence.present
+          ? data.recurrence.value
+          : this.recurrence,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -665,6 +702,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
           ..write('status: $status, ')
           ..write('parentTaskId: $parentTaskId, ')
           ..write('goalId: $goalId, ')
+          ..write('recurrence: $recurrence, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('syncedAt: $syncedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -688,6 +726,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
     status,
     parentTaskId,
     goalId,
+    recurrence,
     sortOrder,
     syncedAt,
     createdAt,
@@ -710,6 +749,7 @@ class TaskEntry extends DataClass implements Insertable<TaskEntry> {
           other.status == this.status &&
           other.parentTaskId == this.parentTaskId &&
           other.goalId == this.goalId &&
+          other.recurrence == this.recurrence &&
           other.sortOrder == this.sortOrder &&
           other.syncedAt == this.syncedAt &&
           other.createdAt == this.createdAt &&
@@ -730,6 +770,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
   final Value<String> status;
   final Value<String?> parentTaskId;
   final Value<String?> goalId;
+  final Value<String?> recurrence;
   final Value<double> sortOrder;
   final Value<DateTime?> syncedAt;
   final Value<DateTime> createdAt;
@@ -749,6 +790,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     this.status = const Value.absent(),
     this.parentTaskId = const Value.absent(),
     this.goalId = const Value.absent(),
+    this.recurrence = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.syncedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -769,6 +811,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     this.status = const Value.absent(),
     this.parentTaskId = const Value.absent(),
     this.goalId = const Value.absent(),
+    this.recurrence = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.syncedAt = const Value.absent(),
     required DateTime createdAt,
@@ -793,6 +836,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     Expression<String>? status,
     Expression<String>? parentTaskId,
     Expression<String>? goalId,
+    Expression<String>? recurrence,
     Expression<double>? sortOrder,
     Expression<DateTime>? syncedAt,
     Expression<DateTime>? createdAt,
@@ -813,6 +857,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
       if (status != null) 'status': status,
       if (parentTaskId != null) 'parent_task_id': parentTaskId,
       if (goalId != null) 'goal_id': goalId,
+      if (recurrence != null) 'recurrence': recurrence,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (syncedAt != null) 'synced_at': syncedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -835,6 +880,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     Value<String>? status,
     Value<String?>? parentTaskId,
     Value<String?>? goalId,
+    Value<String?>? recurrence,
     Value<double>? sortOrder,
     Value<DateTime?>? syncedAt,
     Value<DateTime>? createdAt,
@@ -855,6 +901,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
       status: status ?? this.status,
       parentTaskId: parentTaskId ?? this.parentTaskId,
       goalId: goalId ?? this.goalId,
+      recurrence: recurrence ?? this.recurrence,
       sortOrder: sortOrder ?? this.sortOrder,
       syncedAt: syncedAt ?? this.syncedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -899,6 +946,9 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
     if (goalId.present) {
       map['goal_id'] = Variable<String>(goalId.value);
     }
+    if (recurrence.present) {
+      map['recurrence'] = Variable<String>(recurrence.value);
+    }
     if (sortOrder.present) {
       map['sort_order'] = Variable<double>(sortOrder.value);
     }
@@ -939,6 +989,7 @@ class TasksCompanion extends UpdateCompanion<TaskEntry> {
           ..write('status: $status, ')
           ..write('parentTaskId: $parentTaskId, ')
           ..write('goalId: $goalId, ')
+          ..write('recurrence: $recurrence, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('syncedAt: $syncedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -975,6 +1026,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       Value<String> status,
       Value<String?> parentTaskId,
       Value<String?> goalId,
+      Value<String?> recurrence,
       Value<double> sortOrder,
       Value<DateTime?> syncedAt,
       required DateTime createdAt,
@@ -996,6 +1048,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<String> status,
       Value<String?> parentTaskId,
       Value<String?> goalId,
+      Value<String?> recurrence,
       Value<double> sortOrder,
       Value<DateTime?> syncedAt,
       Value<DateTime> createdAt,
@@ -1061,6 +1114,11 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<String> get goalId => $composableBuilder(
     column: $table.goalId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1159,6 +1217,11 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
@@ -1240,6 +1303,11 @@ class $$TasksTableAnnotationComposer
   GeneratedColumn<String> get goalId =>
       $composableBuilder(column: $table.goalId, builder: (column) => column);
 
+  GeneratedColumn<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<double> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
@@ -1302,6 +1370,7 @@ class $$TasksTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String?> parentTaskId = const Value.absent(),
                 Value<String?> goalId = const Value.absent(),
+                Value<String?> recurrence = const Value.absent(),
                 Value<double> sortOrder = const Value.absent(),
                 Value<DateTime?> syncedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -1321,6 +1390,7 @@ class $$TasksTableTableManager
                 status: status,
                 parentTaskId: parentTaskId,
                 goalId: goalId,
+                recurrence: recurrence,
                 sortOrder: sortOrder,
                 syncedAt: syncedAt,
                 createdAt: createdAt,
@@ -1342,6 +1412,7 @@ class $$TasksTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String?> parentTaskId = const Value.absent(),
                 Value<String?> goalId = const Value.absent(),
+                Value<String?> recurrence = const Value.absent(),
                 Value<double> sortOrder = const Value.absent(),
                 Value<DateTime?> syncedAt = const Value.absent(),
                 required DateTime createdAt,
@@ -1361,6 +1432,7 @@ class $$TasksTableTableManager
                 status: status,
                 parentTaskId: parentTaskId,
                 goalId: goalId,
+                recurrence: recurrence,
                 sortOrder: sortOrder,
                 syncedAt: syncedAt,
                 createdAt: createdAt,

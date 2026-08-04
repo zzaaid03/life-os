@@ -132,6 +132,16 @@ class TaskCard extends StatelessWidget {
                             dueDate: task.dueDate,
                             isCompleted: isCompleted,
                           ),
+                          if (task.recurrence != null) ...[
+                            const SizedBox(width: AppSpacing.xxs),
+                            Icon(
+                              Icons.repeat,
+                              size: 14,
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.45,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],

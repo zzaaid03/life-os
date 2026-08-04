@@ -26,6 +26,7 @@ import 'package:life_os/features/tasks/data/datasources/task_remote_data_source.
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/data/repositories/task_repository.dart';
 import 'package:life_os/features/tasks/data/repositories/task_repository_impl.dart';
+import 'package:life_os/features/tasks/domain/recurrence.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -267,16 +268,27 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   /// Toggles a task between completed and pending.
   ///
   /// If completed → becomes pending again (uncompletes).
-  /// If pending → becomes completed.
+  /// If pending → becomes completed, and if it repeats, spawns the next
+  /// occurrence while stripping the recurrence rule from the completed row.
   Future<void> toggleTaskComplete(String id) async {
     final task = state.tasks.firstWhere((t) => t.id == id);
     final isCompleted = task.status == TaskStatus.completed;
+    final now = DateTime.now();
     final updated = task.copyWith(
       status: isCompleted ? TaskStatus.pending : TaskStatus.completed,
-      completedAt: isCompleted ? null : DateTime.now(),
-      updatedAt: DateTime.now(),
+      completedAt: isCompleted ? null : now,
+      updatedAt: now,
+      clearRecurrence: !isCompleted,
     );
+
+    final next = isCompleted
+        ? null
+        : nextRecurringTask(completed: task, newId: const Uuid().v4(), now: now);
+
     await updateTask(updated);
+    if (next != null) {
+      await createTask(next);
+    }
   }
 
   /// Reloads tasks from the data source.

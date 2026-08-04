@@ -106,6 +106,7 @@ class TaskLocalDataSource {
       'status': entry.status,
       'parent_task_id': entry.parentTaskId,
       'goal_id': entry.goalId,
+      'recurrence': entry.recurrence,
       'sort_order': entry.sortOrder,
       'synced_at': entry.syncedAt?.toIso8601String(),
       'created_at': entry.createdAt.toIso8601String(),
@@ -138,6 +139,7 @@ class TaskLocalDataSource {
       status: Value(json['status'] as String),
       parentTaskId: Value(json['parent_task_id'] as String?),
       goalId: Value(json['goal_id'] as String?),
+      recurrence: Value(json['recurrence'] as String?),
       sortOrder: Value((json['sort_order'] as num).toDouble()),
       syncedAt: Value(
         (json['synced_at'] as String?) != null

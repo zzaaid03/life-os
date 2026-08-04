@@ -71,6 +71,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   late final TextEditingController _descriptionController;
   late TaskPriority _priority;
   DateTime? _dueDate;
+  Recurrence? _recurrence;
   bool _isSaving = false;
   bool _showDueDateError = false;
 
@@ -85,6 +86,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     );
     _priority = widget.task?.priority ?? widget.defaultPriority;
     _dueDate = widget.task?.dueDate ?? widget.initialDueDate;
+    _recurrence = widget.task?.recurrence;
   }
 
   @override
@@ -129,6 +131,8 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
               : _descriptionController.text.trim(),
           priority: _priority,
           dueDate: _dueDate,
+          recurrence: _recurrence,
+          clearRecurrence: _recurrence == null,
           updatedAt: DateTime.now(),
         ) ??
         Task(
@@ -140,6 +144,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
               : _descriptionController.text.trim(),
           priority: _priority,
           dueDate: _dueDate,
+          recurrence: _recurrence,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
@@ -246,6 +251,20 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                   onTap: _pickDate,
                   hasError: _showDueDateError,
                 ),
+                const SizedBox(height: AppSpacing.lg),
+
+                // Repeats selector
+                Text(
+                  'Repeats',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _RecurrenceSelector(
+                  value: _recurrence,
+                  onChanged: (r) => setState(() => _recurrence = r),
+                ),
                 const SizedBox(height: AppSpacing.xxl),
 
                 // Actions
@@ -342,6 +361,58 @@ class _PrioritySelector extends StatelessWidget {
       TaskPriority.low => AppColors.info,
       TaskPriority.medium => AppColors.warning,
       TaskPriority.high => AppColors.error,
+    };
+  }
+}
+
+class _RecurrenceSelector extends StatelessWidget {
+  const _RecurrenceSelector({required this.value, required this.onChanged});
+
+  final Recurrence? value;
+  final ValueChanged<Recurrence?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.primary;
+
+    return Wrap(
+      spacing: AppSpacing.sm,
+      children: <Recurrence?>[null, ...Recurrence.values].map((r) {
+        final isSelected = r == value;
+
+        return FilterChip(
+          label: Text(_recurrenceLabel(r)),
+          selected: isSelected,
+          onSelected: (_) => onChanged(r),
+          selectedColor: color.withValues(alpha: 0.15),
+          labelStyle: theme.textTheme.labelMedium?.copyWith(
+            color: isSelected
+                ? color
+                : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          ),
+          side: BorderSide(
+            color: isSelected
+                ? color.withValues(alpha: 0.3)
+                : theme.colorScheme.outline.withValues(alpha: 0.15),
+          ),
+          showCheckmark: false,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _recurrenceLabel(Recurrence? r) {
+    return switch (r) {
+      null => 'Never',
+      Recurrence.daily => 'Daily',
+      Recurrence.weekly => 'Weekly',
+      Recurrence.monthly => 'Monthly',
     };
   }
 }
