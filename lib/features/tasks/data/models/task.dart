@@ -13,6 +13,23 @@ enum TaskPriority { none, low, medium, high }
 /// The workflow status of a task.
 enum TaskStatus { pending, inProgress, completed, archived }
 
+/// How often a task repeats.
+///
+/// Deliberately three fixed rules rather than an RRULE string. A full
+/// recurrence grammar is a lot of surface to get wrong for a need nobody has
+/// expressed. See `features/tasks/domain/recurrence.dart` for the date maths
+/// and for what happens when a recurring task is completed.
+enum Recurrence {
+  /// Repeats one day after the previous due date.
+  daily,
+
+  /// Repeats seven days after the previous due date.
+  weekly,
+
+  /// Repeats one calendar month after the previous due date.
+  monthly,
+}
+
 /// A task entity — an actionable item in Life OS.
 class Task extends Equatable implements Entity {
   /// Creates a [Task].
@@ -27,6 +44,7 @@ class Task extends Equatable implements Entity {
     this.status = TaskStatus.pending,
     this.parentTaskId,
     this.goalId,
+    this.recurrence,
     this.sortOrder = 0,
     this.syncedAt,
     required this.createdAt,
@@ -53,6 +71,7 @@ class Task extends Equatable implements Entity {
       status: _parseStatus(json['status'] as String?),
       parentTaskId: json['parent_task_id'] as String?,
       goalId: json['goal_id'] as String?,
+      recurrence: _parseRecurrence(json['recurrence'] as String?),
       sortOrder: (json['sort_order'] as num?)?.toDouble() ?? 0,
       syncedAt: json['synced_at'] != null
           ? DateTime.parse(json['synced_at'] as String).toLocal()
@@ -97,6 +116,12 @@ class Task extends Equatable implements Entity {
   /// The ID of the goal this task was generated for, if any.
   final String? goalId;
 
+  /// How often this task repeats, or null if it does not.
+  ///
+  /// A completed task gives up its rule to the occurrence it spawns, so a row
+  /// that is both completed and recurring should not exist.
+  final Recurrence? recurrence;
+
   /// Sort ordering within a list.
   final double sortOrder;
 
@@ -131,6 +156,7 @@ class Task extends Equatable implements Entity {
       'status': _encodeStatus(status),
       'parent_task_id': parentTaskId,
       'goal_id': goalId,
+      'recurrence': recurrence?.name,
       'sort_order': sortOrder,
       'synced_at': syncedAt?.toUtc().toIso8601String(),
       'created_at': createdAt.toUtc().toIso8601String(),
@@ -152,6 +178,7 @@ class Task extends Equatable implements Entity {
     TaskStatus? status,
     String? parentTaskId,
     String? goalId,
+    Recurrence? recurrence,
     double? sortOrder,
     DateTime? syncedAt,
     DateTime? createdAt,
@@ -159,6 +186,7 @@ class Task extends Equatable implements Entity {
     DateTime? deletedAt,
     SyncStatus? syncStatus,
     int? version,
+    bool clearRecurrence = false,
   }) {
     return Task(
       id: id ?? this.id,
@@ -171,6 +199,11 @@ class Task extends Equatable implements Entity {
       status: status ?? this.status,
       parentTaskId: parentTaskId ?? this.parentTaskId,
       goalId: goalId ?? this.goalId,
+      // Every other nullable field here uses the `?? this.x` idiom, which
+      // cannot express "set this back to null". Recurrence has to: completing
+      // a repeating task strips its rule, and that is the only thing stopping
+      // an un-complete/re-complete from spawning a second occurrence.
+      recurrence: clearRecurrence ? null : (recurrence ?? this.recurrence),
       sortOrder: sortOrder ?? this.sortOrder,
       syncedAt: syncedAt ?? this.syncedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -194,6 +227,17 @@ class Task extends Equatable implements Entity {
     return switch (status) {
       TaskStatus.inProgress => 'in_progress',
       _ => status.name,
+    };
+  }
+
+  /// Anything unrecognised (including null) means "does not repeat". This runs
+  /// on every row read from Supabase and from Drift, so it must never throw.
+  static Recurrence? _parseRecurrence(String? value) {
+    return switch (value) {
+      'daily' => Recurrence.daily,
+      'weekly' => Recurrence.weekly,
+      'monthly' => Recurrence.monthly,
+      _ => null,
     };
   }
 
@@ -223,6 +267,7 @@ class Task extends Equatable implements Entity {
     status,
     parentTaskId,
     goalId,
+    recurrence,
     sortOrder,
     createdAt,
     updatedAt,
