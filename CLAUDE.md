@@ -18,7 +18,138 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-07-28) — `main` AND `staging` @ `a2f422b` — LEARNING SYSTEM SLICE 1 LIVE, MERGED TO STABLE
+## Current state (2026-08-04) — `staging` @ `5312204`, `main` @ `da953fd` — iOS SELF-SERVE UPDATES SHIPPED, REMINDERS BUILT BUT UNTESTED ON DEVICE
+
+**`staging` is 3 commits ahead of `main`, pushed, clean. NOT merged to stable.** Nothing was deployed
+to production this round beyond two incidental web redeploys (see below). No migrations, no edge
+function deploys, no Supabase changes at all this round.
+
+### ✅ THE IBRAHIM DEPENDENCY IS GONE. This was the round's headline.
+Zaid has an iPhone 13 on an **iOS 26 developer beta** and no Mac. Life OS was installed via Xcode free
+provisioning from Ibrahim's borrowed Mac, so **every single release needed Ibrahim and Zaid's phone
+physically handed over.** Release cadence is every 1-2 days when active, so that fired constantly.
+
+**Now:** `.github/workflows/ios-ipa.yml` builds an **unsigned** `.ipa` on a free macOS runner and
+publishes it as a GitHub release asset. Zaid downloads it on the phone from Safari and imports it into
+**SideStore**, which re-signs on-device with his own Apple ID. **No cable, no PC, no Ibrahim.**
+Verified end to end: releases `ios-1` (from `da953fd`) and `ios-2` (from `5312204`) both built green,
+**~4m25s per build**, and Zaid confirmed `ios-1` installed and ran correctly on the phone.
+
+**Why unsigned matters: no certificate, Apple ID, team ID or signing secret ever enters CI.** SideStore
+does all signing locally. Do not "improve" this by adding signing to the workflow.
+
+**Ibrahim's agent validated this plan before it was built** and set the test order that was followed:
+prove SideStore can refresh ITSELF on the iOS 26 beta first (Zaid did, it refreshed cleanly), then add
+the CI job, then verify a real import. Its standing constraints: keep the **default anisette server**,
+never a third-party one; never use web-based signing services; free tier allows **3 sideloaded apps
+total including SideStore** and 10 App ID registrations per 7 days.
+
+**Facts the workflow depends on, all verified in-repo, do not re-derive:**
+- The app's bundle id is **`com.lifeos.app.zaid`**, not `com.lifeos.app`. The plain namespace was
+  already globally claimed, so free provisioning used the documented fallback. The workflow `sed`s the
+  3 app `PRODUCT_BUNDLE_IDENTIFIER` lines in `project.pbxproj` at build time; the repo itself is never
+  changed. The pattern is anchored on the trailing semicolon so it CANNOT match the 3
+  `com.lifeos.app.RunnerTests;` lines.
+- **`ios/Runner/Info.plist`'s OAuth URL scheme must stay `com.lifeos.app`** even though the bundle id is
+  `com.lifeos.app.zaid`. **This mismatch is deliberate and correct. Changing it breaks Google sign-in.**
+- The sed step **asserts exactly 3 lines were renamed and fails the build otherwise.** This is
+  load-bearing: `sed` exits 0 on zero matches, so without it a future bundle-id change would silently
+  ship an `.ipa` under an id that is not Zaid's, and SideStore would refuse it for a reason nothing in
+  the log would explain.
+- Trigger is **`workflow_dispatch` only**, deliberately. A `workflow_dispatch` workflow only appears in
+  the Actions UI if the file exists on the **default branch (`main`)**, which is why it was merged there.
+
+### ⚠️ DECIDED BY ZAID THIS ROUND, DO NOT RE-LITIGATE
+- **$99/yr Apple Developer account: REJECTED.** So TestFlight is out, and so is real push (APNs).
+- **TrollStore: DEAD**, needs iOS 14-16/early 17, Zaid is on 26.
+- **Google OAuth verification: EXPLICITLY PARKED.** The planner made the case (it is calendar time, the
+  review is slow, and demo mode now makes the required demo video trivial) and **Zaid chose "not yet,
+  keep building."** That is his call. Raise it again at most once, do not nag.
+- **Reminder design: evening before AND morning of, ONE PER TASK.** The planner flagged the
+  notification-volume/mute risk on both choices; Zaid picked the loudest combination knowingly.
+- **PWA stays the always-current fallback** (`lifeos.deadthrone.dev`, Add to Home Screen). Immune to all
+  beta/sideload churn, only loses offline task access.
+
+### 🚧 BUILT THIS ROUND BUT NOT DEVICE-TESTED — THIS IS THE FIRST THING TO RESOLVE
+**Local task reminders** (`5312204`, 4 parallel worker lanes + planner contract + planner wiring).
+`flutter analyze` clean, 27 tests pass incl. 7 new, iOS compiles on the macOS runner. **But nobody has
+confirmed a notification actually arrives.** The test Zaid was given and had NOT reported back on:
+install `ios-2`, create a task due tomorrow, **force-quit the app**, expect "Due tomorrow" at 20:00
+local and "Due today" at 09:00. **The force-quit is the whole point; testing with the app open proves
+nothing about the claim.**
+
+**How it works, do not re-derive:**
+- `lib/features/notifications/domain/reminder_schedule.dart` — planner-written, pure, fully unit
+  tested. `buildReminderSchedule(tasks, now)` returns `PendingReminder`s. Slots are 20:00 local the day
+  before and 09:00 local on the due day, rebuilt via `DateTime`'s own constructor so DST stays correct.
+- **The 64-cap is enforced in our code, not left to iOS.** iOS holds at most 64 pending local
+  notifications and silently drops whichever it likes past that. Two slots per task means the nearest
+  **~32 tasks** are covered. Ours truncates soonest-first, deterministically.
+- `PendingReminder.id` is the **list index**, valid only because `syncSchedule` always cancels
+  everything and reschedules the whole window. That full rebuild is also how a completed or deleted
+  task loses its reminder.
+- `reminder_sync_provider.dart` (planner-written) is the **ONLY** place that talks to the OS. It
+  watches the task list + the preference behind a 2s debounce and a change signature, serialises
+  overlapping syncs, requests permission once and only when reminders are wanted, **returns early on
+  `kIsWeb`**, and swallows failures so a reminder problem can never break tasks or sync.
+- Settings has a per-user-ID SharedPreferences **"Task reminders"** toggle (default ON). It writes the
+  preference ONLY; it never calls the notification service. The dead "Notifications, coming soon"
+  placeholder tile was removed since it now contradicted a working toggle.
+- **Demo mode overrides `notificationServiceProvider` with `NoopNotificationService`** so a sandbox
+  visitor is never prompted and never leaves alarms on their phone.
+
+**⚠️ THE KNOWN, ACCEPTED LIMITATION — explain it, do not try to "fix" it.** A scheduled local
+notification **does fire with the app closed or force-quit**; the OS holds it. But **only an open app
+can schedule one.** A task created on the web while the phone is shut has no reminder until the phone
+app next opens. Closing that gap needs real push (APNs), which needs the $99 account Zaid rejected.
+**Do NOT reach for iOS Background App Refresh as a substitute** — iOS runs it whenever it likes, which
+would turn a predictable limitation into randomly unreliable reminders.
+
+**Android got the manifest work but NO new APK was built this round.** Reminders are iPhone-only in
+practice until someone runs `flutter build apk --release`.
+
+### Planner review caught three real defects in clean, analyze-passing worker output
+All 4 lanes reported honestly and each passed `flutter analyze`. The diffs still contained:
+1. **Android reminders would have silently never fired.** `AndroidScheduleMode.exactAllowWhileIdle` was
+   used unconditionally. Per the plugin's own README (v22.2.0, line 953), without the exact-alarm grant
+   it **logs an error and schedules nothing**, and that grant is not automatic on Android 14+. So the
+   toggle would say ON and nothing would ever arrive. Now checks `canScheduleExactNotifications()` and
+   falls back to `inexactAllowWhileIdle`. A 09:00 reminder at 09:12 is fine; not arriving is not.
+2. **`requestExactAlarmsPermission()` threw the user out to a system settings screen.** Removed. We do
+   not need exact alarms, so there is no reason to ask.
+3. The dead "Notifications, coming soon" Settings tile sitting directly above the new real toggle.
+
+### 🆕 NEW CAPABILITY, USE IT: the iOS CI build is now a free Swift typechecker
+`flutter analyze` does NOT check Swift, and there is no Mac. This round changed
+`ios/Runner/AppDelegate.swift` (adding the `UNUserNotificationCenter` delegate) and the only way to
+know it compiled was to **dispatch the iOS workflow against `staging` and watch it go green**. It did.
+`gh workflow run "Build iOS IPA (unsigned)" --ref <branch>` costs ~4 minutes and nothing else.
+**Never merge a Swift or iOS-native change without doing this.**
+
+### ⚠️ PRE-EXISTING, FOUND THIS ROUND, NOT FIXED
+- **`test/widget_test.dart` has been FAILING for a long time.** It constructs `LifeOSApp` with no
+  `ProviderScope`, so the first `ref.read` in `initState` throws `Bad state: No ProviderScope found`.
+  **Confirmed pre-existing by stashing all changes and re-running on clean `HEAD`** — do not waste time
+  suspecting the notifications work.
+- **The reason nobody noticed: `deploy.yml` never runs `flutter test`.** CI only builds and rsyncs. The
+  suite has been red with zero signal. Worth fixing both together in a small round.
+
+### Open items
+- **FIRST: get the reminder device-test result from Zaid** (see above), then merge `staging` to `main`.
+- **The weekly SideStore refresh is still not set up.** Ibrahim's step 3 said put a manual weekly
+  reminder in place rather than trusting background auto-refresh, which has known reliability issues
+  (SideStore #1369, #1389). If it lapses the app stops launching on day 8 and it will look like the
+  pipeline broke. Zaid was told; a repeating phone reminder is the fix.
+- No Android APK built with reminders.
+- `widget_test.dart` + no `flutter test` in CI (above).
+- Delete the pre-fix duplicate "Android Developer" job row from the Jobs tab (manual, cosmetic).
+- Brand icon round 2 (in-app header lockup on the welcome screen) — still never started.
+- `remove_alpha_ios` — **effectively dead**, it only matters for App Store submission and the $99
+  account is rejected. Do not spend a round on it.
+- Google OAuth verification — parked by Zaid this round.
+- The zaidj.tech lab demo gap.
+
+## SUPERSEDED — Current state (2026-07-28) — `main` AND `staging` @ `a2f422b` — LEARNING SYSTEM SLICE 1 LIVE, MERGED TO STABLE
 
 **Both branches at `a2f422b`, pushed, clean, NO divergence.** Merge to `main` was a straight fast-forward
 (`2f551bd..a2f422b`, 4 commits, sole author Zaid Jarrar, no agent attribution). Production verified by
@@ -882,6 +1013,33 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **Read the INSTALLED package, not your memory of its API.** `flutter_local_notifications` v22 renamed
+  and removed parameters that every online tutorial still uses. Both worker prompts this round said so
+  explicitly and pointed at the pub cache, and both workers came back with corrections to what they had
+  expected. A confidently wrong API signature written into a prompt costs more than the lookup. The
+  same read is what found the exact-alarm silent-failure defect, in the README, in plain English.
+- **Before blaming your own change for a failing test, check whether it was already failing.** The full
+  suite went red right after the notifications work landed and the obvious read was "I broke it." One
+  `git stash -u` + re-run on clean `HEAD` proved `widget_test.dart` had been failing all along. Thirty
+  seconds of evidence beat a plausible story.
+- **A green CI build is a free compiler for languages you cannot run locally.** There is no Mac and
+  `flutter analyze` ignores Swift, so an `AppDelegate.swift` edit was completely unverifiable on
+  Windows until the iOS workflow existed. Dispatching it against the branch (~4 min) is now the only
+  honest way to check iOS-native changes. Build the verification tool, then use it every time.
+- **"Fires when the app is closed" and "can be scheduled when the app is closed" are different claims,
+  and conflating them misleads the user.** The planner initially told Zaid local notifications only
+  work while the app is open, which is wrong and would have killed a feature he wanted. Scheduled local
+  notifications ARE delivered by the OS with the app force-quit; only SCHEDULING needs the app open.
+  Correct the record explicitly when this kind of distinction turns out to matter.
+- **A platform API that "logs an error and does nothing" is worse than one that throws.** Android's
+  exact-alarm grant is not automatic on 14+, and the plugin's documented response to a missing grant is
+  to log and skip scheduling. The user would have seen a toggle reading ON and received nothing, with
+  no diagnosable signal anywhere. Always ask what happens on the DENIED path of a permission, and
+  prefer a degraded-but-working fallback (inexact timing) over a silent no-op.
+- **When you remove a placeholder's reason to exist, remove the placeholder.** Settings had a
+  "Notifications, coming soon" tile; a worker correctly added a real "Task reminders" toggle directly
+  beneath it and, correctly staying in scope, left the lie in place. Scope discipline is the worker's
+  job; noticing the contradiction is the planner's.
 - **A NEGATIVE test proves nothing unless a POSITIVE result could have shown up.** Zaid checked
   file isolation by signing into his second account and reporting "I can't see any file." It read
   like a clean pass. It was worthless: at that moment **no screen in the app listed files at all**,
