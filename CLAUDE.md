@@ -18,7 +18,99 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-04) — `staging` @ `5312204`, `main` @ `da953fd` — iOS SELF-SERVE UPDATES SHIPPED, REMINDERS BUILT BUT UNTESTED ON DEVICE
+## Current state (2026-08-04, late) — `main` AND `staging` @ `a02cb35` — REPEATING TASKS SHIPPED, ANDROID BUILD RESCUED, REMINDERS STILL UNVERIFIED
+
+**Both branches at `a02cb35`, pushed, clean, NO divergence.** Merge to `main` was a straight
+fast-forward. Production verified by fetching the page, not by trusting CI:
+`https://lifeos.deadthrone.dev` serves `flutter_bootstrap.js?v=a02cb35`. Sole author Zaid Jarrar,
+no agent attribution.
+
+### ⚠️ READ FIRST: THE REMINDER DEVICE TEST WAS NEVER RUN, AND WE MERGED ANYWAY
+Zaid instructed "merge and deploy everything so we close all the opens" while the 20:00 / 09:00
+notification test was still pending. That was his explicit call after being told the feature was
+unverified. **So local task reminders are now on `main` and in production having never been
+confirmed to fire on a real device.** The test still matters:
+
+> Create a task due tomorrow, leave the app open ~5s (the sync is debounced 2s), **force-quit it**,
+> expect "Due tomorrow" at 20:00 local and "Due today" at 09:00. A task due TODAY produces nothing,
+> correctly: both its slots are already past.
+
+**⚠️ Installing a new build may cancel the pending notifications and void the test.** If Zaid
+installed `ios-4` before 20:00, the test has to be re-armed from scratch on the new build.
+
+### Shipped this round
+- **Repeating tasks** (`823f97c` contract, `f3d474b` build). Daily / weekly / monthly, picked in the
+  task editor, repeat icon on the card. Completing a repeating task spawns the next occurrence and
+  **strips the rule from the finished row** — that is the whole idempotency guarantee, an
+  un-complete/re-complete cannot spawn a duplicate. The next due date advances from the PREVIOUS DUE
+  DATE (so a weekly task stays anchored to its weekday when completed late) and rolls forward past
+  today (so finishing four days late does not schedule reminders for dates already gone). Monthly
+  clamps 31 Jan → 28 Feb and does not restore. Pure logic in
+  `lib/features/tasks/domain/recurrence.dart`, 9 unit tests.
+- **`Task.copyWith` now has TWO clear-flags**, `clearRecurrence` and `clearCompletedAt`. Everything
+  else uses the `?? this.x` idiom, which cannot express "set back to null". `clearCompletedAt` fixed
+  a real latent bug: un-completing a task kept its old completion timestamp.
+- **The inbox scan now knows who it is scanning for** (`0a7e08b`). `extract-tasks` prepends the
+  user's own `user_facts` to the USER message, framed as background that must never itself become a
+  task. **`SYSTEM_PROMPT` is byte-identical on purpose** — it was tightened twice to stop the model
+  inventing job applications. Degrades to today's exact request on no user, no facts, a query error
+  or a transport fault. `factsCount` in the debug response reports what actually reached the model.
+- **CI runs `flutter test` before deploying** (`17fd948`), and `widget_test.dart` is deleted. It was
+  a template leftover that pumped the app with no `ProviderScope` and had been red for months;
+  repairing it meant mocking Supabase startup to assert on a splash screen. A red suite now blocks a
+  deploy, which is the point.
+- What's New release version 3, and two demo tasks now repeat so the sandbox shows the feature.
+
+### Two production changes, both live
+1. **Migration `017_task_recurrence.sql` applied via the dashboard SQL editor.** Nullable `recurrence`
+   column plus a CHECK constraining it to daily/weekly/monthly. **This had to land BEFORE the client
+   shipped:** `Task.toJson()` sends the key on every write, and without the column every task write
+   400s with `PGRST204`.
+2. **`extract-tasks` redeployed.** Verified from outside: unauthenticated POST returns **401**, not 404.
+
+### 🔴 THE ANDROID RELEASE BUILD HAS BEEN BROKEN SINCE THE NOTIFICATIONS ROUND (`a02cb35` fixes it)
+Nobody knew because no APK was ever built. Two independent failures, neither in our code:
+- **`flutter_local_notifications` requires core library desugaring** and fails the AAR metadata check
+  outright without it. **Android task reminders could never have shipped.** Now enabled in
+  `android/app/build.gradle.kts` with `desugar_jdk_libs:2.1.4`.
+- **`file_picker` pins compileSdk 34** while its own transitive `flutter_plugin_android_lifecycle`
+  demands 36. Every plugin subproject is now forced to 36 in `android/build.gradle.kts`. That
+  registration **must come before `evaluationDependsOn(":app")` in the same `subprojects` block** —
+  that call evaluates the project and `afterEvaluate` throws once it has. Raising compileSdk widens
+  the APIs a library may compile against and leaves minSdk/targetSdk alone.
+
+**APK built: 65.7 MB at `build/app/outputs/flutter-apk/app-release.apk`, still debug-keystore signed
+(sideload only).** A separate local-only trap on the way: a stale untracked
+`android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java` referencing plugins
+that would not resolve. `flutter clean` cleared it. It is not in git, so it never affected CI.
+
+### iOS
+`ios-4` (from `a02cb35`) built green and is the installable build. `ios-3` is from `da953fd`.
+No Swift or iOS-native code changed this round.
+
+### Open items
+- **The reminder device test (above). Highest priority, and now shipped-unverified.**
+- The weekly SideStore refresh reminder is still not set up. The app stops launching on day 8 and it
+  will look like the pipeline broke. **Repeating tasks now exist, so this can finally be a weekly
+  task inside Life OS itself** — which is also a real dogfooding test of the feature.
+- **`flutter test` now gates deploys.** A red suite blocks production. Fine, but know it.
+- Code comments across `lib/` still contain em dashes, which violates the writing rule for a public
+  repo. User-facing release copy was cleaned this round; the comment sweep is its own small round.
+- Delete the pre-fix duplicate "Android Developer" job row from the Jobs tab (manual, cosmetic).
+- Brand icon round 2. Google OAuth verification (parked by Zaid). The zaidj.tech lab demo gap.
+
+### Lessons worth keeping
+- **A worker lane that runs codegen makes its neighbours look broken.** Workers 2 and 3 both reported
+  three analyze errors in Worker 1's files. All three were real at the moment they ran and all three
+  evaporated once `build_runner` finished. Sequence the codegen lane first, or expect the noise.
+- **The Supabase CLI is STILL broken at 2.111.0** (was 2.110.0). `migration list --linked` returns
+  `"local":""` for all 15 remote entries. `db push` would try to re-run everything and die on the
+  unguarded `CREATE POLICY` statements in 001/002/006/007. Go straight to the dashboard. Do not run
+  `migration repair`.
+- **A green build for one platform says nothing about another.** Web and iOS were green throughout
+  while Android could not compile at all. If a feature claims a platform, build for that platform.
+
+## SUPERSEDED — Current state (2026-08-04) — `staging` @ `5312204`, `main` @ `da953fd` — iOS SELF-SERVE UPDATES SHIPPED, REMINDERS BUILT BUT UNTESTED ON DEVICE
 
 **`staging` is 3 commits ahead of `main`, pushed, clean. NOT merged to stable.** Nothing was deployed
 to production this round beyond two incidental web redeploys (see below). No migrations, no edge
