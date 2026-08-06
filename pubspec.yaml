@@ -69,6 +69,7 @@ flutter:
 
   assets:
     - .env
+    - assets/branding/logo_mark_1024.png
 
 flutter_launcher_icons:
   android: true

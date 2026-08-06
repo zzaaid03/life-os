@@ -32,6 +32,31 @@ class WelcomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Spacer(flex: 3),
+              // Brand lockup
+              Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        child: Image.asset(
+                          'assets/branding/logo_mark_1024.png',
+                          width: 72,
+                          height: 72,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Text(
+                        'LifeOS',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
+                  )
+                  .animate()
+                  .fadeIn(duration: 500.ms)
+                  .slideY(begin: 0.08, end: 0, duration: 500.ms),
+              const SizedBox(height: AppSpacing.xl),
               // Title
               Text(
                     'Welcome.',
