@@ -25,7 +25,17 @@ fast-forward. Production verified by fetching the page, not by trusting CI:
 `https://lifeos.deadthrone.dev` serves `flutter_bootstrap.js?v=a02cb35`. Sole author Zaid Jarrar,
 no agent attribution.
 
-### ⚠️ READ FIRST: THE REMINDER DEVICE TEST WAS NEVER RUN, AND WE MERGED ANYWAY
+### ✅ UPDATE 2026-08-06 — BOTH UNVERIFIED FEATURES ARE NOW CONFIRMED BY REAL USE
+Zaid used the app for two days and reported: **task reminders fire correctly** (evening-before and
+morning-of, with the app closed) and **repeating tasks work as expected** (completing one spawns the
+next). Both shipped unverified and both hold. **These two items are CLOSED — do not re-investigate.**
+
+Also decided 2026-08-06: close out the brand icon round 2, the duplicate job row, the em dash sweep
+in `lib/`, and the SideStore weekly reminder. **Next feature round is the widened inbox scan** — read
+the 2026-08-06 block at the top of `_planning/V2_SCOPE.md` first, it corrects a false privacy premise
+and records the settled design.
+
+### ⚠️ HISTORICAL — THE REMINDER DEVICE TEST WAS NOT RUN AT MERGE TIME (resolved above)
 Zaid instructed "merge and deploy everything so we close all the opens" while the 20:00 / 09:00
 notification test was still pending. That was his explicit call after being told the feature was
 unverified. **So local task reminders are now on `main` and in production having never been
