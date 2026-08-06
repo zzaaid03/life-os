@@ -34,23 +34,48 @@ const corsHeaders = {
 const SYSTEM_PROMPT =
   `You are an inbox assistant for a busy person who is also actively job-hunting.
 You read emails and produce TWO things: (1) actionable TASKS, and (2) JOB APPLICATION
-UPDATES. Be precise — if an email fits neither category, ignore it completely.
+UPDATES. Be precise: if an email fits neither category, ignore it completely.
+
+The user message states TODAY as the user's local date, and every email carries its own
+sentDate. Resolve dates against those two only, never against your own idea of the date.
 
 === TASKS ===
-Extract a task ONLY when the email clearly requires the recipient to personally DO
-something actionable — a real person asking them to send/review/reply/prepare
-something, a deadline they must act on, an appointment to book, or a bill to pay.
+Extract a task when the email requires the recipient to personally DO something, or
+names something dated they cannot afford to miss. That means any of:
+1. REQUESTS AND DEADLINES: a real person asking them to send/review/reply/prepare
+   something, or a deadline they must act on.
+2. BILLS AND PAYMENTS DUE: an amount the recipient still owes. A paid receipt or a
+   successful payment confirmation is NOT a bill.
+3. APPOINTMENTS AND EVENTS: something at a specific time they must attend, book,
+   confirm or reschedule.
+4. SUBSCRIPTION RENEWALS: a subscription, plan or membership that will auto-renew,
+   expire, or change price, where knowing the date lets them cancel or budget.
+5. DELIVERIES AND COLLECTION DEADLINES: a parcel needing action from them, such as
+   collect by a date, arrange redelivery, or a failed delivery attempt.
 
 ALWAYS IGNORE for tasks (they are noise):
 - Automated notifications and security alerts ("a new app/login was added",
   "your data was shared", "sign-in from a new device")
 - Newsletters, marketing, promotions, and job-board nudges
-- Receipts, order/shipping updates, and bills that need no action
+- Receipts, and order or shipping updates that need nothing from the recipient
 - Social notifications, "Welcome to X" emails, and no-reply informational mail
+A dated fact the recipient can do nothing about is NOT a task.
 Do NOT invent vague tasks like "review this" or "visit settings" from informational
 emails. Emit ONE task per distinct action; never split one request into many.
-Each task: {title (short imperative), dueDateHint (short phrase or null),
-priority (none|low|medium|high), sourceEmailId}.
+Each task: {title (short imperative), dueDate (see DATES), dueDateHint (short phrase
+or null), priority (none|low|medium|high), sourceEmailId}.
+
+DATES. dueDate is an ISO yyyy-mm-dd string and is the anti-hallucination gate:
+- Emit a dueDate ONLY when the email states the date plainly enough that you could
+  point at the words that say it. "Due 15 March", "by 03/15/2026", "renews on
+  1 April" all qualify. A weekday or relative phrase ("by Friday", "within 7 days")
+  qualifies ONLY once you resolve it against that email's sentDate.
+- If the year is missing, pick the year that puts the date on or after the email's
+  sentDate. Never emit a dueDate before that email's sentDate.
+- If the email gives no date, or gives a vague one ("soon", "shortly", "as soon as
+  possible", "end of the month"), dueDate MUST be null. Guessing a date is a failure,
+  worse than emitting none. Put the vague wording in dueDateHint instead.
+- dueDate and dueDateHint are independent. Emit either, both, or neither.
 
 === JOB UPDATES ===
 Produce a job update ONLY when the email clearly concerns the RECIPIENT'S OWN
@@ -90,7 +115,7 @@ Each job update: {company, role, status, summary, sourceEmailId}.
   (e.g. "RoboService rejected your application for the Data Science working-student role.")
 
 Respond with ONLY a JSON object of this exact form:
-{"tasks":[{"title": string, "dueDateHint": string|null, "priority": string, "sourceEmailId": string}],
+{"tasks":[{"title": string, "dueDate": string|null, "dueDateHint": string|null, "priority": string, "sourceEmailId": string}],
  "jobUpdates":[{"company": string, "role": string, "status": string, "summary": string, "sourceEmailId": string}]}`;
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -157,7 +182,18 @@ function extractBody(payload: GmailPart | undefined): string {
   return "";
 }
 
-async function fetchRecentEmails(accessToken: string, maxResults: number) {
+// Local calendar date (yyyy-mm-dd) for an epoch, shifted by the caller's UTC offset.
+// The model resolves "by Friday" against these, so they must be the user's dates and
+// not the server's. Same tzOffsetMinutes contract daily-brief already uses.
+function localDate(epochMs: number, tzOffsetMinutes: number): string {
+  return new Date(epochMs + tzOffsetMinutes * 60_000).toISOString().slice(0, 10);
+}
+
+async function fetchRecentEmails(
+  accessToken: string,
+  maxResults: number,
+  tzOffsetMinutes: number,
+) {
   const gmail = (path: string) =>
     fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -185,7 +221,13 @@ async function fetchRecentEmails(accessToken: string, maxResults: number) {
         headers.find((x: { name: string }) => x.name.toLowerCase() === n.toLowerCase())
           ?.value ?? "";
       const body = extractBody(m.payload).replace(/\s+/g, " ").trim().slice(0, 1500);
-      return { id, from: h("From"), subject: h("Subject"), body };
+      // internalDate (epoch ms, Gmail's own receipt time) rather than the Date
+      // header, which is free-form and sometimes absent or forged.
+      const epoch = Number(m.internalDate);
+      const sentDate = Number.isFinite(epoch)
+        ? localDate(epoch, tzOffsetMinutes)
+        : null;
+      return { id, from: h("From"), subject: h("Subject"), sentDate, body };
     }),
   );
   return { account, emails };
@@ -290,6 +332,12 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => null);
     const maxResults = Math.min(Math.max(Number(body?.maxResults) || 10, 1), 20);
     const debug = body?.debug === true;
+    // Clamped to the real-world range and defaulting to 0, so a missing or junk
+    // value degrades to UTC dates rather than throwing the scan away.
+    const rawTz = Number(body?.tzOffsetMinutes);
+    const tzOffsetMinutes = Number.isFinite(rawTz)
+      ? Math.min(Math.max(rawTz, -840), 840)
+      : 0;
 
     const { token: accessToken, userId, error: tokenError } = await resolveAccessToken(
       req,
@@ -300,7 +348,11 @@ Deno.serve(async (req: Request) => {
     let account = "";
     let emails;
     try {
-      const result = await fetchRecentEmails(accessToken!, maxResults);
+      const result = await fetchRecentEmails(
+        accessToken!,
+        maxResults,
+        tzOffsetMinutes,
+      );
       account = result.account;
       emails = result.emails;
     } catch (e) {
@@ -311,9 +363,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const { block: factsBlock, factsCount } = await buildFactsBlock(userId);
+    const todayLine = `TODAY is ${localDate(Date.now(), tzOffsetMinutes)}.`;
     const userContent = factsBlock
-      ? `${factsBlock}\n\nEmails:\n${JSON.stringify(emails)}`
-      : "Emails:\n" + JSON.stringify(emails);
+      ? `${todayLine}\n\n${factsBlock}\n\nEmails:\n${JSON.stringify(emails)}`
+      : `${todayLine}\n\nEmails:\n${JSON.stringify(emails)}`;
 
     const groqRes = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",

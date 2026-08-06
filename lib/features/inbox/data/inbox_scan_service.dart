@@ -46,6 +46,7 @@ class SuggestedTask {
   /// Creates a [SuggestedTask].
   const SuggestedTask({
     required this.title,
+    this.dueDate,
     this.dueDateHint,
     required this.priority,
     this.sourceEmailId,
@@ -55,14 +56,39 @@ class SuggestedTask {
   factory SuggestedTask.fromJson(Map<String, dynamic> json) {
     return SuggestedTask(
       title: (json['title'] as String? ?? '').trim(),
+      dueDate: _parseDueDate(json['dueDate']),
       dueDateHint: (json['dueDateHint'] as String?)?.trim(),
       priority: (json['priority'] as String? ?? 'none').trim().toLowerCase(),
       sourceEmailId: json['sourceEmailId'] as String?,
     );
   }
 
+  /// Parses the model's `dueDate` into local midnight, or null.
+  ///
+  /// The model is instructed to emit a plain ISO `yyyy-mm-dd` and nothing else,
+  /// but it is still a model: anything unparseable is dropped rather than
+  /// guessed at, which leaves the user picking a date by hand exactly as they
+  /// do today. Parsed as local midnight to match how [Task] stores due dates.
+  static DateTime? _parseDueDate(Object? raw) {
+    if (raw is! String) return null;
+    final trimmed = raw.trim();
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) return null;
+    final parts = trimmed.split('-').map(int.parse).toList();
+    final parsed = DateTime(parts[0], parts[1], parts[2]);
+    // Reject a roll-over from an impossible date such as 2026-02-31.
+    if (parsed.month != parts[1] || parsed.day != parts[2]) return null;
+    return parsed;
+  }
+
   /// Short imperative task title.
   final String title;
+
+  /// Due date the email stated plainly, at local midnight, or null.
+  ///
+  /// Null is the common and correct case: the model emits a date only when the
+  /// email says one outright, so an absent date means "the email did not say",
+  /// never "the model could not decide".
+  final DateTime? dueDate;
 
   /// Natural-language due-date hint (e.g. "Friday"), or null.
   final String? dueDateHint;
@@ -172,7 +198,13 @@ class InboxScanService {
     try {
       response = await client.functions.invoke(
         'extract-tasks',
-        body: {'maxResults': maxResults},
+        // tzOffsetMinutes anchors the model's date resolution to the user's
+        // calendar. Without it the server reads dates in UTC and "due today"
+        // lands a day out for anyone east of it, the same bug daily-brief hit.
+        body: {
+          'maxResults': maxResults,
+          'tzOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
+        },
       );
     } catch (e) {
       throw InboxScanException('Could not reach the inbox assistant. ($e)');
