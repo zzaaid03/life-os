@@ -18,22 +18,72 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-04, late) — `main` AND `staging` @ `a02cb35` — REPEATING TASKS SHIPPED, ANDROID BUILD RESCUED, REMINDERS STILL UNVERIFIED
+## Current state (2026-08-06) — `staging` @ `9c7bf6c`, `main` @ `ab6e560` — CLEANUP ROUND IN FLIGHT, UNCOMMITTED, NOT YET REVIEWED
 
-**Both branches at `a02cb35`, pushed, clean, NO divergence.** Merge to `main` was a straight
-fast-forward. Production verified by fetching the page, not by trusting CI:
-`https://lifeos.deadthrone.dev` serves `flutter_bootstrap.js?v=a02cb35`. Sole author Zaid Jarrar,
-no agent attribution.
+**Both branches pushed and match origin. `staging` is 1 commit ahead of `main`** (a docs-only commit,
+`9c7bf6c`, recording the confirmation below). **The working tree is DIRTY on top of that** — three
+parallel Zed workers ran this session against three planner prompts and their diffs are sitting
+uncommitted, exactly per the workflow (workers never commit). **Nobody has pasted their text reports
+yet, and the planner has not reviewed the diffs line-by-line.** That is the successor's first job.
 
-### ✅ UPDATE 2026-08-06 — BOTH UNVERIFIED FEATURES ARE NOW CONFIRMED BY REAL USE
-Zaid used the app for two days and reported: **task reminders fire correctly** (evening-before and
-morning-of, with the app closed) and **repeating tasks work as expected** (completing one spawns the
-next). Both shipped unverified and both hold. **These two items are CLOSED — do not re-investigate.**
+### ✅ CLOSED THIS SESSION, DO NOT RE-INVESTIGATE
+Zaid used the app for two days. **Task reminders fire correctly** (evening-before and morning-of,
+app closed) and **repeating tasks work as expected** (completing one spawns the next). Both shipped
+unverified in the previous round (`a02cb35`, merged and deployed before the device test ran — see
+the historical note just below) and both are now confirmed.
 
-Also decided 2026-08-06: close out the brand icon round 2, the duplicate job row, the em dash sweep
-in `lib/`, and the SideStore weekly reminder. **Next feature round is the widened inbox scan** — read
-the 2026-08-06 block at the top of `_planning/V2_SCOPE.md` first, it corrects a false privacy premise
-and records the settled design.
+### 🚧 UNCOMMITTED — three worker prompts ran, diffs present, reports not yet pasted
+`git status --short` shows ~29 files touched. **Verified independently before offboarding** (not
+just from worker self-reports): `flutter analyze` is clean and `flutter test` passes 38/38 on the
+dirty tree exactly as it sits. That's the tree-wide health check; it is NOT the same as reviewing
+each diff for correctness, which still needs doing.
+
+1. **Em dash / en dash sweep across `lib/`.** Touched ~24 files, almost entirely comments. Verified
+   directly: `Get-ChildItem lib -Recurse -Filter *.dart | Where-Object { $_.Name -notlike "*.g.dart" }
+   | Select-String -Pattern "[–—]"` returns **zero hits**, the sweep is complete by its own
+   acceptance criteria. **Caution: an earlier run of that same command mid-session returned 47 hits**
+   — the worker was still writing when it ran. If a stray dash turns up later, re-run the scan before
+   assuming the sweep regressed; it may just be new dashes from unrelated work.
+2. **Brand lockup on the welcome screen.** `pubspec.yaml` now declares
+   `assets/branding/logo_mark_1024.png` under `flutter: assets:` (it was previously referenced only
+   by the `flutter_launcher_icons` config, not shipped as a loadable asset — that gap is now closed
+   too, incidentally). `welcome_screen.dart` has +33 lines. **Not visually verified — nobody has run
+   the app and looked at it in light and dark mode.** Do that before trusting it.
+3. **Inbox scan disclosure copy.** `inbox_scan_screen.dart` and `inbox_consent_dialog.dart` gained
+   explanatory text; `inbox_consent_provider.dart` and `inbox_scan_provider.dart` also changed but
+   **confirmed by diff to be ONLY the em-dash sweep touching their comments — no scan logic
+   changed.** This closes a real gap found this session, not a cosmetic one: `extract-tasks` has no
+   Gmail search query at all, it fetches the N most recent inbox emails whatever they are and sends
+   full bodies to Groq. Users were never told that. **Read the exact copy before trusting it** — the
+   prompt asked for calm, accurate wording, not reassurance.
+
+**Successor's first action:** get Zaid's three worker reports, review each diff for real (especially
+#2 and #3, which are unverified beyond `flutter analyze`/`flutter test` passing), commit each as its
+own logical commit (see the git log for the round's existing pattern), push `staging`, merge to
+`main` once Zaid confirms.
+
+**Also open, Zaid's own manual steps — ask whether done, do not assume:**
+- Create a **weekly repeating task** inside Life OS itself for the SideStore refresh (the app stops
+  launching on day 8 without it — now that repeating tasks ship, this can finally live in the app,
+  which also dogfoods the feature).
+- Delete the stale **"Android Developer"** duplicate row from the Jobs tab.
+
+### NEXT REAL FEATURE ROUND — the widened inbox scan
+Fully scoped, not yet built. **Read the `## 2026-08-06` block near the top of `_planning/V2_SCOPE.md`
+before writing a single prompt** — it corrects a privacy premise that was wrong in the original v2
+plan (the scan already reads everything; widening extraction changes what it ACTS on, not what it
+reads) and records every design decision Zaid already made:
+- All four categories in the first slice: bills/payments due, appointments/events, subscription
+  renewals, deliveries/deadlines. Zaid chose all four despite the planner flagging the same bundle
+  risk that made the job extractor hallucinate twice before — mitigate that in the prompt itself,
+  don't narrow the scope he asked for.
+- Extracted items become **tasks**. No new table, no migration, no new screen.
+- Add a real `dueDate` (ISO `yyyy-mm-dd`) to the extraction schema, emitted ONLY when an email states
+  a date plainly, else null — this is both the feature (bills/renewals need a real date, not the
+  existing vague `dueDateHint` the user has to convert by hand) and the anti-hallucination gate.
+- **`SYSTEM_PROMPT` in `extract-tasks/index.ts` should be planner-written, not delegated** — the
+  existing job-extraction rules in it are load-bearing and must survive byte-identical.
+- The disclosure copy from item 3 above should already be live before this ships, not after.
 
 ### ⚠️ HISTORICAL — THE REMINDER DEVICE TEST WAS NOT RUN AT MERGE TIME (resolved above)
 Zaid instructed "merge and deploy everything so we close all the opens" while the 20:00 / 09:00
