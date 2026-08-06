@@ -64,10 +64,11 @@ class InboxConsentDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  'Life OS will read your recent emails to suggest tasks and '
-                  'track your job applications. We never store your emails — '
-                  'only the tasks and summaries you keep. Powered by an AI '
-                  'provider that does not train on your data.',
+                  'Life OS reads your 10 most recent inbox emails, whatever '
+                  'they are about, and sends them to an AI service to find '
+                  'tasks and job updates. The emails themselves are never '
+                  'stored, only the tasks and summaries you keep. Powered '
+                  'by an AI provider that does not train on your data.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     height: 1.5,

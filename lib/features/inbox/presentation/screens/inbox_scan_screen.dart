@@ -175,6 +175,16 @@ class InboxScanScreen extends ConsumerWidget {
                 height: 1.5,
               ),
             ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Each scan sends your 10 most recent inbox emails to an AI '
+              'service, whatever they are about. Only what it extracts is '
+              'saved, never the emails themselves.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                height: 1.4,
+              ),
+            ),
             const SizedBox(height: AppSpacing.lg),
             SizedBox(
               width: double.infinity,
