@@ -2,7 +2,7 @@
 ///
 /// Picks a file, lets the user mark it private, and uploads it directly
 /// through [fileRepositoryProvider]. Deliberately does not touch
-/// `fileListProvider` — with no Files browse screen watching it, that
+/// `fileListProvider`, since with no Files browse screen watching it, that
 /// provider's notifier is never created, so calling its upload() would
 /// throw before ever reaching the repository.
 library;

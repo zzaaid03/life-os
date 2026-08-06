@@ -9,7 +9,7 @@ import 'package:life_os/core/data/entity.dart';
 /// The workflow status of a goal.
 enum GoalStatus { active, completed, archived, paused }
 
-/// A goal entity — a long-term objective in Life OS.
+/// A goal entity: a long-term objective in Life OS.
 class Goal extends Equatable implements Entity {
   /// Creates a [Goal].
   const Goal({

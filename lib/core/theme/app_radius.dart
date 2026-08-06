@@ -9,22 +9,22 @@ import 'package:flutter/material.dart';
 abstract final class AppRadius {
   AppRadius._();
 
-  /// 4.0 logical pixels — subtle rounding for small elements.
+  /// 4.0 logical pixels, subtle rounding for small elements.
   static const double xs = 4.0;
 
-  /// 8.0 logical pixels — standard rounding for inputs and chips.
+  /// 8.0 logical pixels: standard rounding for inputs and chips.
   static const double sm = 8.0;
 
-  /// 12.0 logical pixels — default for cards and containers.
+  /// 12.0 logical pixels, the default for cards and containers.
   static const double md = 12.0;
 
-  /// 16.0 logical pixels — prominent rounding for large cards.
+  /// 16.0 logical pixels: prominent rounding for large cards.
   static const double lg = 16.0;
 
-  /// 20.0 logical pixels — extra prominent for modals and sheets.
+  /// 20.0 logical pixels, extra prominent for modals and sheets.
   static const double xl = 20.0;
 
-  /// 24.0 logical pixels — maximum rounding for hero elements.
+  /// 24.0 logical pixels: maximum rounding for hero elements.
   static const double xxl = 24.0;
 
   /// Fully circular (pill-shaped) radius.

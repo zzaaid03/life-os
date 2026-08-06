@@ -1,4 +1,4 @@
-/// In-memory demo override of [InboxScanService] — plays a realistic
+/// In-memory demo override of [InboxScanService]: plays a realistic
 /// scanning beat then returns fixed, canned results. Never calls the
 /// `extract-tasks` edge function.
 library;
@@ -6,7 +6,7 @@ library;
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// An [InboxScanService] that never hits the network — [scanInbox] waits a
+/// An [InboxScanService] that never hits the network: [scanInbox] waits a
 /// couple of seconds then returns a fixed [ScanResult].
 class DemoInboxScanService extends InboxScanService {
   /// Creates a [DemoInboxScanService].

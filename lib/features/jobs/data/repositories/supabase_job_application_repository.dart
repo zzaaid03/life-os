@@ -71,7 +71,7 @@ class SupabaseJobApplicationRepository implements JobApplicationRepository {
       if (list.isEmpty) return null;
       if (list.length == 1) return list.first['id'] as String?;
       // Multiple applications at the same company: disambiguate by role.
-      // If none matches, don't guess — return null so it's surfaced as a
+      // If none matches, don't guess: return null so it's surfaced as a
       // new card for the user to confirm, never merged into the wrong row.
       final role = update.role.trim().toLowerCase();
       for (final row in list) {

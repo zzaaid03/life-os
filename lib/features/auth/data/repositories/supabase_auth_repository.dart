@@ -118,7 +118,7 @@ class SupabaseAuthRepository implements AuthRepository {
     // On web, Google needs to redirect back to the exact localhost origin
     // (e.g. http://localhost:51915). Without redirectTo, Supabase defaults
     // to the Site URL configured in the dashboard, which is the production
-    // URL — Google redirects there instead, breaking local dev.
+    // URL: Google redirects there instead, breaking local dev.
     //
     // On native platforms (Android, iOS), OAuth uses platform-specific
     // deep links / custom URL schemes, so no redirectTo is needed.

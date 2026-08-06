@@ -142,7 +142,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ).animate().fadeIn(duration: 200.ms),
                   const SizedBox(height: AppSpacing.lg),
                 ],
-                // Google — Primary
+                // Google: Primary
                 SizedBox(
                   height: 56,
                   child: FilledButton.icon(

@@ -24,7 +24,7 @@ class OnboardingState {
   /// Whether the stored value has finished loading from disk.
   ///
   /// The router must wait for this to be `true` before deciding whether to
-  /// redirect to `/create-profile` — otherwise a returning user briefly sees
+  /// redirect to `/create-profile`, otherwise a returning user briefly sees
   /// the default `completed: false` and gets redirected incorrectly.
   final bool loaded;
 
@@ -63,7 +63,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       state = OnboardingState(userId: userId, completed: completed, loaded: true);
     } catch (_) {
       if (state.userId != userId) return;
-      // Treat any storage failure as "not completed" — the worst case is
+      // Treat any storage failure as "not completed": the worst case is
       // re-showing create-profile, which just re-upserts.
       state = OnboardingState(userId: userId, completed: false, loaded: true);
     }

@@ -23,7 +23,7 @@ class AnnouncementsState {
   /// Whether the stored value has finished loading from disk.
   ///
   /// The UI must wait for this to be `true` before deciding whether to show
-  /// the carousel — otherwise a returning user briefly sees the default
+  /// the carousel, otherwise a returning user briefly sees the default
   /// `ackedVersion: 0` and gets the tour again incorrectly.
   final bool loaded;
 
@@ -49,7 +49,7 @@ class AnnouncementsController extends StateNotifier<AnnouncementsState> {
       final acked = prefs.getInt(_kAnnouncementsAckedVersionKey) ?? 0;
       state = AnnouncementsState(ackedVersion: acked, loaded: true);
     } catch (_) {
-      // Treat any storage failure as "nothing acknowledged" — the worst
+      // Treat any storage failure as "nothing acknowledged": the worst
       // case is showing the tour again, which is safe.
       state = const AnnouncementsState(ackedVersion: 0, loaded: true);
     }

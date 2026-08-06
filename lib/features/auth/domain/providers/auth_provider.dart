@@ -127,7 +127,7 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 /// Convenience provider for the current Google access token.
 ///
 /// Recomputes whenever auth state changes. The value may still be null even
-/// when authenticated — `providerToken` is not restored across reloads — so
+/// when authenticated (`providerToken` is not restored across reloads), so
 /// consumers must handle null by prompting a Gmail reconnect.
 final googleAccessTokenProvider = Provider<String?>((ref) {
   ref.watch(authProvider);

@@ -121,7 +121,7 @@ class GoalListNotifier extends StateNotifier<GoalListState> {
     await refresh();
   }
 
-  /// Sets a goal's progress (0.0–1.0), marking it completed at 100%.
+  /// Sets a goal's progress (0.0-1.0), marking it completed at 100%.
   Future<void> setProgress(Goal goal, double progress) async {
     final clamped = progress.clamp(0.0, 1.0);
     await updateGoal(
@@ -202,7 +202,7 @@ final goalTaskCountProvider = Provider.family<int, String>((ref, goalId) {
 
 /// The derived progress (0.0-1.0) for the goal with [goalId], computed as
 /// completed-linked-tasks / total-linked-tasks. Returns 0.0 if the goal has
-/// no linked tasks — callers should check [goalTaskCountProvider] first to
+/// no linked tasks: callers should check [goalTaskCountProvider] first to
 /// decide whether to show derived vs. manual progress.
 final goalProgressProvider = Provider.family<double, String>((ref, goalId) {
   final tasks = ref

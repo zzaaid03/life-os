@@ -5,7 +5,7 @@
 /// exposes task list state to the UI.
 ///
 /// Key performance decisions:
-/// - State updates are **optimistic** — UI updates before sync completes
+/// - State updates are **optimistic**: UI updates before sync completes
 /// - Sync runs in the **background** after every mutation
 /// - **After sync completes, state is reloaded** from the data source
 ///   so pulled remote tasks appear in the UI automatically
@@ -150,7 +150,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
 
   /// The userId of an in-flight [loadTasks] call, if any.
   ///
-  /// Guards against redundant concurrent loads for the same user —
+  /// Guards against redundant concurrent loads for the same user,
   /// this can happen at cold start, where both the auth-state listener
   /// and the "already authenticated" initial check in [taskListProvider]
   /// may race to call [loadTasks] for the same user.
@@ -315,7 +315,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       final tasks = await _repository.getAll(userId);
       state = TaskListState(status: TaskListStatus.loaded, tasks: tasks);
     } catch (_) {
-      // Sync failures are silent — existing state remains valid.
+      // Sync failures are silent: existing state remains valid.
     }
   }
 }
@@ -361,7 +361,7 @@ DateTime _dateOnly(DateTime dateTime) {
 ///
 /// A task with no due date is always considered "today" so it never
 /// gets lost. A task is only "upcoming" once its due date is strictly
-/// after today — see [upcomingTasksProvider].
+/// after today, see [upcomingTasksProvider].
 bool _isDueTodayOrOverdue(DateTime? dueDate) {
   if (dueDate == null) return true;
   final today = _dateOnly(DateTime.now());

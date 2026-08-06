@@ -1,4 +1,4 @@
-/// In-memory demo override of [FilePickerService] — returns a small
+/// In-memory demo override of [FilePickerService], returns a small
 /// hardcoded [PickedFile] instead of opening the platform file picker.
 library;
 

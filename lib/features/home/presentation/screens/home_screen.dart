@@ -1,4 +1,4 @@
-/// Home screen — the main dashboard.
+/// Home screen: the main dashboard.
 ///
 /// Displays a personalized greeting, quick actions grid,
 /// and dashboard cards for Tasks, the Inbox Assistant, and Goals.
@@ -110,7 +110,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-/// AI "Daily Brief" card — a warm 2–3 sentence summary of the user's day.
+/// AI "Daily Brief" card: a warm 2-3 sentence summary of the user's day.
 ///
 /// Fetches lazily on first build, offers a refresh button, and quietly
 /// collapses to an invitation line if the AI call fails.
@@ -139,7 +139,7 @@ class _DailyBriefCardState extends ConsumerState<_DailyBriefCard> {
     final String body = switch (state.status) {
       DailyBriefStatus.loaded => state.brief!,
       DailyBriefStatus.error =>
-        'Your brief isn\'t available right now — tap refresh to try again.',
+        'Your brief isn\'t available right now, tap refresh to try again.',
       _ => 'Summing up your day…',
     };
 
@@ -262,7 +262,7 @@ class _GoalsCard extends ConsumerWidget {
   }
 }
 
-/// Today's tasks card — watches [todayTasksProvider].
+/// Today's tasks card: watches [todayTasksProvider].
 ///
 /// Shows tasks due today (or overdue, or with no due date) that are
 /// still outstanding. This mirrors exactly what the Tasks list shows
@@ -350,9 +350,9 @@ class _TodayTasksCard extends ConsumerWidget {
   /// deserves different copy so the dashboard never tells an existing
   /// user "no tasks scheduled" when they actually have tasks:
   ///
-  /// 1. A brand-new user with no tasks at all — invite them to create one.
-  /// 2. A user who has completed everything due today — celebrate it.
-  /// 3. A user with tasks, but none due today — reassure them they're
+  /// 1. A brand-new user with no tasks at all: invite them to create one.
+  /// 2. A user who has completed everything due today: celebrate it.
+  /// 3. A user with tasks, but none due today: reassure them they're
   ///    caught up (and mention what's coming up, if anything).
   Widget _buildTodayEmptyState(BuildContext context, WidgetRef ref) {
     final allTasks = ref.watch(taskListProvider).tasks;

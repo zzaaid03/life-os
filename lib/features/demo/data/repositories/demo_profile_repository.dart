@@ -1,4 +1,4 @@
-/// In-memory demo [ProfileRepository] — always returns a non-null demo
+/// In-memory demo [ProfileRepository]: always returns a non-null demo
 /// profile so the router never redirects to `/create-profile`.
 library;
 

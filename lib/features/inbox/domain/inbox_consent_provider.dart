@@ -23,7 +23,7 @@ class InboxConsentController extends StateNotifier<bool> {
       final prefs = await SharedPreferences.getInstance();
       state = prefs.getBool(_kInboxConsentKey) ?? false;
     } catch (_) {
-      // Treat any storage failure as "not yet consented" — the worst case is
+      // Treat any storage failure as "not yet consented": the worst case is
       // showing the consent screen again, which is safe.
       state = false;
     }

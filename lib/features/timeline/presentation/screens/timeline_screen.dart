@@ -1,4 +1,4 @@
-/// Timeline screen — month calendar of upcoming and past task activity.
+/// Timeline screen: month calendar of upcoming and past task activity.
 ///
 /// Renders the [CalendarView] month grid; tapping a day lists that day's
 /// tasks beneath the grid.

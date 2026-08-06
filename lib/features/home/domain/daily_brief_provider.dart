@@ -52,7 +52,7 @@ class DailyBriefNotifier extends StateNotifier<DailyBriefState> {
   bool _refreshPending = false;
 
   /// Cheap signature of the task list so unrelated rebuilds don't trigger
-  /// a re-fetch — only an actual change to id/status/dueDate does.
+  /// a re-fetch, only an actual change to id/status/dueDate does.
   String _signatureFor(List<Task> tasks) {
     final sorted = [...tasks]..sort((a, b) => a.id.compareTo(b.id));
     return sorted

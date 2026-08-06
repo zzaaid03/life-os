@@ -23,7 +23,7 @@ final oauthTabDismissProvider = Provider<void>((ref) {
       return;
     }
 
-    // `closeInAppWebView` is async — awaiting it inside the try is what makes
+    // `closeInAppWebView` is async: awaiting it inside the try is what makes
     // the catch effective; unawaited, a failure escapes as an unhandled error.
     try {
       await closeInAppWebView();

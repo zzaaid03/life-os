@@ -1,4 +1,4 @@
-/// Life screen — holistic life management.
+/// Life screen: holistic life management.
 library;
 
 import 'package:flutter/material.dart';

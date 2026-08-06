@@ -1,4 +1,4 @@
-/// Welcome screen — the first screen new users see.
+/// Welcome screen: the first screen new users see.
 ///
 /// Minimal, elegant, Apple-inspired. No illustrations.
 /// Just a warm welcome and a single call to action.
@@ -81,7 +81,7 @@ class WelcomeScreen extends StatelessWidget {
                   .fadeIn(duration: 500.ms, delay: 400.ms)
                   .slideY(begin: 0.08, end: 0, duration: 500.ms, delay: 400.ms),
               const Spacer(flex: 2),
-              // Primary CTA — the sandbox demo is the headline entry point.
+              // Primary CTA: the sandbox demo is the headline entry point.
               SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -97,14 +97,14 @@ class WelcomeScreen extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      child: const Text('Try it — no sign-up'),
+                      child: const Text('Try it, no sign-up'),
                     ),
                   )
                   .animate()
                   .fadeIn(duration: 500.ms, delay: 700.ms)
                   .slideY(begin: 0.12, end: 0, duration: 500.ms, delay: 700.ms),
               const SizedBox(height: AppSpacing.md),
-              // Secondary CTA — real sign-up/sign-in, still clearly reachable.
+              // Secondary CTA: real sign-up/sign-in, still clearly reachable.
               SizedBox(
                     width: double.infinity,
                     height: 56,

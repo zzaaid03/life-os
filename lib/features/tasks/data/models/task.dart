@@ -30,7 +30,7 @@ enum Recurrence {
   monthly,
 }
 
-/// A task entity — an actionable item in Life OS.
+/// A task entity: an actionable item in Life OS.
 class Task extends Equatable implements Entity {
   /// Creates a [Task].
   const Task({

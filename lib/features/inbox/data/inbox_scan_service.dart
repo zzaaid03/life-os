@@ -134,7 +134,7 @@ class ScanResult {
       jobUpdates: rawJobs
           .whereType<Map<String, dynamic>>()
           .map(JobUpdate.fromJson)
-          // Keep updates that carry meaningful info even without a company —
+          // Keep updates that carry meaningful info even without a company,
           // e.g. a rejection whose company the AI couldn't identify.
           .where((j) => j.summary.isNotEmpty || j.company.isNotEmpty)
           .toList(),

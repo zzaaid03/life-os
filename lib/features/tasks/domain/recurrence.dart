@@ -44,7 +44,7 @@ DateTime nextRecurrenceDueDate(
 /// it has no due date to advance from.
 ///
 /// The returned task is a fresh pending row carrying the rule forward. It is
-/// deliberately NOT linked to the completed one (no `parentTaskId`) — that
+/// deliberately NOT linked to the completed one (no `parentTaskId`): that
 /// field means subtask, and a repeat is a sibling, not a child.
 Task? nextRecurringTask({
   required Task completed,

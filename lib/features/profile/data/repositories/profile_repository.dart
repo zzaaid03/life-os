@@ -14,7 +14,7 @@ abstract class ProfileRepository {
 
   /// Creates or updates the profile for the given [userId].
   ///
-  /// This is an upsert — it creates if missing, updates if exists.
+  /// This is an upsert: it creates if missing, updates if exists.
   Future<Profile> upsertProfile(Profile profile);
 
   /// Updates only the display name of the profile.

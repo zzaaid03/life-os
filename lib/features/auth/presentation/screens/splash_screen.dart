@@ -1,4 +1,4 @@
-/// Splash screen — the initial entry point.
+/// Splash screen: the initial entry point.
 ///
 /// Displays the Life OS logo with a gentle scale and fade animation.
 /// Automatically skips to the correct destination based on auth state.

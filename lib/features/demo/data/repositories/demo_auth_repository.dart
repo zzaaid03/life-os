@@ -1,4 +1,4 @@
-/// In-memory demo [AuthRepository] — always authenticated as the fixed
+/// In-memory demo [AuthRepository]: always authenticated as the fixed
 /// demo persona, "Alex." No Supabase, no network.
 library;
 
@@ -17,7 +17,7 @@ const demoAuthState = AuthState(
   displayName: 'Alex',
 );
 
-/// Stateless demo [AuthRepository] — always reports [demoAuthState].
+/// Stateless demo [AuthRepository]: always reports [demoAuthState].
 ///
 /// [signOut] is the demo exit path: it flips [demoModeController] back to
 /// `false`, which rebuilds the whole `ProviderScope` back to the real app.

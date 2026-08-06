@@ -200,7 +200,7 @@ class _JobCard extends StatelessWidget {
   /// Called when the card is tapped (opens the editor).
   final VoidCallback? onTap;
 
-  /// The bold headline for the card — company, else role, else a
+  /// The bold headline for the card: company, else role, else a
   /// status-based fallback so a company-less row never renders blank.
   String get _title {
     if (job.company.trim().isNotEmpty) return job.company.trim();

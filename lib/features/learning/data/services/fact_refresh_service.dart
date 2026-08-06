@@ -4,7 +4,7 @@
 /// file notes and is not something the UI should ever wait on. This gates
 /// the call behind a per-user SharedPreferences timestamp
 /// (`facts_last_refreshed_$userId`), the same per-user-ID pattern already
-/// used by `onboarding_provider.dart` — a per-browser flag would be wrong
+/// used by `onboarding_provider.dart`: a per-browser flag would be wrong
 /// here for the same reason it was wrong there.
 library;
 
@@ -23,7 +23,7 @@ const _refreshInterval = Duration(hours: 24);
 /// Calls `infer-facts` for [userId] if it hasn't run in the last 24 hours,
 /// then refreshes [factListProvider] on success.
 ///
-/// Never throws into the caller — every failure is caught and logged. Skips
+/// Never throws into the caller: every failure is caught and logged. Skips
 /// silently in demo mode, which must make zero network calls.
 class FactRefreshService {
   /// Creates a [FactRefreshService].

@@ -34,7 +34,7 @@ enum SyncStatus {
 /// Every entity in the system must implement this interface
 /// to enable universal sync, audit, and soft-delete operations.
 ///
-/// The properties here are NOT optional — they are required on
+/// The properties here are NOT optional: they are required on
 /// every table in both Supabase and Drift.
 abstract class Entity {
   /// Universally unique identifier.

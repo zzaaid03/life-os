@@ -41,7 +41,7 @@ abstract class AuthRepository {
   ///
   /// This token is required to call the `extract-tasks` Edge Function, which
   /// reads the user's Gmail server-side. Supabase only populates
-  /// `providerToken` in-session immediately after a Google sign-in — it is
+  /// `providerToken` in-session immediately after a Google sign-in: it is
   /// NOT persisted, so it returns null after a full page reload. Callers must
   /// handle a null result by asking the user to reconnect Gmail (re-run the
   /// Google sign-in flow).

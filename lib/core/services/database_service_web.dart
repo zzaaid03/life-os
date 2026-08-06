@@ -1,4 +1,4 @@
-/// Database connection — web stub.
+/// Database connection: web stub.
 ///
 /// Drift does not support web. This stub prevents the
 /// platform plugin from crashing on web startup.
@@ -24,7 +24,7 @@ QueryExecutor openDatabaseConnection() {
   );
 }
 
-/// Provider that returns null on web — Supabase is the data source.
+/// Provider that returns null on web: Supabase is the data source.
 final databaseConnectionProvider = Provider<QueryExecutor>((ref) {
   return openDatabaseConnection();
 });

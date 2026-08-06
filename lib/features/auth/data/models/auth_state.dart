@@ -7,7 +7,7 @@ import 'package:equatable/equatable.dart';
 
 /// The current status of authentication.
 enum AuthStatus {
-  /// Initial state — authentication has not been checked yet.
+  /// Initial state: authentication has not been checked yet.
   unknown,
 
   /// User is authenticated.

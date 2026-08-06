@@ -15,7 +15,7 @@ abstract final class AppSpacing {
   /// 4.0 logical pixels.
   static const double xs = 4.0;
 
-  /// 8.0 logical pixels — base unit.
+  /// 8.0 logical pixels, the base unit.
   static const double sm = 8.0;
 
   /// 12.0 logical pixels.

@@ -1,4 +1,4 @@
-/// In-memory demo override of [GoalBreakdownService] — plays a realistic
+/// In-memory demo override of [GoalBreakdownService]: plays a realistic
 /// generating beat then returns a fixed breakdown for the demo persona's
 /// Product Manager goal. Never calls the `goal-breakdown` edge function.
 library;
@@ -6,7 +6,7 @@ library;
 import 'package:life_os/features/goals/data/goal_breakdown_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// A [GoalBreakdownService] that never hits the network — [generateTasks]
+/// A [GoalBreakdownService] that never hits the network: [generateTasks]
 /// waits a couple of seconds then returns a fixed set of suggested tasks.
 class DemoGoalBreakdownService extends GoalBreakdownService {
   /// Creates a [DemoGoalBreakdownService].

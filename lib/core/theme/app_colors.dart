@@ -1,7 +1,7 @@
 /// Design system color tokens for Life OS.
 ///
 /// The "Evergreen" palette: a balanced teal-green identity inspired
-/// by Things 3, Linear, and Notion — warm off-whites, softer neutrals,
+/// by Things 3, Linear, and Notion: warm off-whites, softer neutrals,
 /// and a muted, natural accent color instead of a generic saturated blue.
 library;
 
@@ -12,7 +12,7 @@ abstract final class AppColors {
 
   // --- Primary Palette (Evergreen) ---
 
-  /// Primary accent — a balanced teal-green.
+  /// Primary accent, a balanced teal-green.
   static const Color primary = Color(0xFF1E9E82);
 
   /// Darker variant for pressed states (light theme), and used as the
@@ -59,16 +59,16 @@ abstract final class AppColors {
 
   // --- Semantic (muted) ---
 
-  /// Success — soft green.
+  /// Success: soft green.
   static const Color success = Color(0xFF2FAF6A);
 
-  /// Warning — warm amber.
+  /// Warning: warm amber.
   static const Color warning = Color(0xFFE8A13C);
 
-  /// Error — muted coral-red.
+  /// Error: muted coral-red.
   static const Color error = Color(0xFFE5544E);
 
-  /// Info — soft blue.
+  /// Info: soft blue.
   static const Color info = Color(0xFF3E9BD6);
 
   // --- Misc ---

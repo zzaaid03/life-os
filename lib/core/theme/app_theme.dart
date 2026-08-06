@@ -13,7 +13,7 @@ import 'package:life_os/core/theme/app_typography.dart';
 abstract final class AppTheme {
   AppTheme._();
 
-  /// Light theme — clean, bright, minimal.
+  /// Light theme: clean, bright, minimal.
   static ThemeData get light {
     final colorScheme = ColorScheme.light(
       primary: AppColors.primary,
@@ -33,10 +33,10 @@ abstract final class AppTheme {
     return _buildTheme(colorScheme, Brightness.light);
   }
 
-  /// Dark theme — deep, calm, premium.
+  /// Dark theme: deep, calm, premium.
   ///
   /// Uses [AppColors.primaryOnDark] rather than the light theme's
-  /// [AppColors.primary] — the brightened variant is needed to stay
+  /// [AppColors.primary]. The brightened variant is needed to stay
   /// legible against the dark surface colors.
   static ThemeData get dark {
     final colorScheme = ColorScheme.dark(

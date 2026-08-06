@@ -1,7 +1,7 @@
 /// Task list screen.
 ///
 /// Displays tasks grouped into Today, Upcoming, and Completed sections.
-/// The FAB is provided by the AppShell — this screen only handles
+/// The FAB is provided by the AppShell: this screen only handles
 /// content rendering and task interactions.
 library;
 

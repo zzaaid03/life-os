@@ -1,7 +1,7 @@
 /// Timeline event model + aggregator.
 ///
 /// Builds a unified chronological feed from the existing feature
-/// providers — created/completed tasks, goal updates, and job-application
+/// providers: created/completed tasks, goal updates, and job-application
 /// status changes. Because it `watch`es each underlying provider, the feed
 /// recomputes automatically whenever any source data changes.
 library;
@@ -66,7 +66,7 @@ class TimelineEvent {
 final timelineEventsProvider = Provider<List<TimelineEvent>>((ref) {
   final events = <TimelineEvent>[];
 
-  // Tasks — creation and completion are separate events.
+  // Tasks: creation and completion are separate events.
   final tasks = ref.watch(taskListProvider).tasks;
   for (final task in tasks) {
     events.add(
@@ -87,7 +87,7 @@ final timelineEventsProvider = Provider<List<TimelineEvent>>((ref) {
     }
   }
 
-  // Goals — one event per goal reflecting its latest update.
+  // Goals: one event per goal reflecting its latest update.
   final goals = ref.watch(goalListProvider).goals;
   for (final goal in goals) {
     final linkedCount = ref.watch(goalTaskCountProvider(goal.id));
@@ -108,7 +108,7 @@ final timelineEventsProvider = Provider<List<TimelineEvent>>((ref) {
     );
   }
 
-  // Job applications — one event per application's latest status.
+  // Job applications: one event per application's latest status.
   final jobs = ref.watch(jobListProvider).jobs;
   for (final job in jobs) {
     events.add(

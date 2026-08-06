@@ -2,7 +2,7 @@
 ///
 /// Persists the user's Google OAuth refresh token in the
 /// `public.google_credentials` table so the `extract-tasks` Edge Function
-/// can mint fresh Gmail access tokens server-side — without the app ever
+/// can mint fresh Gmail access tokens server-side, without the app ever
 /// having to hold a live access token. Per-user RLS protects each row.
 library;
 

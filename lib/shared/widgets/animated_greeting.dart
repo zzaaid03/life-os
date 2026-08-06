@@ -3,7 +3,7 @@
 /// Displays a time-based greeting that fades in on first build.
 /// The greeting automatically changes based on the current hour:
 /// - Good morning (before 12:00)
-/// - Good afternoon (12:00–17:00)
+/// - Good afternoon (12:00-17:00)
 /// - Good evening (after 17:00)
 ///
 /// Includes an inspirational subtitle that makes the dashboard

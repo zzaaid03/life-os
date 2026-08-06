@@ -1,4 +1,4 @@
-/// Search screen — global search across all Life OS data.
+/// Search screen: global search across all Life OS data.
 ///
 /// Search is the ONLY way to reach an uploaded file: there is deliberately
 /// no Files tab and no browse list. This screen is therefore also the only

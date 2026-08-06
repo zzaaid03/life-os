@@ -1,4 +1,4 @@
-/// In-memory demo override of [ProcessedEmailsRepository] — always reports
+/// In-memory demo override of [ProcessedEmailsRepository]: always reports
 /// nothing as processed so the canned scan results always appear fresh.
 library;
 

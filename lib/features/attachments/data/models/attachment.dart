@@ -6,7 +6,7 @@ library;
 import 'package:equatable/equatable.dart';
 import 'package:life_os/core/data/entity.dart';
 
-/// An attachment entity — a file associated with any Life OS entity.
+/// An attachment entity: a file associated with any Life OS entity.
 class Attachment extends Equatable implements Entity {
   /// Creates an [Attachment].
   const Attachment({

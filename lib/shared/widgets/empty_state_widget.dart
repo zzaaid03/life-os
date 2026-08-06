@@ -35,7 +35,7 @@ class EmptyStateWidget extends StatelessWidget {
   /// The primary message.
   final String title;
 
-  /// The secondary message — usually a call to action.
+  /// The secondary message, usually a call to action.
   final String subtitle;
 
   /// Override the icon color. Defaults to a subtle tint.

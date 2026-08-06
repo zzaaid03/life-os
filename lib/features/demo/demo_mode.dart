@@ -1,9 +1,9 @@
-/// Sandbox demo mode — swaps every repository for an in-memory demo
+/// Sandbox demo mode: swaps every repository for an in-memory demo
 /// implementation via a keyed [ProviderScope] rebuild.
 ///
 /// Entering/exiting demo mode flips [demoModeController], which
 /// `AppBootstrap` (in `main.dart`) listens to and uses to rebuild the whole
-/// `ProviderScope` under a new key — giving demo mode a completely fresh,
+/// `ProviderScope` under a new key, giving demo mode a completely fresh,
 /// ephemeral container (and wiping it clean again on exit or reload).
 library;
 
@@ -39,10 +39,10 @@ import 'package:riverpod/riverpod.dart';
 /// Whether the app is currently showing the sandbox demo experience.
 final demoModeController = ValueNotifier<bool>(false);
 
-/// Enters demo mode — the app rebuilds against in-memory demo repositories.
+/// Enters demo mode: the app rebuilds against in-memory demo repositories.
 void enterDemoMode() => demoModeController.value = true;
 
-/// Exits demo mode — the app rebuilds against the real repositories.
+/// Exits demo mode: the app rebuilds against the real repositories.
 void exitDemoMode() => demoModeController.value = false;
 
 /// Whether the current provider container is the demo one. Always `false`

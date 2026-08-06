@@ -44,7 +44,7 @@ class InboxScanState {
   /// A user-facing error message when [phase] is [InboxScanPhase.error].
   final String? errorMessage;
 
-  /// Whether at least one scan has completed this session — drives the
+  /// Whether at least one scan has completed this session, drives the
   /// "Scan my inbox" vs "Update" button label.
   final bool hasScannedOnce;
 

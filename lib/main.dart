@@ -1,4 +1,4 @@
-/// Life OS — Application entry point.
+/// Life OS: Application entry point.
 ///
 /// Initializes all services, configures providers,
 /// and launches the application with the configured router.
@@ -51,8 +51,8 @@ Future<void> _initializeAndRun() async {
 
   // On web, the OAuth redirect is consumed during `Supabase.initialize()`, so
   // the freshly-restored session is the ONLY place `providerRefreshToken` is
-  // available — it's gone by the time the `googleCredentialsCaptureProvider`
-  // listener subscribes in `LifeOSApp.initState`. Persist it here, right away,
+  // available (it's gone by the time the `googleCredentialsCaptureProvider`
+  // listener subscribes in `LifeOSApp.initState`.) Persist it here, right away,
   // so the `extract-tasks` function can mint Gmail tokens later. The provider
   // listener still runs as a backup for native / in-session sign-ins.
   final session = Supabase.instance.client.auth.currentSession;
@@ -81,7 +81,7 @@ Future<void> _initializeAndRun() async {
 }
 
 /// Rebuilds the [ProviderScope] with a fresh, uniquely-keyed container
-/// whenever [demoModeController] flips — entering demo mode gives a clean
+/// whenever [demoModeController] flips: entering demo mode gives a clean
 /// container seeded with in-memory demo overrides; exiting (or reloading)
 /// wipes it and returns to the real, Supabase-backed providers.
 class AppBootstrap extends StatelessWidget {

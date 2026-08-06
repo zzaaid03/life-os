@@ -1,4 +1,4 @@
-/// Database connection — native (Android, iOS, desktop).
+/// Database connection: native (Android, iOS, desktop).
 ///
 /// Provides a real SQLite database via Drift for
 /// offline-first data persistence.

@@ -27,7 +27,7 @@ import 'package:uuid/uuid.dart';
 
 /// A reviewed suggestion awaiting the user's save decision.
 ///
-/// Not yet a real [Task] — created only when the user saves.
+/// Not yet a real [Task], created only when the user saves.
 class _ReviewItem {
   const _ReviewItem({
     required this.key,
@@ -388,7 +388,7 @@ class _GoalBreakdownScreenState extends ConsumerState<GoalBreakdownScreen> {
                     vertical: AppSpacing.lg,
                   ),
                   child: Text(
-                    'No tasks left — you can still save the goal on its own.',
+                    'No tasks left, you can still save the goal on its own.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurface.withValues(
                         alpha: 0.5,

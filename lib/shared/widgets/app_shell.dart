@@ -68,7 +68,7 @@ class _DemoBanner extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              "Demo mode — your changes won't be saved",
+              "Demo mode: your changes won't be saved",
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: colorScheme.onPrimaryContainer,
                 fontWeight: FontWeight.w600,

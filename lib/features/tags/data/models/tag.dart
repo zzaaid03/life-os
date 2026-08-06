@@ -6,7 +6,7 @@ library;
 import 'package:equatable/equatable.dart';
 import 'package:life_os/core/data/entity.dart';
 
-/// A tag entity — a label for categorizing other entities.
+/// A tag entity: a label for categorizing other entities.
 class Tag extends Equatable implements Entity {
   /// Creates a [Tag].
   const Tag({

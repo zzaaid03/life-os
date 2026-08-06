@@ -191,7 +191,7 @@ GoRouter createRouter(Ref ref) {
         builder: (context, state) => const FilesPermissionScreen(),
       ),
 
-      // Main app — wrapped in AppShell with floating nav + FAB
+      // Main app, wrapped in AppShell with floating nav + FAB
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
@@ -228,7 +228,7 @@ GoRouter createRouter(Ref ref) {
         ],
       ),
 
-      // Task detail — standalone, no nav bar
+      // Task detail: standalone, no nav bar
       GoRoute(
         path: AppRoutes.taskDetail,
         name: 'taskDetail',
@@ -236,7 +236,7 @@ GoRouter createRouter(Ref ref) {
             TaskDetailScreen(taskId: state.pathParameters['id']!),
       ),
 
-      // AI inbox assistant — standalone, no nav bar
+      // AI inbox assistant, standalone, no nav bar
       GoRoute(
         path: AppRoutes.inboxScan,
         name: 'inboxScan',
@@ -248,7 +248,7 @@ GoRouter createRouter(Ref ref) {
         builder: (context, state) => const JobApplicationsScreen(),
       ),
 
-      // Life features — standalone, no nav bar
+      // Life features: standalone, no nav bar
       GoRoute(
         path: AppRoutes.goals,
         name: 'goals',
