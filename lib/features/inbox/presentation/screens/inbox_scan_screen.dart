@@ -23,6 +23,7 @@ import 'package:life_os/features/jobs/presentation/job_display.dart';
 import 'package:life_os/features/jobs/presentation/widgets/job_status_chip.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
+import 'package:life_os/features/tasks/presentation/widgets/task_due_date_badge.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_priority_chip.dart';
 
@@ -103,15 +104,18 @@ class InboxScanScreen extends ConsumerWidget {
     WidgetRef ref,
     SuggestedTask suggestion,
   ) async {
-    // Per product decision: don't parse the natural-language hint into a
-    // real date. Surface it in the description and let the user pick.
+    // A parsed dueDate is pre-filled directly on the editor, so the
+    // "Suggested due:" description is only needed when we don't have one.
     final hint = suggestion.dueDateHint?.trim() ?? '';
-    final description = hint.isEmpty ? null : 'Suggested due: $hint';
+    final description = (suggestion.dueDate == null && hint.isNotEmpty)
+        ? 'Suggested due: $hint'
+        : null;
 
     final result = await TaskEditorSheet.show(
       context,
       initialTitle: suggestion.title,
       initialDescription: description,
+      initialDueDate: suggestion.dueDate,
       defaultPriority: mapSuggestedPriority(suggestion.priority),
     );
     if (result == null) return;
@@ -449,7 +453,9 @@ class _SuggestedTaskCard extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (priority != TaskPriority.none || hint.isNotEmpty) ...[
+                if (priority != TaskPriority.none ||
+                    suggestion.dueDate != null ||
+                    hint.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Row(
                     children: [
@@ -457,7 +463,9 @@ class _SuggestedTaskCard extends StatelessWidget {
                         TaskPriorityChip(priority: priority),
                         const SizedBox(width: AppSpacing.sm),
                       ],
-                      if (hint.isNotEmpty)
+                      if (suggestion.dueDate != null)
+                        TaskDueDateBadge(dueDate: suggestion.dueDate)
+                      else if (hint.isNotEmpty)
                         Flexible(
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
