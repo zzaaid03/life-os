@@ -189,32 +189,49 @@ function localDate(epochMs: number, tzOffsetMinutes: number): string {
   return new Date(epochMs + tzOffsetMinutes * 60_000).toISOString().slice(0, 10);
 }
 
-async function fetchRecentEmails(
-  accessToken: string,
-  maxResults: number,
-  tzOffsetMinutes: number,
-) {
-  const gmail = (path: string) =>
-    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+function gmailFetch(accessToken: string, path: string): Promise<Response> {
+  return fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
 
+// Lists inbox message ids inside a rolling horizon, newest first (Gmail's own
+// order), without fetching any body. One page only (500 ids) — if Gmail says
+// there's more, `capped` is set so the caller can report it, but we never
+// page further in a single request.
+async function listInboxIds(
+  accessToken: string,
+  horizonDays: number,
+): Promise<{ account: string; ids: string[]; capped: boolean }> {
   // Which Google account does this token actually belong to?
   let account = "";
-  const profileRes = await gmail("profile");
+  const profileRes = await gmailFetch(accessToken, "profile");
   if (profileRes.ok) {
     account = (await profileRes.json()).emailAddress ?? "";
   }
 
-  const listRes = await gmail(`messages?maxResults=${maxResults}&labelIds=INBOX`);
+  const afterEpochSeconds = Math.floor(Date.now() / 1000) - horizonDays * 86400;
+  const listRes = await gmailFetch(
+    accessToken,
+    `messages?maxResults=500&labelIds=INBOX&q=${encodeURIComponent(`after:${afterEpochSeconds}`)}`,
+  );
   if (!listRes.ok) {
     throw new Error(`Gmail list ${listRes.status}: ${await listRes.text()}`);
   }
-  const { messages = [] } = await listRes.json();
+  const { messages = [], nextPageToken } = await listRes.json();
+  const ids = messages.map((m: { id: string }) => m.id as string);
+  return { account, ids, capped: Boolean(nextPageToken) };
+}
 
-  const emails = await Promise.all(
-    messages.map(async ({ id }: { id: string }) => {
-      const r = await gmail(`messages/${id}?format=full`);
+// Fetches full bodies for exactly the given ids (a selected batch, not "recent N").
+async function fetchEmailBodies(
+  accessToken: string,
+  ids: string[],
+  tzOffsetMinutes: number,
+) {
+  return await Promise.all(
+    ids.map(async (id: string) => {
+      const r = await gmailFetch(accessToken, `messages/${id}?format=full`);
       const m = await r.json();
       const headers = m.payload?.headers ?? [];
       const h = (n: string) =>
@@ -230,7 +247,48 @@ async function fetchRecentEmails(
       return { id, from: h("From"), subject: h("Subject"), sentDate, body };
     }),
   );
-  return { account, emails };
+}
+
+// Subtracts ids already analysed (present in processed_emails) from a listed
+// id set. A query failure degrades to "nothing filtered" — re-analysing a few
+// emails is wasteful, failing the scan over it is not. No user id (test path)
+// means no processed-set to check, so nothing is filtered either.
+async function filterPendingIds(
+  userId: string | undefined,
+  ids: string[],
+): Promise<string[]> {
+  if (!userId || ids.length === 0) return ids;
+  try {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { data, error } = await admin
+      .from("processed_emails")
+      .select("email_id")
+      .eq("user_id", userId);
+    if (error || !data) return ids;
+    const processed = new Set(data.map((r: { email_id: string }) => r.email_id as string));
+    return ids.filter((id) => !processed.has(id));
+  } catch (_) {
+    return ids;
+  }
+}
+
+// Marks a batch as analysed after a SUCCESSFUL Groq response only. A write
+// failure here is logged and swallowed — the user getting their tasks matters
+// more than the mark, and the cost of a missed mark is just re-analysis.
+async function markProcessed(userId: string | undefined, ids: string[]): Promise<void> {
+  if (!userId || ids.length === 0) return;
+  try {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const rows = ids.map((id) => ({ user_id: userId, email_id: id }));
+    const { error } = await admin
+      .from("processed_emails")
+      .upsert(rows, { onConflict: "user_id,email_id", ignoreDuplicates: true });
+    if (error) {
+      console.error("processed_emails upsert failed", error);
+    }
+  } catch (e) {
+    console.error("processed_emails upsert failed", e);
+  }
 }
 
 // Resolve a Gmail access token for this request (test path OR stored-refresh path).
@@ -330,7 +388,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => null);
-    const maxResults = Math.min(Math.max(Number(body?.maxResults) || 10, 1), 20);
+    const maxResults = Math.min(Math.max(Number(body?.maxResults) || 10, 1), 50);
     const debug = body?.debug === true;
     // Clamped to the real-world range and defaulting to 0, so a missing or junk
     // value degrades to UTC dates rather than throwing the scan away.
@@ -338,6 +396,12 @@ Deno.serve(async (req: Request) => {
     const tzOffsetMinutes = Number.isFinite(rawTz)
       ? Math.min(Math.max(rawTz, -840), 840)
       : 0;
+    const action = body?.action === "count" ? "count" : "scan";
+    const order = body?.order === "oldest" ? "oldest" : "newest";
+    const rawHorizon = Number(body?.horizonDays);
+    const horizonDays = Number.isFinite(rawHorizon)
+      ? Math.min(Math.max(Math.floor(rawHorizon), 1), 90)
+      : 30;
 
     const { token: accessToken, userId, error: tokenError } = await resolveAccessToken(
       req,
@@ -346,20 +410,40 @@ Deno.serve(async (req: Request) => {
     if (tokenError) return tokenError;
 
     let account = "";
-    let emails;
+    let pendingIds: string[] = [];
+    let capped = false;
     try {
-      const result = await fetchRecentEmails(
-        accessToken!,
-        maxResults,
-        tzOffsetMinutes,
-      );
-      account = result.account;
-      emails = result.emails;
+      const listing = await listInboxIds(accessToken!, horizonDays);
+      account = listing.account;
+      capped = listing.capped;
+      pendingIds = await filterPendingIds(userId, listing.ids);
     } catch (e) {
       return jsonResponse({ error: "Gmail fetch failed", detail: String(e) }, 502);
     }
-    if (emails.length === 0) {
+
+    // Count-only: must never fetch a body or call the model. Returns as soon
+    // as the id set is known, before any per-message Gmail call is made.
+    if (action === "count") {
+      return jsonResponse({
+        pending: pendingIds.length,
+        capped,
+        horizonDays,
+        scannedAccount: account,
+      });
+    }
+
+    if (pendingIds.length === 0) {
       return jsonResponse({ tasks: [], jobUpdates: [], scannedAccount: account });
+    }
+
+    const orderedIds = order === "oldest" ? [...pendingIds].reverse() : pendingIds;
+    const batchIds = orderedIds.slice(0, maxResults);
+
+    let emails;
+    try {
+      emails = await fetchEmailBodies(accessToken!, batchIds, tzOffsetMinutes);
+    } catch (e) {
+      return jsonResponse({ error: "Gmail fetch failed", detail: String(e) }, 502);
     }
 
     const { block: factsBlock, factsCount } = await buildFactsBlock(userId);
@@ -402,10 +486,18 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Model returned invalid JSON", raw: content }, 502);
     }
 
+    // Only mark the batch analysed once Groq has genuinely succeeded — never
+    // on a Gmail/Groq/JSON failure above, and never on the count path.
+    await markProcessed(userId, batchIds);
+    const analyzedCount = batchIds.length;
+    const remaining = Math.max(pendingIds.length - analyzedCount, 0);
+
     return jsonResponse({
       tasks: parsed.tasks ?? [],
       jobUpdates: parsed.jobUpdates ?? [],
       scannedAccount: account,
+      analyzedCount,
+      remaining,
       ...(debug
         ? {
             _debug: {
