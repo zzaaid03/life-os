@@ -4,6 +4,7 @@
 library;
 
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
+import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// An [InboxScanService] that never hits the network: [scanInbox] waits a
@@ -13,7 +14,10 @@ class DemoInboxScanService extends InboxScanService {
   DemoInboxScanService() : super(Supabase.instance.client);
 
   @override
-  Future<ScanResult> scanInbox({int maxResults = 10}) async {
+  Future<ScanResult> scanInbox({
+    int maxResults = kScanBatchSize,
+    ScanOrder order = ScanOrder.newest,
+  }) async {
     await Future<void>.delayed(const Duration(seconds: 2));
 
     final now = DateTime.now();
@@ -85,6 +89,11 @@ class DemoInboxScanService extends InboxScanService {
         ),
       ],
     );
+  }
+
+  @override
+  Future<InboxScanPending> countPending() async {
+    return const InboxScanPending(pending: 0, capped: false);
   }
 }
 

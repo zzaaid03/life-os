@@ -9,6 +9,7 @@
 library;
 
 import 'package:life_os/core/services/supabase_service.dart';
+import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -193,7 +194,10 @@ class InboxScanService {
   /// stored refresh token. Throws [GmailNotConnectedException] when no
   /// refresh token is stored yet, and [InboxScanException] for any other
   /// failure.
-  Future<ScanResult> scanInbox({int maxResults = 10}) async {
+  Future<ScanResult> scanInbox({
+    int maxResults = kScanBatchSize,
+    ScanOrder order = ScanOrder.newest,
+  }) async {
     final FunctionResponse response;
     try {
       response = await client.functions.invoke(
@@ -204,6 +208,7 @@ class InboxScanService {
         body: {
           'maxResults': maxResults,
           'tzOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
+          'order': order.wire,
         },
       );
     } catch (e) {
@@ -226,6 +231,37 @@ class InboxScanService {
     }
 
     return ScanResult.fromJson(map);
+  }
+
+  /// Asks how many emails are waiting to be scanned, without analysing any
+  /// of them.
+  ///
+  /// This call must never throw: it decides whether the scan screen offers a
+  /// choice, so any failure (transport, malformed response, an `error` key,
+  /// or a server that predates this feature and ignores `action`) degrades
+  /// to zero pending, which is exactly today's behaviour, a scan just runs.
+  Future<InboxScanPending> countPending() async {
+    try {
+      final response = await client.functions.invoke(
+        'extract-tasks',
+        body: {
+          'action': 'count',
+          'horizonDays': kScanHorizonDays,
+          'tzOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
+        },
+      );
+      final data = response.data;
+      if (data is! Map) {
+        return const InboxScanPending(pending: 0, capped: false);
+      }
+      final map = Map<String, dynamic>.from(data);
+      if (map['error'] != null) {
+        return const InboxScanPending(pending: 0, capped: false);
+      }
+      return InboxScanPending.fromJson(map);
+    } catch (_) {
+      return const InboxScanPending(pending: 0, capped: false);
+    }
   }
 }
 
