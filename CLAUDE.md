@@ -18,7 +18,85 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-06) — `staging` @ `9c7bf6c`, `main` @ `ab6e560` — CLEANUP ROUND IN FLIGHT, UNCOMMITTED, NOT YET REVIEWED
+## Current state (2026-08-07) — `staging` @ `7e680bc`, `main` @ `bfbda42` — WIDENED INBOX SCAN SHIPPED + DEPLOYED, TWO FOLLOW-UP LANES STAGING-ONLY, PORTFOLIO DEMO ALSO UPDATED
+
+**Both branches pushed. `main` is 2 commits BEHIND `staging`** (`783067c`, `7e680bc` — see below).
+Nothing is uncommitted; the previous round's three worker diffs were all reviewed line-by-line,
+split cleanly (one file had two lanes' edits interleaved and had to be separated by hunk), and
+committed as five logical commits, which is what closed that round out.
+
+### ✅ SHIPPED AND LIVE — `main` @ `bfbda42`, deployed
+1. **Inbox scan disclosure** (`b967271`) — both the scan screen and the connect-Gmail consent
+   dialog now say plainly that each scan reads the 10 most recent inbox emails regardless of
+   content and only the extracted result is kept. The AI-training-claim line
+   ("Powered by a provider that does not train on your data") was DROPPED in a follow-up
+   (`ae3f2ec`) — it was the one sentence in that paragraph we couldn't back up ourselves.
+2. **Brand lockup on the welcome screen** (`54e1278`) — this was "brand icon round 2" from the old
+   roadmap, closed. Not yet visually confirmed by Zaid in light/dark; low risk, reuses the
+   existing fade/slide idiom.
+3. **Em/en dash sweep across `lib/`** (`6c69f34`) — 57 files, 110 insertions/110 deletions, pure
+   1:1 substitutions verified by diffing the block. Ripgrep with unicode escapes
+   (`[\x{2014}\x{2013}]`) confirms zero matches outside `.g.dart`; a plain bash bracket expression
+   (`[—–]`) is NOT reliable here, it splits UTF-8 byte-wise and produces false positives on `→`/`…`.
+4. **The widened inbox scan itself** (`bfbda42`, `extract-tasks` redeployed, exit 0, verified from
+   outside: unauthenticated POST returns 401). Extraction now covers bills/payments due,
+   appointments/events, subscription renewals, and deliveries/deadlines, alongside the existing
+   job-application rules, which are **verified byte-identical** (diffed the 38-line block against
+   the previous deploy). New: each task can carry a real `dueDate` (ISO `yyyy-mm-dd`, local
+   midnight) when an email states one plainly, else null.
+   - **The scope doc's date rule had a real gap, found before it shipped, not after:** emails
+     reached the model as `{id, from, subject, body}` with no date anywhere, and the model was
+     never told today's date. "Due 15 March" has no year and "by Friday" is unresolvable without
+     an anchor — `dueDate` would have been hallucination by construction, the exact failure the
+     anti-hallucination gate exists to prevent. **Fixed:** each email now carries `sentDate`
+     (derived from Gmail's `internalDate`, not the free-form/spoofable `Date` header), and the
+     request states the user's local `TODAY` via the same `tzOffsetMinutes` contract `daily-brief`
+     already uses. An unparseable or impossible date (`_parseDueDate` in
+     `inbox_scan_service.dart` rejects roll-overs like 2026-02-31) is dropped, never guessed.
+   - **NOT YET TESTED AGAINST A REAL SCAN.** Zaid had no test emails available this session. This
+     is the single highest-value thing to do next: run a real scan and read what comes back,
+     specifically watching for (a) a marketing "your plan renews, upgrade now" email surfacing as
+     a false renewal task, and (b) a `dueDate` on an email that never actually stated one. Either
+     is a prompt tightening + redeploy, no migration, no client rebuild, nothing to undo.
+
+### 🚧 STAGING ONLY, NOT MERGED — `staging` @ `7e680bc`, 2 commits ahead of `main`
+Built the same session, right after the merge above, as two more worker lanes with a
+planner-written shared contract (`SuggestedTask.dueDate`) reviewed and committed directly, no
+report-review gap this time.
+1. **`783067c`** — the task editor now pre-fills from `suggestion.dueDate` when the scan supplied
+   one, using the sheet's existing `initialDueDate` param (no sheet changes needed). The
+   suggestion card shows the same `TaskDueDateBadge` real task cards use instead of reformatting
+   the raw hint by hand. Falls back to the old hint-in-description behavior when `dueDate` is null.
+2. **`7e680bc`** — demo mode's canned scan result gained 3 new dated suggestions (bill, streaming
+   renewal, dentist appointment) so the sandbox shows the widened categories too, plus a What's New
+   version 4 announcing the feature to real users.
+- `flutter analyze` clean, 38/38 tests pass on both. **Ask Zaid before merging to `main`** — he
+  merged the first batch explicitly; these two haven't been through that yet.
+
+### ✅ ALSO SHIPPED — the zaidj.tech lab portfolio demo (different repo, different deploy)
+`C:\Users\Zaid\Desktop\zaidj.tech`, `main` @ `3fe2c3f`, pushed, deployed (`Deploy Lab` green, 35s),
+verified live by fetching `https://lab.zaidj.tech/specimen/life-os/` directly (not assumed from a
+green CI run). Closed a gap that had been sitting since 2026-07-27: the ported interactive demo
+(`packages/demos/src/life-os/`) still ran the original 5 job-only screens and had never gotten
+files or search. Now: the canned scan fixtures match the real app's 4 widened categories, and two
+new screens (Add a file, Search) demonstrate the actual file-search mechanic, typing "tenancy"
+finds a file named `lease_signed_2026.pdf` through a synonym its one-line note earned it, and
+marking a file private drops those synonyms entirely since a private file never reaches the model.
+The specimen's "Inbox scanning" paragraph was also fixed, it was still describing job-only
+extraction next to a demo that (now) shows otherwise. `pnpm build` 9 pages clean, `pnpm test`
+33/33 (unaffected, no logic-test package touched), zero em/en dashes in the new files.
+
+### iOS build cut this session
+`ios-5` (https://github.com/zzaaid03/life-os/releases/tag/ios-5), from `staging` @ `7e680bc`,
+6m6s, includes everything through the demo/announcement lane above. Zaid has it or is about to
+sideload it via SideStore. No Swift/iOS-native code changed, so this build exists for device
+testing, not because CI verification of a native change required it.
+
+### Manual steps, CONFIRMED DONE this session (do not re-ask)
+Both closed: the weekly SideStore-refresh repeating task exists inside Life OS itself, and the
+stale duplicate "Android Developer" job row is deleted from the Jobs tab.
+
+## SUPERSEDED — Current state (2026-08-06) — `staging` @ `9c7bf6c`, `main` @ `ab6e560` — CLEANUP ROUND IN FLIGHT, UNCOMMITTED, NOT YET REVIEWED
 
 **Both branches pushed and match origin. `staging` is 1 commit ahead of `main`** (a docs-only commit,
 `9c7bf6c`, recording the confirmation below). **The working tree is DIRTY on top of that** — three
@@ -1165,6 +1243,32 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **"Emit a date only when the email states one plainly" is not enough of a rule if the model was
+  never given a date to compare against.** The widened-scan design said `dueDate` should be an
+  anti-hallucination gate, emit null unless the email says a date outright. But emails reached the
+  model as `{id, from, subject, body}` with no date field at all, and the model was never told
+  today's date. "By Friday" and "due 15 March" are unresolvable without both anchors, so a
+  well-intentioned gate would have produced either silent guessing or an unusably narrow gate.
+  Caught by reading what the prompt's user message actually contained before writing the new
+  categories, not after. Fix: each email carries its own `sentDate` (from Gmail's `internalDate`,
+  not the spoofable `Date` header) and the request states `TODAY` via the client's
+  `tzOffsetMinutes`, the same contract `daily-brief` already uses.
+- **A bash bracket expression (`[—–]`) splits UTF-8 byte-wise and produces false-positive dash
+  matches** on unrelated multi-byte characters like `→` and `…`. It flagged a "regression" in a
+  dash sweep that was actually already clean. Ripgrep with the literal unicode escapes
+  (`[\x{2014}\x{2013}]`) gave the correct zero-match result. Don't trust a bash grep for anything
+  beyond ASCII; reach for ripgrep's `\x{...}` escapes for multi-byte characters specifically.
+- **When two workers' diffs land interleaved in the same file, split by hunk, don't force one
+  commit.** `welcome_screen.dart` came back with both a brand-lockup lane's insertion and a
+  dash-sweep lane's substitutions mixed into one file. Reset the file to `HEAD`, hand-apply just
+  the lockup hunk, commit, then restore the full worker diff on top (the dash edits are then the
+  only remaining delta) and commit that separately. Produces two clean, correctly-attributed
+  commits instead of one that muddies two unrelated changes together.
+- **A gap flagged once and not scheduled compounds.** The zaidj.tech portfolio demo's "no files or
+  search" gap was noted 2026-07-27 as "a reasonable next round, not an oversight" and then wasn't
+  picked up for over a week, during which the real app ALSO widened its scan categories. By the
+  time it was addressed, the ported demo was stale in two independent ways instead of one. A noted
+  gap with no round attached to it is a gap that grows.
 - **Read the INSTALLED package, not your memory of its API.** `flutter_local_notifications` v22 renamed
   and removed parameters that every online tutorial still uses. Both worker prompts this round said so
   explicitly and pointed at the pub cache, and both workers came back with corrections to what they had
