@@ -125,6 +125,25 @@ const List<Release> kReleases = [
       ),
     ],
   ),
+  Release(
+    version: 4,
+    slides: [
+      AnnouncementSlide(
+        icon: Icons.mark_email_unread_outlined,
+        headline: 'Your inbox scan finds more',
+        body:
+            'It used to catch job updates only. Now it also picks up '
+            'bills, appointments, subscription renewals and deliveries.',
+      ),
+      AnnouncementSlide(
+        icon: Icons.event_available_outlined,
+        headline: 'Due dates, filled in for you',
+        body:
+            'When an email states a due date plainly, the task gets a '
+            'real date automatically, no typing it in by hand.',
+      ),
+    ],
+  ),
 ];
 
 /// The most recent release version. Bumping [kReleases] with a new entry
