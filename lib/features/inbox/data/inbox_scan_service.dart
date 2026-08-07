@@ -146,12 +146,14 @@ class ScanResult {
     required this.tasks,
     required this.jobUpdates,
     this.scannedAccount,
+    this.remaining = 0,
   });
 
   /// Parses a [ScanResult] from the Edge Function response body.
   factory ScanResult.fromJson(Map<String, dynamic> json) {
     final rawTasks = json['tasks'] as List<dynamic>? ?? const [];
     final rawJobs = json['jobUpdates'] as List<dynamic>? ?? const [];
+    final rawRemaining = json['remaining'];
     return ScanResult(
       tasks: rawTasks
           .whereType<Map<String, dynamic>>()
@@ -166,6 +168,7 @@ class ScanResult {
           .where((j) => j.summary.isNotEmpty || j.company.isNotEmpty)
           .toList(),
       scannedAccount: (json['scannedAccount'] as String?)?.trim(),
+      remaining: rawRemaining is num ? rawRemaining.toInt() : 0,
     );
   }
 
@@ -177,6 +180,10 @@ class ScanResult {
 
   /// The Gmail address that was scanned, as reported by the function.
   final String? scannedAccount;
+
+  /// How many pending emails this scan did not get to. A server that
+  /// predates this field, or the demo service, omits it and this is 0.
+  final int remaining;
 }
 
 /// Calls the `extract-tasks` Edge Function and parses its response.

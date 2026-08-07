@@ -2,14 +2,21 @@
 ///
 /// Holds the latest scan result app-wide (instead of screen-local state)
 /// so navigating away from and back to the Scan screen keeps the results.
-/// Also orchestrates the scan pipeline: invoke the Edge Function, drop task
-/// suggestions whose source email was already processed, persist job
-/// updates, refresh the jobs list, and record the newly-seen email ids.
+/// Also orchestrates the scan pipeline: invoke the Edge Function, persist
+/// job updates, and refresh the jobs list.
+///
+/// The server is now the sole source of dedup: `extract-tasks` only ever
+/// selects emails it has not already marked processed, so an email surfaced
+/// once cannot come back. A client-side filter against the same
+/// `processed_emails` table used to run here too, from before the server
+/// tracked anything itself; keeping it would now filter out every single
+/// suggestion, since the server marks a batch processed before the response
+/// ever reaches the client.
 library;
 
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
-import 'package:life_os/features/inbox/data/processed_emails_repository.dart';
+import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:riverpod/riverpod.dart';
@@ -27,6 +34,7 @@ class InboxScanState {
     this.scannedAccount,
     this.errorMessage,
     this.hasScannedOnce = false,
+    this.remaining = 0,
   });
 
   /// Current phase of the flow.
@@ -48,6 +56,9 @@ class InboxScanState {
   /// "Scan my inbox" vs "Update" button label.
   final bool hasScannedOnce;
 
+  /// How many pending emails the last scan did not get to.
+  final int remaining;
+
   /// Returns a copy with the given overrides.
   InboxScanState copyWith({
     InboxScanPhase? phase,
@@ -56,6 +67,7 @@ class InboxScanState {
     String? scannedAccount,
     String? errorMessage,
     bool? hasScannedOnce,
+    int? remaining,
   }) {
     return InboxScanState(
       phase: phase ?? this.phase,
@@ -64,6 +76,7 @@ class InboxScanState {
       scannedAccount: scannedAccount ?? this.scannedAccount,
       errorMessage: errorMessage,
       hasScannedOnce: hasScannedOnce ?? this.hasScannedOnce,
+      remaining: remaining ?? this.remaining,
     );
   }
 }
@@ -75,72 +88,45 @@ class InboxScanController extends StateNotifier<InboxScanState> {
 
   final Ref _ref;
 
+  /// Asks how much mail is waiting, without analysing any of it.
+  ///
+  /// Cheap enough to call before every scan; see [InboxScanService.countPending].
+  Future<InboxScanPending> checkPending() {
+    return _ref.read(inboxScanServiceProvider).countPending();
+  }
+
   /// Runs a scan end-to-end.
   ///
   /// Rethrows [GmailNotConnectedException] so the UI can offer the
   /// connect-Gmail flow; all other failures land in an error state.
-  Future<void> scan({int maxResults = 10}) async {
+  Future<void> scan({
+    int maxResults = kScanBatchSize,
+    ScanOrder order = ScanOrder.newest,
+  }) async {
     state = state.copyWith(phase: InboxScanPhase.scanning);
 
     try {
       final result = await _ref
           .read(inboxScanServiceProvider)
-          .scanInbox(maxResults: maxResults);
+          .scanInbox(maxResults: maxResults, order: order);
 
       final userId = _ref.read(authProvider).userId;
-      var tasks = result.tasks;
       var jobUpdates = result.jobUpdates;
 
-      if (userId != null) {
-        final processedRepo = _ref.read(processedEmailsRepositoryProvider);
-
-        // Drop suggestions/job updates already seen in a previous scan.
-        final taskIds = result.tasks
-            .map((t) => t.sourceEmailId)
-            .whereType<String>()
-            .where((id) => id.isNotEmpty)
-            .toList();
-        final jobIds = result.jobUpdates
-            .map((j) => j.sourceEmailId)
-            .whereType<String>()
-            .where((id) => id.isNotEmpty)
-            .toList();
-        final allIds = [...taskIds, ...jobIds];
-        try {
-          final seen = await processedRepo.getProcessedIds(userId, allIds);
-          tasks = result.tasks
-              .where(
-                (t) =>
-                    t.sourceEmailId == null || !seen.contains(t.sourceEmailId),
-              )
-              .toList();
-          jobUpdates = result.jobUpdates
-              .where(
-                (j) =>
-                    j.sourceEmailId == null || !seen.contains(j.sourceEmailId),
-              )
-              .toList();
-          // Everything surfaced this scan counts as seen from now on.
-          await processedRepo.markProcessed(userId, allIds);
-        } catch (_) {
-          // Dedup is best-effort; a failure just means suggestions/job
-          // updates may reappear on the next scan.
-        }
-
-        if (jobUpdates.isNotEmpty) {
-          jobUpdates = await _ref
-              .read(jobApplicationRepositoryProvider)
-              .applyKnownAndCollectNew(jobUpdates, userId);
-          await _ref.read(jobListProvider.notifier).refresh();
-        }
+      if (userId != null && jobUpdates.isNotEmpty) {
+        jobUpdates = await _ref
+            .read(jobApplicationRepositoryProvider)
+            .applyKnownAndCollectNew(jobUpdates, userId);
+        await _ref.read(jobListProvider.notifier).refresh();
       }
 
       state = InboxScanState(
         phase: InboxScanPhase.done,
-        tasks: tasks,
+        tasks: result.tasks,
         jobUpdates: jobUpdates,
         scannedAccount: result.scannedAccount,
         hasScannedOnce: true,
+        remaining: result.remaining,
       );
     } on GmailNotConnectedException {
       state = state.copyWith(phase: InboxScanPhase.idle);

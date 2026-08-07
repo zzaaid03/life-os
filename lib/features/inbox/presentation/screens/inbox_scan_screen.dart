@@ -15,8 +15,10 @@ import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_consent_provider.dart';
+import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_provider.dart';
 import 'package:life_os/features/inbox/presentation/widgets/inbox_consent_dialog.dart';
+import 'package:life_os/features/inbox/presentation/widgets/scan_backlog_sheet.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/jobs/presentation/job_display.dart';
@@ -42,8 +44,22 @@ class InboxScanScreen extends ConsumerWidget {
       await ref.read(inboxConsentProvider.notifier).grantConsent();
     }
 
+    final notifier = ref.read(inboxScanProvider.notifier);
+    var order = ScanOrder.newest;
+
+    // A cheap count, never a body fetch or a model call, decides whether to
+    // ask which end of a backlog to start from. A failed count reads as
+    // zero pending, so this just falls through to a normal scan.
+    final pending = await notifier.checkPending();
+    if (pending.needsChoice) {
+      if (!context.mounted) return;
+      final chosen = await showScanBacklogSheet(context, pending);
+      if (chosen == null) return;
+      order = chosen;
+    }
+
     try {
-      await ref.read(inboxScanProvider.notifier).scan();
+      await notifier.scan(order: order);
     } on GmailNotConnectedException {
       if (context.mounted) await _promptConnectGmail(context, ref);
     }
@@ -181,7 +197,7 @@ class InboxScanScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Each scan sends your 10 most recent inbox emails to an AI '
+              'Each scan sends a batch of your inbox emails to an AI '
               'service, whatever they are about. Only what it extracts is '
               'saved, never the emails themselves.',
               style: theme.textTheme.bodySmall?.copyWith(
@@ -226,8 +242,19 @@ class InboxScanScreen extends ConsumerWidget {
             if (scanState.phase == InboxScanPhase.done &&
                 scanState.scannedAccount != null) ...[
               _ScannedAccountLine(account: scanState.scannedAccount!),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.sm),
             ],
+            if (scanState.phase == InboxScanPhase.done &&
+                scanState.remaining > 0) ...[
+              Text(
+                '${scanState.remaining} more waiting. Tap Update to keep going.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ] else if (scanState.phase == InboxScanPhase.done)
+              const SizedBox(height: AppSpacing.md),
             if (scanState.phase == InboxScanPhase.error)
               _ErrorMessage(message: scanState.errorMessage),
             if (scanState.phase == InboxScanPhase.done)

@@ -64,10 +64,10 @@ class InboxConsentDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  'Life OS reads your 10 most recent inbox emails, whatever '
-                  'they are about, and sends them to an AI service to find '
-                  'tasks and job updates. The emails themselves are never '
-                  'stored, only the tasks and summaries you keep.',
+                  'Life OS reads emails from your inbox, whatever they are '
+                  'about, and sends them to an AI service to find tasks and '
+                  'job updates. The emails themselves are never stored, only '
+                  'the tasks and summaries you keep.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     height: 1.5,
