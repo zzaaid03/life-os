@@ -45,7 +45,7 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: AppSpacing.md),
                       Text(
-                        'LifeOS',
+                        'Life OS',
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.3,
@@ -80,6 +80,23 @@ class WelcomeScreen extends StatelessWidget {
                   .animate()
                   .fadeIn(duration: 500.ms, delay: 400.ms)
                   .slideY(begin: 0.08, end: 0, duration: 500.ms, delay: 400.ms),
+              const SizedBox(height: AppSpacing.lg),
+              // Plain description of what the app actually does, not just a
+              // tagline: visible with no sign-in, no interaction required.
+              Text(
+                    'Life OS reads your inbox with your permission and turns '
+                    'it into tasks: bills due, appointments, subscription '
+                    'renewals, deliveries, and updates on jobs you\'ve '
+                    'applied to. It also tracks tasks, goals, and job '
+                    'applications you add yourself.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      height: 1.5,
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(duration: 500.ms, delay: 550.ms)
+                  .slideY(begin: 0.08, end: 0, duration: 500.ms, delay: 550.ms),
               const Spacer(flex: 2),
               // Primary CTA: the sandbox demo is the headline entry point.
               SizedBox(
