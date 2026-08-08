@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'package:life_os/core/services/supabase_service.dart';
+import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -41,6 +42,16 @@ class GoogleCredentialsRepository {
         .maybeSingle();
     return response != null;
   }
+
+  /// Deletes the stored refresh token for [userId].
+  ///
+  /// This revokes Life OS's own ability to mint Gmail access tokens for the
+  /// user; it does not touch the grant on the Google account side (the user
+  /// can also do that from myaccount.google.com). A missing row is a no-op,
+  /// not an error, so disconnecting twice is harmless.
+  Future<void> deleteCredentials(String userId) async {
+    await _client.from(_table).delete().eq('user_id', userId);
+  }
 }
 
 /// Provides the [GoogleCredentialsRepository].
@@ -49,6 +60,16 @@ final googleCredentialsRepositoryProvider =
       final client = ref.watch(supabaseClientProvider);
       return GoogleCredentialsRepository(client);
     });
+
+/// Whether the signed-in user currently has a stored Gmail refresh token.
+///
+/// `autoDispose` so Settings re-checks fresh every time it's opened, rather
+/// than caching a stale "connected" answer across a disconnect.
+final gmailConnectedProvider = FutureProvider.autoDispose<bool>((ref) async {
+  final userId = ref.watch(authProvider).userId;
+  if (userId == null) return false;
+  return ref.watch(googleCredentialsRepositoryProvider).hasCredentials(userId);
+});
 
 /// Captures the Google refresh token from raw Supabase auth events and
 /// persists it for the signed-in user.

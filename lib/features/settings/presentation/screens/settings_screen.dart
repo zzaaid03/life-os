@@ -10,6 +10,7 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/theme/theme_mode_provider.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/inbox/data/google_credentials_repository.dart';
 import 'package:life_os/features/notifications/domain/providers/reminder_settings_provider.dart';
 import 'package:life_os/features/onboarding/domain/release_notes.dart';
 import 'package:life_os/features/onboarding/presentation/announcements_sheet.dart';
@@ -56,6 +57,13 @@ class SettingsScreen extends ConsumerWidget {
                 title: 'What Life knows about you',
                 onTap: () => context.push(AppRoutes.knownFacts),
               ),
+              if (ref.watch(gmailConnectedProvider).value == true)
+                _SettingsTile(
+                  icon: Icons.mail_outline_rounded,
+                  title: 'Gmail access',
+                  subtitle: 'Connected. Tap to disconnect.',
+                  onTap: () => _disconnectGmail(context, ref),
+                ),
             ],
           ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
 
@@ -199,6 +207,50 @@ class SettingsScreen extends ConsumerWidget {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  /// Confirms, then deletes the stored Gmail refresh token so Life OS can
+  /// no longer read the user's inbox. Reconnecting later goes through the
+  /// normal Google sign-in flow again.
+  Future<void> _disconnectGmail(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Disconnect Gmail'),
+        content: const Text(
+          'Life OS will no longer be able to scan your inbox until you '
+          'connect Gmail again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final userId = ref.read(authProvider).userId;
+    if (userId == null) return;
+
+    await ref
+        .read(googleCredentialsRepositoryProvider)
+        .deleteCredentials(userId);
+    ref.invalidate(gmailConnectedProvider);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gmail disconnected.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   /// Opens a dialog to edit the user's display name.
