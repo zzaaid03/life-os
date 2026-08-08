@@ -126,7 +126,20 @@ class WelcomeScreen extends StatelessWidget {
                   .animate()
                   .fadeIn(duration: 500.ms, delay: 850.ms)
                   .slideY(begin: 0.12, end: 0, duration: 500.ms, delay: 850.ms),
-              const SizedBox(height: AppSpacing.massive),
+              const SizedBox(height: AppSpacing.lg),
+              Center(
+                    child: TextButton(
+                      onPressed: () => context.push(AppRoutes.privacy),
+                      style: TextButton.styleFrom(
+                        foregroundColor: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.4),
+                      ),
+                      child: const Text('Privacy Policy'),
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(duration: 500.ms, delay: 950.ms),
+              const SizedBox(height: AppSpacing.xl),
             ],
           ),
         ),
