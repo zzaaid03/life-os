@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/core/theme/app_colors.dart';
@@ -44,6 +45,13 @@ Future<void> main() async {
 /// Performs the normal startup sequence and launches the app.
 Future<void> _initializeAndRun() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Without this, web uses hash-style URLs (#/privacy) and a real path
+  // typed directly into the address bar (a Google OAuth reviewer, an
+  // App Store listing link) never reaches GoRouter at all: the browser
+  // loads the SPA shell, GoRouter finds no hash fragment, and falls back
+  // to initialLocation, which is the splash screen. A no-op on native.
+  usePathUrlStrategy();
 
   await dotenv.load(fileName: '.env');
 
