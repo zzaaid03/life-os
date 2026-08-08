@@ -111,7 +111,7 @@ class SettingsScreen extends ConsumerWidget {
               _SettingsTile(
                 icon: Icons.privacy_tip_outlined,
                 title: 'Privacy',
-                onTap: () => _showComingSoon(context, 'Privacy'),
+                onTap: () => context.push(AppRoutes.privacy),
               ),
               _SettingsTile(
                 icon: Icons.tips_and_updates_outlined,

@@ -29,6 +29,7 @@ import 'package:life_os/features/permissions/presentation/screens/notification_p
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:life_os/features/profile/presentation/screens/create_profile_screen.dart';
 import 'package:life_os/features/search/presentation/screens/search_screen.dart';
+import 'package:life_os/features/settings/presentation/screens/privacy_policy_screen.dart';
 import 'package:life_os/features/settings/presentation/screens/settings_screen.dart';
 import 'package:life_os/features/tasks/presentation/screens/task_detail_screen.dart';
 import 'package:life_os/features/tasks/presentation/screens/task_list_screen.dart';
@@ -60,6 +61,7 @@ abstract final class AppRoutes {
   static const String search = '/search';
   static const String settings = '/settings';
   static const String knownFacts = '/known-facts';
+  static const String privacy = '/privacy';
   static const String tasks = '/tasks';
   static const String taskDetail = '/tasks/:id';
 
@@ -100,6 +102,10 @@ GoRouter createRouter(Ref ref) {
           location == AppRoutes.welcome ||
           location == AppRoutes.checkEmail;
       final isSplash = location == AppRoutes.splash;
+      // Reachable with no account: an OAuth reviewer, or anyone following a
+      // link from the Play/App Store listing, has neither.
+      final isPublicContent = location == AppRoutes.privacy;
+      if (isPublicContent) return null;
 
       // Onboarding screens
       final isOnboarding =
@@ -167,6 +173,14 @@ GoRouter createRouter(Ref ref) {
         name: 'checkEmail',
         builder: (context, state) =>
             CheckEmailScreen(email: state.extra as String?),
+      ),
+
+      // Reachable with no account: linked from Settings and from anywhere
+      // outside the app (e.g. an OAuth consent screen review).
+      GoRoute(
+        path: AppRoutes.privacy,
+        name: 'privacy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
       ),
 
       // Onboarding
