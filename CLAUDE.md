@@ -18,7 +18,106 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-07) — `staging` @ `7e680bc`, `main` @ `bfbda42` — WIDENED INBOX SCAN SHIPPED + DEPLOYED, TWO FOLLOW-UP LANES STAGING-ONLY, PORTFOLIO DEMO ALSO UPDATED
+## Current state (2026-08-08): `staging` AND `main` @ `c0be6c4`, OAUTH VERIFICATION CANCELLED (Zaid's call, cost-driven), PRIVACY POLICY + GMAIL DISCONNECT SHIPPED, STAYING IN TESTING MODE
+
+**Both branches at `c0be6c4`, pushed, clean, no divergence.** Everything from this round is
+committed and deployed; production verified serving this exact bundle at every step, not assumed
+from a green CI run.
+
+### ⛔ GOOGLE OAUTH VERIFICATION IS CANCELLED, NOT PAUSED. DO NOT RESUME WITHOUT ZAID EXPLICITLY REOPENING IT
+Zaid pursued verification this round to leave Testing mode (100-user cap, "unverified app" warning)
+and support public Google sign-in. He got through domain ownership (DNS TXT on the `lifeos`
+subdomain, scoped, not the shared `deadthrone.dev` zone root), branding verification (three rounds
+of real, deployed fixes, see below, followed by an evidence-based appeal after the same three
+issues came back byte-identical three times), and the Data Access / scope-justification submission
+(intended-use text plus a demo video). **Google's next step required a CASA AL1 security assessment,
+roughly $540/year, recurring annually. Zaid cancelled rather than pay that for a project with no revenue.**
+He has already replied to Google confirming the cancellation and reverted the Cloud Console
+Publishing Status to Testing himself. **This is fully done, nothing pending.**
+**`gmail.readonly` stays in the project config on purpose:** only the publish state reverted, the
+scope itself was never removed, and the inbox-scan feature keeps working exactly as before for
+Zaid and any existing test users. **Do not revive the OAuth verification workstream** (branding
+fixes, CASA prep, demo videos, scope justification) unless Zaid explicitly reopens it. Checked the
+codebase for anything assuming "In Production" status (copy implying open public sign-in, error
+handling not accounting for the 100-test-user cap or the unverified-app warning): **found nothing**.
+Grepped for verified/unverified/public-sign-in language and reviewed the Google sign-in error path;
+it's fully generic and doesn't reference verification state at all.
+
+### ✅ SHIPPED THIS ROUND, ALL STILL LIVE AND WORTH KEEPING regardless of the cancellation
+These are real, standalone improvements, not OAuth-verification scaffolding. They were correctly
+identified as worth keeping even once verification itself was dropped:
+1. **A real privacy policy** (`68c6370`) at `/privacy`. The app had none before. Plain-language,
+   accurate to what's actually deployed (Gmail scan behaviour, file uploads, the learned-facts
+   system, the two real third-party processors, no analytics/ads, contact for account deletion).
+2. **Real path-based URLs** (`061c610`). `usePathUrlStrategy()` was never called, so web defaulted
+   to hash-style URLs and any direct link (including `/privacy`) silently bounced to the welcome
+   screen instead of loading. Confirmed by reading the actual redirect logic, not guessed: the
+   splash screen's own unconditional auth redirect was firing because GoRouter never saw a real path
+   with no hash fragment. Verified fixed with a real incognito-window test, not just a curl.
+3. **Privacy policy linked from the welcome screen** (`e8b840c`). It existed and was reachable but
+   nothing public pointed to it, which would have failed the exact review it was built for.
+4. **Gmail disconnect** (`a8cbbe6`). `GoogleCredentialsRepository` only ever had `saveRefreshToken`
+   and `hasCredentials`, no delete, and nothing in the UI called one. The scope-justification text
+   claimed users could disconnect at any time; that wasn't true, so the real feature was built rather
+   than softening the claim. RLS delete policy and table grant already existed from migrations
+   007/008, no migration needed.
+5. **App name and purpose copy fixed on the welcome screen** (`85608c4`). The wordmark read "LifeOS"
+   (no space) while the page title/meta said "Life OS" (with one), a literal mismatch Google flagged.
+   Also added a real one-paragraph description of what the app does; the previous copy was a tagline
+   ("Your life, in one place"), not a functional description.
+6. **Static fallback HTML for the CanvasKit rendering gap** (`c0be6c4`). **This is the one worth
+   understanding, it's a real, general finding, not just OAuth scaffolding.** This app's Flutter web
+   build renders through CanvasKit (confirmed by grepping the actual build output), meaning ALL
+   visible UI text is pixels on a `<canvas>`, never real readable DOM text, until the JS bundle fully
+   boots. Any tool that doesn't execute and wait on JavaScript (a share-preview unfurler, certain
+   crawlers, screen readers in some configurations) sees a blank page no matter what the rendered app
+   actually shows. Fixed with real static HTML in `web/index.html`'s body: the app name, a
+   description, and a privacy-policy link, present before any script runs, removed via the real
+   `flutter-first-frame` window event (**confirmed genuine by grepping the installed Flutter SDK's
+   own `platform_dispatcher.dart`, not assumed from memory**) the instant the real app paints.
+   **Verified with an actual headless browser, not just static analysis:** present on initial DOM
+   load, gone within 8 seconds once Flutter's first frame renders, zero JS errors. This is now a
+   permanently-useful piece of infra independent of OAuth: anything that reads the page without
+   running JS (search-engine indexing, a Slack/Discord link unfurl, an accessibility tool) benefits.
+
+### Also fixed in passing, small drive-by cleanups
+`pubspec.yaml`'s description and `web/index.html`'s meta description both still had em dashes,
+missed by the earlier `lib/`-only dash sweep (`6c69f34`) since that commit's own description said
+exactly what it covered. Fixed both while already in those files rather than opening a new round for
+two characters.
+
+### Real, hard-won lessons from the OAuth round, keep these even though verification is cancelled
+- **A repeated identical automated-check result across genuinely different deployed states is
+  itself evidence.** Branding verification came back with the exact same three issues, word for
+  word, three times in a row, despite three rounds of real, deployed, independently-verified fixes.
+  The pattern was the signal: Google's content checker likely evaluates a cached snapshot rather than
+  re-crawling on every resubmission. A fourth blind code fix would have been guessing against a check
+  that may not have been looking. Diagnosed by checking what DID change between attempts (the
+  domain-ownership check cleared instantly on its first live re-check, proving SOME parts of the
+  pipeline recheck live) versus what didn't (the three content-based checks, frozen across three
+  attempts): the asymmetry located the problem precisely.
+- **A crawler/checker not executing JavaScript is a real, general risk for any pure-client-rendered
+  web app, not an OAuth-specific problem.** This app has no server-side rendering and, as of this
+  session, renders via CanvasKit specifically, meaning without the static-fallback fix, literally
+  zero page text was ever machine-readable without a full JS boot. The fix (item 6 above) stays
+  valuable regardless of OAuth's fate.
+- **"I have fixed the issues" and "I believe the issues found are incorrect" are different tools for
+  different situations.** The first assumes the checker will see something new; the second is for
+  disputing a checker that's plausibly wrong, and is the right move once evidence (a real curl
+  fetch, a real headless-browser test) contradicts a repeated automated finding.
+- **When a decision is made in a parallel or different chat session** (Zaid used a separate Claude
+  Chat to draft the reply to Google's email), get the FULL resulting state confirmed explicitly
+  before touching anything. Zaid's handoff message here already stated the reply was sent and the
+  publish state was reverted, so this round's job was verification (checking the codebase, not
+  re-doing his reply) and bookkeeping, not re-deciding anything already decided.
+
+### NEXT
+Nothing open from this round. The app stays in Testing mode indefinitely until Zaid decides
+otherwise; do not propose resuming OAuth verification unprompted. Smaller carried-forward items
+(brand lockup visual confirmation in light/dark, Android APK freshness, the `_planning/V2_SCOPE.md`
+"scan ALL emails" depth question) are all still exactly where they were, untouched this round.
+
+## SUPERSEDED — Current state (2026-08-07) — `staging` @ `7e680bc`, `main` @ `bfbda42` — WIDENED INBOX SCAN SHIPPED + DEPLOYED, TWO FOLLOW-UP LANES STAGING-ONLY, PORTFOLIO DEMO ALSO UPDATED
 
 **Both branches pushed. `main` is 2 commits BEHIND `staging`** (`783067c`, `7e680bc` — see below).
 Nothing is uncommitted; the previous round's three worker diffs were all reviewed line-by-line,
