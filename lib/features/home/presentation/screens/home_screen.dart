@@ -163,15 +163,35 @@ class _DailyBriefCardState extends ConsumerState<_DailyBriefCard> {
             ),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
-        child: Text(
-          body,
+        child: Column(
           key: ValueKey(body),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(
-              alpha: state.status == DailyBriefStatus.loaded ? 0.8 : 0.45,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              body,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(
+                  alpha: state.status == DailyBriefStatus.loaded ? 0.8 : 0.45,
+                ),
+                height: 1.5,
+              ),
             ),
-            height: 1.5,
-          ),
+            if (state.status == DailyBriefStatus.loaded &&
+                (state.noticed?.isNotEmpty ?? false)) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Life OS noticed: ${state.noticed}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.75,
+                  ),
+                  fontStyle: FontStyle.italic,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

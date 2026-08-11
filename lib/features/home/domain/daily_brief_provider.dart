@@ -19,13 +19,21 @@ enum DailyBriefStatus { initial, loading, loaded, error }
 /// State held by [DailyBriefNotifier].
 class DailyBriefState {
   /// Creates a [DailyBriefState].
-  const DailyBriefState({this.status = DailyBriefStatus.initial, this.brief});
+  const DailyBriefState({
+    this.status = DailyBriefStatus.initial,
+    this.brief,
+    this.noticed,
+  });
 
   /// The current loading status.
   final DailyBriefStatus status;
 
   /// The brief text, when loaded.
   final String? brief;
+
+  /// One AI-inferred fact about the user, surfaced separately from the
+  /// brief. Null when there is none to show.
+  final String? noticed;
 }
 
 /// Loads and refreshes the daily brief.
@@ -103,11 +111,16 @@ class DailyBriefNotifier extends StateNotifier<DailyBriefState> {
       );
       final data = response.data;
       final brief = data is Map ? data['brief'] as String? : null;
+      final noticed = data is Map ? data['noticed'] as String? : null;
       if (brief == null || brief.isEmpty) {
         state = const DailyBriefState(status: DailyBriefStatus.error);
         return;
       }
-      state = DailyBriefState(status: DailyBriefStatus.loaded, brief: brief);
+      state = DailyBriefState(
+        status: DailyBriefStatus.loaded,
+        brief: brief,
+        noticed: noticed,
+      );
     } catch (_) {
       state = const DailyBriefState(status: DailyBriefStatus.error);
     }

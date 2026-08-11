@@ -7,7 +7,9 @@
 // TypeScript directly from the caller's own rows — no model is involved, so
 // nothing is ever invented. The caller is identified from their Supabase
 // JWT; data is read server-side with the service role. Returns
-// { brief: string }.
+// { brief: string, noticed: string | null }. `noticed` is one AI-inferred
+// user fact (from `user_facts`), rotated by local date; it is not part of
+// the model-free brief guarantee above since it comes from a separate table.
 //
 // Deploy:  npx supabase functions deploy daily-brief
 // Secrets: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected.
@@ -53,6 +55,11 @@ interface JobApplication {
   role: string;
   status: string;
   updated_at: string;
+}
+
+interface UserFact {
+  category: string;
+  fact: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -111,30 +118,46 @@ Deno.serve(async (req: Request) => {
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [openTasksRes, completedTasksRes, jobsRes] = await Promise.all([
-      admin
-        .from("tasks")
-        .select("id, title, due_date, priority, status")
-        .eq("user_id", userId)
-        .is("deleted_at", null)
-        .neq("status", "completed")
-        .neq("status", "archived"),
-      admin
-        .from("tasks")
-        .select("id, title, updated_at")
-        .eq("user_id", userId)
-        .is("deleted_at", null)
-        .eq("status", "completed")
-        .gte("updated_at", thirtyDaysAgo.toISOString()),
-      admin
-        .from("job_applications")
-        .select("company, role, status, updated_at")
-        .eq("user_id", userId),
-    ]);
+    const [openTasksRes, completedTasksRes, jobsRes, factsRes] =
+      await Promise.all([
+        admin
+          .from("tasks")
+          .select("id, title, due_date, priority, status")
+          .eq("user_id", userId)
+          .is("deleted_at", null)
+          .neq("status", "completed")
+          .neq("status", "archived"),
+        admin
+          .from("tasks")
+          .select("id, title, updated_at")
+          .eq("user_id", userId)
+          .is("deleted_at", null)
+          .eq("status", "completed")
+          .gte("updated_at", thirtyDaysAgo.toISOString()),
+        admin
+          .from("job_applications")
+          .select("company, role, status, updated_at")
+          .eq("user_id", userId),
+        admin
+          .from("user_facts")
+          .select("category, fact")
+          .eq("user_id", userId)
+          .is("suppressed_at", null)
+          .order("last_confirmed_at", { ascending: false })
+          .limit(15),
+      ]);
 
     const openTasks = (openTasksRes.data ?? []) as OpenTask[];
     const completedTasks = (completedTasksRes.data ?? []) as CompletedTask[];
     const jobs = (jobsRes.data ?? []) as JobApplication[];
+    const facts = (factsRes.error ? [] : factsRes.data ?? []) as UserFact[];
+
+    // Rotate deterministically by the caller's local date so it isn't the
+    // same fact every day, without needing any extra state.
+    const dayNumber = Math.floor(day0Start.getTime() / 86400000);
+    const noticed = facts.length > 0
+      ? facts[dayNumber % facts.length].fact
+      : null;
 
     const overdue = openTasks.filter(
       (t) => t.due_date && new Date(t.due_date) < day0Start,
@@ -252,7 +275,7 @@ Deno.serve(async (req: Request) => {
       const brief = firstName
         ? `${firstName}, nothing needs your attention today.`
         : "Nothing needs your attention today.";
-      return jsonResponse({ brief });
+      return jsonResponse({ brief, noticed });
     }
 
     if (completedThisWeek > 0) {
@@ -268,7 +291,7 @@ Deno.serve(async (req: Request) => {
       brief = `${firstName}, ${brief.charAt(0).toLowerCase()}${brief.slice(1)}`;
     }
 
-    return jsonResponse({ brief });
+    return jsonResponse({ brief, noticed });
   } catch (e) {
     return jsonResponse({ error: String(e) }, 500);
   }

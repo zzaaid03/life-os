@@ -11,6 +11,10 @@ const _demoBrief =
     'Labs recruiter". Meridian Financial, interview stage. Next step: Prep '
     'for Meridian Financial interview. You completed 2 tasks this week.';
 
+const _demoNoticed =
+    'You tend to follow up on job applications within a day or two of '
+    'hearing back.';
+
 /// A [DailyBriefNotifier] that never hits the network: [refresh] (and
 /// therefore [loadIfNeeded], which calls it) just sets the fixed demo brief.
 class DemoDailyBriefNotifier extends DailyBriefNotifier {
@@ -22,6 +26,7 @@ class DemoDailyBriefNotifier extends DailyBriefNotifier {
     state = const DailyBriefState(
       status: DailyBriefStatus.loaded,
       brief: _demoBrief,
+      noticed: _demoNoticed,
     );
   }
 }
