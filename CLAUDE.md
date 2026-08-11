@@ -18,7 +18,61 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-11): `staging` @ `e7eb21b`, `main` @ `a36a10e`, FEATURE ROUNDS RESUMED, SUBSCRIPTIONS 2a BUILT AND UNTESTED ON DEVICE
+## Current state (2026-08-11, later): `staging` @ `c3dc5be`, `main` @ `269bc82`, SUBSCRIPTIONS 2a MERGED AND LIVE, 2b BUILT AND DEPLOYED, PROMPT UNTESTED AGAINST REAL EMAIL
+
+**`staging` is 4 commits ahead of `main`, both pushed, tree clean.** Zaid confirmed the 2a
+device test passed (decimal amount, two currencies as separate lines, cancel leaves the total),
+so 2a was merged as a straight fast-forward and production was verified serving
+`flutter_bootstrap.js?v=269bc82` cache-busted, not from a green CI run.
+
+### ✅ ROUND 2b SHIPPED TO STAGING, AND `extract-tasks` IS DEPLOYED TO PRODUCTION
+The scan can now suggest subscriptions as Add/Dismiss review cards. Four commits,
+`ff7bbf2` (planner contract) then three parallel worker lanes.
+- **The function deploy already happened** (exit 0, verified from outside: 401 against a 404
+  control on a nonexistent function). **The `SYSTEM_PROMPT` job-update block was diffed against
+  the previous revision and is byte-identical**; the change is additive (a new
+  `=== SUBSCRIPTIONS ===` block plus a third key in the response shape).
+- **Rollback, if the prompt turns out to hurt task or job extraction:**
+  `git checkout 269bc82 -- supabase/functions/extract-tasks/index.ts` then redeploy with
+  `npx supabase functions deploy extract-tasks --workdir . --project-ref ganbmkphtzdvxxnmprku`.
+- **Client-before-server was deliberate and matters:** `ScanResult.fromJson` treats a missing
+  `subscriptions` key as an empty list, so `main`'s older bundle ignores the new field instead
+  of erroring. That is why deploying the function while `main` lagged was safe.
+- **Zaid's product call: a renewal email produces BOTH a task and a subscription.** The prompt
+  states this explicitly so the model does not self-suppress one. Do not "fix" the duplication.
+- **The amount is converted in Dart, never by the model.** The model emits the literal text it
+  read ("9.99") and `parseAmountCents` in `billing.dart` does the arithmetic. That parser moved
+  out of the editor dialog so the scan and the text field cannot disagree about what is
+  storable, including the Postgres INTEGER ceiling.
+- **A bare `$` resolves to null, not USD** (it is equally CAD and AUD), and an unstated cycle
+  stays null rather than falling back to monthly. Both are pinned by named tests so a later
+  change has to break a test to undo them. 115 tests pass, up from 68.
+- Add opens the editor **pre-filled** via the new `SubscriptionDraft` rather than writing
+  directly, because the amount and currency are where a misread puts a wrong number on a money
+  screen. Backing out of the editor leaves the card in place.
+- A suggestion whose name matches a non-cancelled existing subscription is hidden, but only
+  once the list has loaded, so a slow load shows everything rather than silently hiding things.
+
+### ⚠️ THE ONE THING STILL UNVERIFIED, AND IT IS THE WHOLE POINT OF THE ROUND
+**Nobody has run a real scan against real email since the prompt changed.** Test on
+`https://staging.lifeos.deadthrone.dev`, not production, since only staging renders the cards.
+Watch specifically for:
+- a marketing "plans from 9.99/month" or "upgrade to Pro" email surfacing as a subscription
+  Zaid does not have. That is the exact failure the new block's first NEVER rule targets, and
+  the same shape as the old job extractor inventing applications.
+- task and job extraction quality **degrading** because a third category distracts the model.
+  The job rules are byte-identical, so any drift is the model, not the rules.
+Either is a prompt tightening plus redeploy: no migration, no client rebuild, nothing to undo.
+
+**Do not merge 2b to `main` until that real-email test passes.**
+
+### Known, deliberately not fixed this round
+`_formatDate` in `subscriptions_screen.dart` renders `M/D/YYYY`, and the new scan card matches
+it. That is US-style and ambiguous for a German reader (1/9/2026 reads as 1 September but means
+9 January). It is pre-existing across the whole subscriptions feature, so changing it is its own
+small round, not a drive-by.
+
+## SUPERSEDED — Current state (2026-08-11): `staging` @ `e7eb21b`, `main` @ `a36a10e`, FEATURE ROUNDS RESUMED, SUBSCRIPTIONS 2a BUILT AND UNTESTED ON DEVICE
 
 **`staging` is 5 commits ahead of `main`, both pushed, tree clean.** OAuth verification stays
 cancelled (see the block below, unchanged). Zaid's framing this session, which should shape every
