@@ -10,6 +10,7 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/demo/data/demo_fact_repository.dart';
+import 'package:life_os/features/demo/data/demo_subscription_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_auth_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_daily_brief_notifier.dart';
 import 'package:life_os/features/demo/data/repositories/demo_file_repository.dart';
@@ -31,6 +32,7 @@ import 'package:life_os/features/learning/data/repositories/fact_repository.dart
 import 'package:life_os/features/notifications/data/noop_notification_service.dart';
 import 'package:life_os/features/notifications/domain/providers/notification_service_provider.dart';
 import 'package:life_os/features/profile/data/repositories/supabase_profile_repository.dart';
+import 'package:life_os/features/subscriptions/data/repositories/subscription_repository.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:riverpod/riverpod.dart';
 
@@ -69,6 +71,9 @@ List<Override> buildDemoOverrides() {
     fileRepositoryProvider.overrideWithValue(DemoFileRepository()),
     filePickerServiceProvider.overrideWithValue(DemoFilePickerService()),
     factRepositoryProvider.overrideWithValue(DemoFactRepository()),
+    subscriptionRepositoryProvider.overrideWithValue(
+      DemoSubscriptionRepository(),
+    ),
     // Demo mode must never touch the OS: no permission prompt, no alarms
     // left scheduled on a stranger's phone after they close the sandbox.
     notificationServiceProvider.overrideWithValue(NoopNotificationService()),
