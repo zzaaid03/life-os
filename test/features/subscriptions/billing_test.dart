@@ -243,4 +243,82 @@ void main() {
       expect(formatAmount(123456), equals('1234.56'));
     });
   });
+
+  group('parseAmountCents', () {
+    test('parses a plain decimal amount', () {
+      expect(parseAmountCents('12.99'), equals(1299));
+    });
+
+    test('parses a whole number with no decimal part', () {
+      expect(parseAmountCents('120'), equals(12000));
+    });
+
+    test('parses zero', () {
+      expect(parseAmountCents('0'), equals(0));
+    });
+
+    test('parses a single decimal digit', () {
+      expect(parseAmountCents('9.9'), equals(990));
+    });
+
+    test('trims surrounding whitespace', () {
+      expect(parseAmountCents(' 12.99 '), equals(1299));
+    });
+
+    test('returns null for an empty string', () {
+      expect(parseAmountCents(''), isNull);
+    });
+
+    test('returns null for non-numeric text', () {
+      expect(parseAmountCents('abc'), isNull);
+    });
+
+    test('returns null for a negative amount', () {
+      expect(parseAmountCents('-5'), isNull);
+    });
+
+    test('returns null for a thousands separator', () {
+      expect(parseAmountCents('1,299'), isNull);
+    });
+
+    test('returns null for three decimal places', () {
+      expect(parseAmountCents('12.999'), isNull);
+    });
+
+    test('returns null for two decimal points', () {
+      expect(parseAmountCents('1.2.3'), isNull);
+    });
+
+    test('returns null for a trailing decimal point with no digits', () {
+      expect(parseAmountCents('12.'), isNull);
+    });
+
+    test('returns null for a leading decimal point with no whole part', () {
+      expect(parseAmountCents('.99'), isNull);
+    });
+
+    test('returns null for scientific notation', () {
+      expect(parseAmountCents('1e5'), isNull);
+    });
+
+    test('returns null for whitespace only', () {
+      expect(parseAmountCents('  '), isNull);
+    });
+
+    test('returns null just above the storage ceiling', () {
+      const overCeiling = (maxAmountCents ~/ 100) + 1;
+      expect(parseAmountCents('$overCeiling'), isNull);
+    });
+
+    test('parses a value just under the storage ceiling', () {
+      const underCeiling = maxAmountCents ~/ 100;
+      expect(parseAmountCents('$underCeiling'), equals(underCeiling * 100));
+    });
+
+    for (final cents in [0, 5, 100, 123456]) {
+      test('round-trips $cents cents through formatAmount', () {
+        expect(parseAmountCents(formatAmount(cents)), equals(cents));
+      });
+    }
+  });
 }
