@@ -31,6 +31,7 @@ class InboxScanState {
     this.phase = InboxScanPhase.idle,
     this.tasks = const <SuggestedTask>[],
     this.jobUpdates = const <JobUpdate>[],
+    this.subscriptions = const <SuggestedSubscription>[],
     this.scannedAccount,
     this.errorMessage,
     this.hasScannedOnce = false,
@@ -45,6 +46,9 @@ class InboxScanState {
 
   /// Job updates from the last scan (already persisted).
   final List<JobUpdate> jobUpdates;
+
+  /// Suggested subscriptions still awaiting an Add/Dismiss decision.
+  final List<SuggestedSubscription> subscriptions;
 
   /// The Gmail address the last scan read.
   final String? scannedAccount;
@@ -64,6 +68,7 @@ class InboxScanState {
     InboxScanPhase? phase,
     List<SuggestedTask>? tasks,
     List<JobUpdate>? jobUpdates,
+    List<SuggestedSubscription>? subscriptions,
     String? scannedAccount,
     String? errorMessage,
     bool? hasScannedOnce,
@@ -73,6 +78,7 @@ class InboxScanState {
       phase: phase ?? this.phase,
       tasks: tasks ?? this.tasks,
       jobUpdates: jobUpdates ?? this.jobUpdates,
+      subscriptions: subscriptions ?? this.subscriptions,
       scannedAccount: scannedAccount ?? this.scannedAccount,
       errorMessage: errorMessage,
       hasScannedOnce: hasScannedOnce ?? this.hasScannedOnce,
@@ -124,6 +130,7 @@ class InboxScanController extends StateNotifier<InboxScanState> {
         phase: InboxScanPhase.done,
         tasks: result.tasks,
         jobUpdates: jobUpdates,
+        subscriptions: result.subscriptions,
         scannedAccount: result.scannedAccount,
         hasScannedOnce: true,
         remaining: result.remaining,
@@ -159,6 +166,18 @@ class InboxScanController extends StateNotifier<InboxScanState> {
 
   /// Removes a job update the user dismissed.
   void dismissJobUpdate(JobUpdate update) => removeJobUpdate(update);
+
+  /// Removes a subscription suggestion after the user added it.
+  void removeSubscription(SuggestedSubscription s) {
+    state = state.copyWith(
+      subscriptions: state.subscriptions
+          .where((sub) => !identical(sub, s))
+          .toList(),
+    );
+  }
+
+  /// Removes a subscription suggestion the user dismissed.
+  void dismissSubscription(SuggestedSubscription s) => removeSubscription(s);
 }
 
 /// The app-wide inbox scan state.

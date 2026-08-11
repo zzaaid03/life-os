@@ -23,6 +23,10 @@ import 'package:life_os/features/jobs/data/repositories/job_application_reposito
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/jobs/presentation/job_display.dart';
 import 'package:life_os/features/jobs/presentation/widgets/job_status_chip.dart';
+import 'package:life_os/features/subscriptions/data/models/subscription.dart';
+import 'package:life_os/features/subscriptions/domain/billing.dart';
+import 'package:life_os/features/subscriptions/domain/providers/subscription_provider.dart';
+import 'package:life_os/features/subscriptions/presentation/widgets/subscription_editor_dialog.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_due_date_badge.dart';
@@ -172,6 +176,59 @@ class InboxScanScreen extends ConsumerWidget {
     );
   }
 
+  /// Opens the subscription editor prefilled from a suggestion. Only writes
+  /// on an explicit save; backing out leaves the card in place so the user
+  /// keeps the chance to add it later.
+  Future<void> _addSubscription(
+    BuildContext context,
+    WidgetRef ref,
+    SuggestedSubscription suggestion,
+  ) async {
+    final result = await SubscriptionEditorDialog.show(
+      context,
+      draft: SubscriptionDraft(
+        name: suggestion.name,
+        amountCents: suggestion.amountCents,
+        currency: suggestion.currency,
+        cycle: suggestion.cycle,
+        nextChargeDate: suggestion.nextChargeDate,
+      ),
+    );
+    if (!context.mounted) return;
+    if (result == null || result.action != SubscriptionEditorAction.save) {
+      return;
+    }
+
+    try {
+      await ref.read(subscriptionListProvider.notifier).create(
+        name: result.name,
+        amountCents: result.amountCents,
+        currency: result.currency,
+        cycle: result.cycle,
+        nextChargeDate: result.nextChargeDate,
+        notes: result.notes,
+        sourceEmailId: suggestion.sourceEmailId,
+      );
+      ref.read(inboxScanProvider.notifier).removeSubscription(suggestion);
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Added to subscriptions'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not add that subscription. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -274,7 +331,21 @@ class InboxScanScreen extends ConsumerWidget {
     final hasTasks = scanState.tasks.isNotEmpty;
     final hasJobs = scanState.jobUpdates.isNotEmpty;
 
-    if (!hasTasks && !hasJobs) {
+    final subscriptionListState = ref.watch(subscriptionListProvider);
+    final visibleSubscriptions = subscriptionListState.status ==
+            SubscriptionListStatus.loaded
+        ? scanState.subscriptions.where((s) {
+            final name = s.name.trim().toLowerCase();
+            return !subscriptionListState.subscriptions.any(
+              (existing) =>
+                  existing.status != SubscriptionStatus.cancelled &&
+                  existing.name.trim().toLowerCase() == name,
+            );
+          }).toList()
+        : scanState.subscriptions;
+    final hasSubs = visibleSubscriptions.isNotEmpty;
+
+    if (!hasTasks && !hasJobs && !hasSubs) {
       return [
         const SizedBox(height: AppSpacing.xxl),
         Center(
@@ -295,7 +366,8 @@ class InboxScanScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'No new tasks or job updates in your recent emails.',
+                'No new tasks, job updates or subscriptions in your recent '
+                'emails.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
@@ -336,6 +408,22 @@ class InboxScanScreen extends ConsumerWidget {
             onAdd: () => _addJobApplication(context, ref, j),
             onDismiss: () =>
                 ref.read(inboxScanProvider.notifier).dismissJobUpdate(j),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+      ],
+      if (hasSubs) ...[
+        _SectionTitle(
+          title: 'Subscriptions',
+          count: visibleSubscriptions.length,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        ...visibleSubscriptions.map(
+          (s) => _SubscriptionCard(
+            suggestion: s,
+            onAdd: () => _addSubscription(context, ref, s),
+            onDismiss: () =>
+                ref.read(inboxScanProvider.notifier).dismissSubscription(s),
           ),
         ),
       ],
@@ -625,6 +713,89 @@ class _JobUpdateCard extends StatelessWidget {
                 onPressed: onDismiss,
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubscriptionCard extends StatelessWidget {
+  const _SubscriptionCard({
+    required this.suggestion,
+    required this.onAdd,
+    required this.onDismiss,
+  });
+
+  final SuggestedSubscription suggestion;
+  final VoidCallback onAdd;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final amountCents = suggestion.amountCents;
+    final currency = suggestion.currency;
+    final cycle = suggestion.cycle;
+    final nextChargeDate = suggestion.nextChargeDate;
+
+    final String detail;
+    if (amountCents != null) {
+      final amount = '${formatAmount(amountCents)}${currency != null ? ' $currency' : ''}';
+      final cyclePart = cycle != null ? ' / ${cycle.name}' : '';
+      final datePart = nextChargeDate != null
+          ? ' · next ${nextChargeDate.month}/${nextChargeDate.day}/${nextChargeDate.year}'
+          : '';
+      detail = '$amount$cyclePart$datePart';
+    } else {
+      detail = 'Amount not stated';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  suggestion.name,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  detail,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          IconButton(
+            icon: const Icon(Icons.check_rounded),
+            color: AppColors.success,
+            tooltip: 'Add subscription',
+            onPressed: onAdd,
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            tooltip: 'Dismiss',
+            onPressed: onDismiss,
           ),
         ],
       ),
