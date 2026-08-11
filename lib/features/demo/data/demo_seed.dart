@@ -43,16 +43,20 @@ List<JobApplication> buildDemoJobs() {
       company: 'Nimbus Labs',
       role: 'Associate PM',
       status: 'applied',
-      createdAt: now,
-      updatedAt: now,
+      // Backdated so the sandbox actually shows the follow-up nudge. Still
+      // relative to now, so it never rots.
+      appliedAt: now.subtract(const Duration(days: 23)),
+      createdAt: now.subtract(const Duration(days: 23)),
+      updatedAt: now.subtract(const Duration(days: 23)),
     ),
     JobApplication(
       id: 'demo-job-vertex',
       company: 'Vertex Design',
       role: 'UX Researcher',
       status: 'viewed',
-      createdAt: now,
-      updatedAt: now,
+      appliedAt: now.subtract(const Duration(days: 18)),
+      createdAt: now.subtract(const Duration(days: 18)),
+      updatedAt: now.subtract(const Duration(days: 18)),
     ),
     JobApplication(
       id: 'demo-job-orbital',
