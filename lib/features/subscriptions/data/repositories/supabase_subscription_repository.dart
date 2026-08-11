@@ -1,8 +1,4 @@
 /// Supabase-backed [SubscriptionRepository].
-///
-/// STUB: the signatures and the provider wiring are planner-written so every
-/// worker lane compiles against the real contract. The bodies are WORKER
-/// LANE 1's job. Do not change any signature here without saying so.
 library;
 
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
@@ -23,8 +19,20 @@ class SupabaseSubscriptionRepository implements SubscriptionRepository {
   SupabaseClient get client => _client;
 
   @override
-  Future<List<Subscription>> getAll(String userId) {
-    throw UnimplementedError('Worker lane 1: implement getAll');
+  Future<List<Subscription>> getAll(String userId) async {
+    final response = await _client
+        .from(table)
+        .select()
+        .eq('user_id', userId)
+        .filter('deleted_at', 'is', null);
+    final subscriptions = (response as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(Subscription.fromJson)
+        .toList();
+    subscriptions.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+    return subscriptions;
   }
 
   @override
@@ -37,17 +45,57 @@ class SupabaseSubscriptionRepository implements SubscriptionRepository {
     DateTime? nextChargeDate,
     String? notes,
     String? sourceEmailId,
-  }) {
-    throw UnimplementedError('Worker lane 1: implement create');
+  }) async {
+    // Built purely to reuse Subscription.toJson()'s `yyyy-mm-dd` date
+    // formatting and currency uppercasing; id/createdAt/updatedAt are
+    // placeholders the database overwrites on insert.
+    final draft = Subscription(
+      id: '',
+      userId: userId,
+      name: name,
+      amountCents: amountCents,
+      currency: currency,
+      cycle: cycle,
+      nextChargeDate: nextChargeDate,
+      notes: notes,
+      sourceEmailId: sourceEmailId,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    final response = await _client
+        .from(table)
+        .insert(draft.toJson())
+        .select()
+        .single();
+    return Subscription.fromJson(response);
   }
 
   @override
-  Future<Subscription> update(Subscription subscription) {
-    throw UnimplementedError('Worker lane 1: implement update');
+  Future<Subscription> update(Subscription subscription) async {
+    final json = subscription.toJson();
+    final values = {
+      'name': json['name'],
+      'amount_cents': json['amount_cents'],
+      'currency': json['currency'],
+      'cycle': json['cycle'],
+      'next_charge_date': json['next_charge_date'],
+      'status': json['status'],
+      'notes': json['notes'],
+    };
+    final response = await _client
+        .from(table)
+        .update(values)
+        .eq('id', subscription.id)
+        .select()
+        .single();
+    return Subscription.fromJson(response);
   }
 
   @override
-  Future<void> softDelete(String id) {
-    throw UnimplementedError('Worker lane 1: implement softDelete');
+  Future<void> softDelete(String id) async {
+    await _client
+        .from(table)
+        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('id', id);
   }
 }
