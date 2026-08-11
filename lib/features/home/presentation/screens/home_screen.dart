@@ -22,6 +22,9 @@ import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/onboarding/domain/announcements_provider.dart';
 import 'package:life_os/features/onboarding/presentation/announcements_sheet.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
+import 'package:life_os/features/subscriptions/data/models/subscription.dart';
+import 'package:life_os/features/subscriptions/domain/billing.dart';
+import 'package:life_os/features/subscriptions/domain/providers/subscription_provider.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
@@ -103,6 +106,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .animate()
               .fadeIn(duration: 400.ms, delay: 500.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 500.ms),
+          const _SubscriptionsSection()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 550.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 550.ms),
           const SizedBox(height: AppSpacing.massive),
         ],
       ),
@@ -572,6 +579,84 @@ class _JobApplicationsCard extends ConsumerWidget {
             : 'Tap to view interviews, acceptances, and more.',
         compact: true,
       ),
+    );
+  }
+}
+
+/// A dashboard section for subscriptions: a header plus a compact card.
+///
+/// Renders nothing at all when the user has no subscriptions, active or
+/// cancelled — an empty-state card here would be noise on a dashboard that
+/// already has an explicit place (the subscriptions screen's own empty
+/// state) to invite adding the first one.
+class _SubscriptionsSection extends ConsumerWidget {
+  const _SubscriptionsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(subscriptionListProvider);
+    if (state.subscriptions.isEmpty) return const SizedBox.shrink();
+
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(title: 'Subscriptions'),
+        SizedBox(height: AppSpacing.md),
+        _SubscriptionsCard(),
+      ],
+    );
+  }
+}
+
+/// A compact dashboard card showing monthly spend and the active
+/// subscription count, tapping through to the subscriptions screen.
+class _SubscriptionsCard extends ConsumerWidget {
+  const _SubscriptionsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeCount = ref
+        .watch(subscriptionListProvider)
+        .subscriptions
+        .where((s) => s.status == SubscriptionStatus.active)
+        .length;
+    final monthlySpend = ref.watch(monthlySpendProvider);
+    final currencies = monthlySpend.keys.toList()..sort();
+
+    return DashboardCard(
+      icon: Icons.repeat_rounded,
+      title: 'Subscriptions',
+      trailing: activeCount > 0
+          ? Text(
+              '$activeCount',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : null,
+      onTap: () => context.push(AppRoutes.subscriptions),
+      child: currencies.isEmpty
+          ? Text(
+              '$activeCount active subscription${activeCount == 1 ? '' : 's'}.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final currency in currencies)
+                  Text(
+                    '$currency ${formatAmount(monthlySpend[currency]!)} / month',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
     );
   }
 }

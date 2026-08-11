@@ -31,6 +31,7 @@ import 'package:life_os/features/profile/presentation/screens/create_profile_scr
 import 'package:life_os/features/search/presentation/screens/search_screen.dart';
 import 'package:life_os/features/settings/presentation/screens/privacy_policy_screen.dart';
 import 'package:life_os/features/settings/presentation/screens/settings_screen.dart';
+import 'package:life_os/features/subscriptions/presentation/screens/subscriptions_screen.dart';
 import 'package:life_os/features/tasks/presentation/screens/task_detail_screen.dart';
 import 'package:life_os/features/tasks/presentation/screens/task_list_screen.dart';
 import 'package:life_os/features/timeline/presentation/screens/timeline_screen.dart';
@@ -68,6 +69,7 @@ abstract final class AppRoutes {
   // AI inbox assistant
   static const String inboxScan = '/inbox-scan';
   static const String jobApplications = '/job-applications';
+  static const String subscriptions = '/subscriptions';
 
   // Life features
   static const String goals = '/goals';
@@ -260,6 +262,11 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.jobApplications,
         name: 'jobApplications',
         builder: (context, state) => const JobApplicationsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.subscriptions,
+        name: 'subscriptions',
+        builder: (context, state) => const SubscriptionsScreen(),
       ),
 
       // Life features: standalone, no nav bar
