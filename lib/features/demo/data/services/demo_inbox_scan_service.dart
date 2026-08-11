@@ -5,6 +5,7 @@ library;
 
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
+import 'package:life_os/features/subscriptions/data/models/subscription.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// An [InboxScanService] that never hits the network: [scanInbox] waits a
@@ -86,6 +87,28 @@ class DemoInboxScanService extends InboxScanService {
               'Cascade Robotics is not moving forward with your application '
               'for the Associate Product Manager role.',
           sourceEmailId: 'demo-email-cascade-decision',
+        ),
+      ],
+      subscriptions: [
+        SuggestedSubscription(
+          name: 'Spotify Premium',
+          amountCents: 1099,
+          currency: 'USD',
+          cycle: BillingCycle.monthly,
+          nextChargeDate: dueDate(14),
+          sourceEmailId: 'demo-email-spotify-receipt',
+        ),
+        SuggestedSubscription(
+          name: 'Adobe Creative Cloud',
+          amountCents: 23988,
+          currency: 'EUR',
+          cycle: BillingCycle.yearly,
+          nextChargeDate: dueDate(45),
+          sourceEmailId: 'demo-email-adobe-receipt',
+        ),
+        const SuggestedSubscription(
+          name: 'Some Gym Membership',
+          sourceEmailId: 'demo-email-gym-receipt',
         ),
       ],
     );

@@ -144,6 +144,25 @@ const List<Release> kReleases = [
       ),
     ],
   ),
+  Release(
+    version: 5,
+    slides: [
+      AnnouncementSlide(
+        icon: Icons.autorenew_rounded,
+        headline: 'Spot your recurring charges',
+        body:
+            'Your inbox scan now notices subscriptions and renewals in '
+            'your receipts and offers them for review.',
+      ),
+      AnnouncementSlide(
+        icon: Icons.fact_check_outlined,
+        headline: 'You decide what gets saved',
+        body:
+            'Nothing is added on its own. Review each one, fix any '
+            'missing details, then add it or dismiss it.',
+      ),
+    ],
+  ),
 ];
 
 /// The most recent release version. Bumping [kReleases] with a new entry
