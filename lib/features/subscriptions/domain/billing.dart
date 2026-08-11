@@ -1,0 +1,107 @@
+/// Pure spending math for subscriptions.
+///
+/// No Riverpod, no I/O, no clock. Everything here is a plain function over
+/// [Subscription] rows so it can be unit tested directly.
+///
+/// The monthly equivalent is DERIVED, never stored, so changing the formula
+/// is a code change and not a migration.
+library;
+
+import 'package:life_os/features/subscriptions/data/models/subscription.dart';
+
+/// Weeks in a year, used to convert a weekly charge to a monthly figure.
+///
+/// 52 rather than 365/7: a weekly charge lands 52 times in a year, and the
+/// fractional 53rd week is not money anyone is actually billed.
+const int _weeksPerYear = 52;
+
+/// Converts [subscription]'s charge to what it costs per month, in cents.
+///
+/// Rounds to the nearest cent. A yearly charge of 10.00 is 83c a month, not
+/// 83.333c, because a total has to be payable in real money.
+int monthlyEquivalentCents(Subscription subscription) {
+  final amount = subscription.amountCents;
+  switch (subscription.cycle) {
+    case BillingCycle.weekly:
+      return (amount * _weeksPerYear / 12).round();
+    case BillingCycle.monthly:
+      return amount;
+    case BillingCycle.quarterly:
+      return (amount / 3).round();
+    case BillingCycle.yearly:
+      return (amount / 12).round();
+  }
+}
+
+/// Converts [subscription]'s charge to what it costs per year, in cents.
+int yearlyEquivalentCents(Subscription subscription) {
+  final amount = subscription.amountCents;
+  switch (subscription.cycle) {
+    case BillingCycle.weekly:
+      return amount * _weeksPerYear;
+    case BillingCycle.monthly:
+      return amount * 12;
+    case BillingCycle.quarterly:
+      return amount * 4;
+    case BillingCycle.yearly:
+      return amount;
+  }
+}
+
+/// Total monthly spend per currency, in cents.
+///
+/// Grouped by currency and NEVER converted between them: this app has no
+/// exchange-rate source, and inventing one would put a made-up number on a
+/// screen about the user's real money. Cancelled and soft-deleted rows are
+/// excluded.
+///
+/// Returns an empty map when nothing counts, so a caller can distinguish
+/// "no subscriptions" from "zero spend".
+Map<String, int> monthlyTotalsByCurrency(List<Subscription> subscriptions) {
+  final totals = <String, int>{};
+  for (final subscription in subscriptions) {
+    if (!subscription.countsTowardTotals) continue;
+    final currency = subscription.currency.toUpperCase();
+    totals[currency] =
+        (totals[currency] ?? 0) + monthlyEquivalentCents(subscription);
+  }
+  return totals;
+}
+
+/// The subscriptions charging within [days] of [from], soonest first.
+///
+/// Rows with no known next charge date are excluded rather than guessed at.
+/// Anything already in the past is excluded too: a stale date means the
+/// charge has happened, not that it is imminent.
+List<Subscription> chargingSoon(
+  List<Subscription> subscriptions,
+  DateTime from, {
+  int days = 7,
+}) {
+  final start = DateTime(from.year, from.month, from.day);
+  final end = start.add(Duration(days: days));
+
+  final soon = subscriptions.where((s) {
+    if (!s.countsTowardTotals) return false;
+    final due = s.nextChargeDate;
+    if (due == null) return false;
+    final day = DateTime(due.year, due.month, due.day);
+    return !day.isBefore(start) && !day.isAfter(end);
+  }).toList();
+
+  soon.sort((a, b) => a.nextChargeDate!.compareTo(b.nextChargeDate!));
+  return soon;
+}
+
+/// Formats [cents] as a plain amount string, e.g. `12.00`.
+///
+/// Deliberately returns no currency symbol: the code is stored per row and
+/// callers render it alongside, which avoids mapping every possible ISO code
+/// to a glyph and getting it subtly wrong.
+String formatAmount(int cents) {
+  final negative = cents < 0;
+  final absolute = cents.abs();
+  final major = absolute ~/ 100;
+  final minor = (absolute % 100).toString().padLeft(2, '0');
+  return '${negative ? '-' : ''}$major.$minor';
+}
