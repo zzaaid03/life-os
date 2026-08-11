@@ -18,7 +18,88 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-08, git state re-verified 2026-08-11): `staging` AND `main` @ `324fa0e`, OAUTH VERIFICATION CANCELLED (Zaid's call, cost-driven), INCREMENTAL INBOX SCAN + PRIVACY POLICY + GMAIL DISCONNECT SHIPPED, STAYING IN TESTING MODE
+## Current state (2026-08-11): `staging` @ `e7eb21b`, `main` @ `a36a10e`, FEATURE ROUNDS RESUMED, SUBSCRIPTIONS 2a BUILT AND UNTESTED ON DEVICE
+
+**`staging` is 5 commits ahead of `main`, both pushed, tree clean.** OAuth verification stays
+cancelled (see the block below, unchanged). Zaid's framing this session, which should shape every
+future round: **this is a PERSONAL app, not a public product.** The 100-test-user Google cap is
+"more than enough" and he explicitly does not want growth, sign-up-funnel or verification work.
+Plan features, not reach.
+
+### ✅ MERGED TO `main` AND DEPLOYED — round 1
+1. **One inferred fact on the Daily Brief** (`de6f94e`). The learning system had been inferring
+   facts for weeks that only ever reached goal breakdown (barely opened) and the scan prompt
+   (invisible). The brief is the one surface seen daily. **`noticed` is its own response field, not
+   joined into the brief string** — every brief sentence maps to a row that already exists, and a
+   fact is an inference, so mixing them would have quietly destroyed that guarantee. One fact per
+   day, chosen by indexing the list with the local day number so it rotates with no stored state.
+   Any error on the facts query leaves it null and the brief is untouched.
+   **`daily-brief` was redeployed to production** (exit 0, verified 401 against a 404 control on a
+   nonexistent function). It still calls no model.
+2. **Job-hunt follow-up nudges** (`25b69f3`). Applications at `applied`/`viewed` for 14+ days
+   surface at the top of the Jobs tab, oldest first, each opening a prefilled follow-up task. Pure
+   function + 9 tests against a fixed clock. Row copy says "Quiet for N days", NOT "Applied N days
+   ago": the reference date falls back to `updated_at` when `applied_at` is null, so the other
+   phrasing claimed something the row does not say. Same bug class as the old "upcoming" job label.
+3. **Demo seed backdated** (`a36a10e`) so the sandbox actually shows the nudge.
+
+### 🚧 STAGING ONLY, NOT MERGED, NOT DEVICE-TESTED — subscriptions slice 2a (`3b61092`..`e7eb21b`)
+**The feature this round exists to fix:** the widened scan already extracts bills and renewals, but
+they became one-off tasks and the knowledge evaporated. Nothing in the app could answer "what am I
+paying for".
+- **Migration `018_subscriptions.sql` IS APPLIED TO PRODUCTION** (Zaid ran it in the dashboard SQL
+  editor; the CLI still cannot reconcile history on this project). **Verified externally with a
+  control:** anon gets `42501 permission denied` on `subscriptions` while a nonexistent table gives
+  `PGRST205`/404. The table exists and is locked. **Postgres's own error hint suggests
+  `GRANT SELECT ... TO anon` — never do that**, the publishable key ships in the public bundle.
+- **Four decisions locked in the contract, all hard to reverse:** amounts are **integer cents**
+  (float money gives you `30.299999999999997` on a totals screen); **currency is per row and never
+  converted**, totals group per currency because there is no FX source and a made-up rate would put
+  an invented number on a screen about real money; cancelled rows stay as history but leave every
+  total; the monthly equivalent is **derived, never stored**, so changing the formula is not a
+  migration.
+- Planner wrote the whole contract as real compiling files first (migration, model, `billing.dart`,
+  repository interface, list provider), which is why both worker lanes analyzed independently.
+- **`DemoSubscriptionRepository` exists because demo mode would otherwise have made a real network
+  call** with the fake `demo-user` id. That failure is SILENT (list errors, card hides itself), so
+  it would have looked fine. Zero-network-in-demo lives in this file, not in code: check it whenever
+  a new repository lands.
+- **NOT YET TESTED BY A HUMAN.** Add one with a decimal amount, add a second in another currency and
+  confirm two separate lines and no combined figure, cancel one and confirm it leaves the total.
+
+### NEXT, in order. Zaid picked all four features; two are done
+- **Round 2b, subscriptions from the inbox scan.** The riskiest remaining work and deliberately left
+  for a fresh planner. `extract-tasks` learns to emit subscription candidates, which surface as
+  **Add/Dismiss review cards, never auto-created** — that review pattern is what fixed the job
+  extractor inventing applications, and this is the same failure shape. **`SYSTEM_PROMPT` is
+  planner-written and the job rules in it must survive byte-identical** (they were tightened twice).
+  Deploys to shared production, so one careful shot. The dedup key already exists: the partial
+  unique index on `(user_id, source_email_id)` in migration 018.
+- **Round 3, weekly review.** A Sunday digest assembled in TypeScript from real rows, same grounded
+  pattern as `daily-brief`. Not started, no design debt.
+- Carried forward untouched: brand lockup visual check in light/dark, Android APK freshness (none
+  built in weeks, so Android has none of the recent rounds).
+
+### Lessons from this session
+- **A plain fetch can lie about which bundle is live.** The production root returned the PREVIOUS
+  commit's stamp from a client-side cache even though `index.html` is served `no-store`. A
+  cache-busted URL (`?cb=<guid>`) gave the truth. Never conclude "the deploy didn't land" from one
+  clean-looking fetch.
+- **Check the STEP list, not the run status, before investigating a stuck deploy.** A `main` run sat
+  `in_progress` for hours with all 15 steps already `completed success`, holding the constant
+  `deploy-vps` concurrency group and queueing staging behind it. It cleared itself. Nothing was
+  broken and nothing needed fixing.
+- **Two parallel lanes will report contradictory `flutter analyze` output, and that is not a
+  defect.** Lane B reported two lint errors in a file only Lane A was editing. Both reports were
+  honest; one was a snapshot mid-write. Re-run analyze yourself before believing either.
+- **Ask what happens on the DENIED or MALFORMED path of user input.** A cents parser gated by
+  `^(\d+)` passed review twice before it was clear the regex matches thirty digits and `int.parse`
+  throws out of a validator. Regex-validated does not mean parse-safe.
+- **A property recorded only in this file is invisible to workers.** Zero-network demo mode is not
+  expressible in code, so nothing stopped a new repository from silently breaking it. When a
+  contract lives in prose, the planner is the only one who can enforce it.
+
+## SUPERSEDED — Current state (2026-08-08, git state re-verified 2026-08-11): `staging` AND `main` @ `324fa0e`, OAUTH VERIFICATION CANCELLED (Zaid's call, cost-driven), INCREMENTAL INBOX SCAN + PRIVACY POLICY + GMAIL DISCONNECT SHIPPED, STAYING IN TESTING MODE
 
 **Both branches at `324fa0e`, pushed, clean, no divergence.** Everything from this round is
 committed and deployed; production verified serving this exact bundle at every step, not assumed
