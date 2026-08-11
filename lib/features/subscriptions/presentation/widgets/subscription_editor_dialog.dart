@@ -10,6 +10,7 @@ import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
+import 'package:life_os/features/subscriptions/domain/billing.dart';
 
 /// What the user asked the dialog to do.
 enum SubscriptionEditorAction {
@@ -80,23 +81,70 @@ class SubscriptionEditorResult {
   final String? notes;
 }
 
+/// Starting values for a subscription the user has not created yet.
+///
+/// This exists so a caller can open the editor pre-filled without inventing a
+/// [Subscription], which would need an id and timestamps for a row that does
+/// not exist. The inbox scan is the caller this was built for: it maps what a
+/// model read out of an email onto these fields.
+///
+/// **Every field is nullable on purpose.** A model that could not find an
+/// amount must leave it null so the field opens empty and the user types it,
+/// rather than being handed a confident zero. A null here means "the email did
+/// not say", never "assume the default".
+class SubscriptionDraft {
+  /// Creates a [SubscriptionDraft].
+  const SubscriptionDraft({
+    this.name,
+    this.amountCents,
+    this.currency,
+    this.cycle,
+    this.nextChargeDate,
+    this.notes,
+  });
+
+  /// Suggested name, or null to leave the field empty.
+  final String? name;
+
+  /// Suggested charge in cents, or null to leave the field empty.
+  final int? amountCents;
+
+  /// Suggested three-letter ISO code, or null to fall back to the default.
+  final String? currency;
+
+  /// Suggested billing cycle, or null to fall back to the default.
+  final BillingCycle? cycle;
+
+  /// Suggested next charge date, or null for none.
+  final DateTime? nextChargeDate;
+
+  /// Suggested note, or null for none.
+  final String? notes;
+}
+
 /// A centered dialog for creating or editing a subscription.
 class SubscriptionEditorDialog extends StatefulWidget {
-  /// Creates a [SubscriptionEditorDialog]. Pass [existing] to edit.
-  const SubscriptionEditorDialog({super.key, this.existing});
+  /// Creates a [SubscriptionEditorDialog]. Pass [existing] to edit, or
+  /// [draft] to create with fields pre-filled.
+  const SubscriptionEditorDialog({super.key, this.existing, this.draft});
 
   /// The subscription being edited, or null to create a new one.
   final Subscription? existing;
+
+  /// Starting values for a new subscription. Ignored when [existing] is set,
+  /// since editing a real row must never be overwritten by a suggestion.
+  final SubscriptionDraft? draft;
 
   /// Shows the editor. Resolves to the entered values/action, or null on
   /// cancel.
   static Future<SubscriptionEditorResult?> show(
     BuildContext context, {
     Subscription? existing,
+    SubscriptionDraft? draft,
   }) {
     return showDialog<SubscriptionEditorResult>(
       context: context,
-      builder: (_) => SubscriptionEditorDialog(existing: existing),
+      builder: (_) => SubscriptionEditorDialog(existing: existing, draft: draft),
     );
   }
 
@@ -119,16 +167,28 @@ class _SubscriptionEditorDialogState extends State<SubscriptionEditorDialog> {
   void initState() {
     super.initState();
     final existing = widget.existing;
-    _nameController = TextEditingController(text: existing?.name ?? '');
+    // A real row always wins over a suggestion, so the draft is only consulted
+    // when there is nothing being edited.
+    final draft = existing == null ? widget.draft : null;
+    final draftAmount = draft?.amountCents;
+    _nameController = TextEditingController(
+      text: existing?.name ?? draft?.name ?? '',
+    );
     _amountController = TextEditingController(
-      text: existing != null ? _formatCentsForInput(existing.amountCents) : '',
+      text: existing != null
+          ? formatAmount(existing.amountCents)
+          : draftAmount != null
+          ? formatAmount(draftAmount)
+          : '',
     );
     _currencyController = TextEditingController(
-      text: existing?.currency ?? 'USD',
+      text: existing?.currency ?? draft?.currency ?? 'USD',
     );
-    _notesController = TextEditingController(text: existing?.notes ?? '');
-    _cycle = existing?.cycle ?? BillingCycle.monthly;
-    _nextChargeDate = existing?.nextChargeDate;
+    _notesController = TextEditingController(
+      text: existing?.notes ?? draft?.notes ?? '',
+    );
+    _cycle = existing?.cycle ?? draft?.cycle ?? BillingCycle.monthly;
+    _nextChargeDate = existing?.nextChargeDate ?? draft?.nextChargeDate;
   }
 
   @override
@@ -140,41 +200,9 @@ class _SubscriptionEditorDialogState extends State<SubscriptionEditorDialog> {
     super.dispose();
   }
 
-  /// Postgres INTEGER ceiling, the storage limit on `amount_cents`.
-  static const int _maxAmountCents = 2147483647;
-
-  static String _formatCentsForInput(int cents) {
-    final major = cents ~/ 100;
-    final minor = (cents % 100).toString().padLeft(2, '0');
-    return '$major.$minor';
-  }
-
-  /// Parses a decimal amount string (e.g. `12.99`) into integer cents by
-  /// string manipulation, never `double * 100`, which is fragile and the
-  /// whole reason the schema stores cents instead of a float.
-  ///
-  /// Returns null for anything not a plain non-negative number with at most
-  /// two decimal places, and for anything too large to store.
-  static int? _parseAmountCents(String raw) {
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) return null;
-    final match = RegExp(r'^(\d+)(?:\.(\d{1,2}))?$').firstMatch(trimmed);
-    if (match == null) return null;
-    // tryParse, not parse: the regex happily matches thirty digits, and
-    // int.parse would throw straight out of a text field's validator.
-    final whole = int.tryParse(match.group(1)!);
-    if (whole == null) return null;
-    final fraction = int.parse((match.group(2) ?? '').padRight(2, '0'));
-    // `amount_cents` is a Postgres INTEGER, so anything past its ceiling
-    // would parse cleanly here and then fail on insert with an overflow the
-    // user could make no sense of. Reject it while it's still a form error.
-    if (whole > _maxAmountCents ~/ 100) return null;
-    return whole * 100 + fraction;
-  }
-
   bool get _isValid =>
       _nameController.text.trim().isNotEmpty &&
-      _parseAmountCents(_amountController.text) != null &&
+      parseAmountCents(_amountController.text) != null &&
       _currencyController.text.trim().length == 3;
 
   Future<void> _pickDate() async {
@@ -190,7 +218,7 @@ class _SubscriptionEditorDialogState extends State<SubscriptionEditorDialog> {
   }
 
   void _validate() {
-    final amountCents = _parseAmountCents(_amountController.text);
+    final amountCents = parseAmountCents(_amountController.text);
     setState(() {
       _amountError = amountCents == null
           ? 'Enter a valid amount, e.g. 12.99'
@@ -202,7 +230,7 @@ class _SubscriptionEditorDialogState extends State<SubscriptionEditorDialog> {
   }
 
   void _save() {
-    final amountCents = _parseAmountCents(_amountController.text);
+    final amountCents = parseAmountCents(_amountController.text);
     if (_nameController.text.trim().isEmpty ||
         amountCents == null ||
         _currencyController.text.trim().length != 3) {

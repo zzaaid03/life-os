@@ -10,6 +10,8 @@ library;
 
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
+import 'package:life_os/features/subscriptions/data/models/subscription.dart';
+import 'package:life_os/features/subscriptions/domain/billing.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -42,6 +44,22 @@ class InboxScanException implements Exception {
   String toString() => 'InboxScanException: $message';
 }
 
+/// Parses a model-supplied `yyyy-mm-dd` string into local midnight, or null.
+///
+/// The model is instructed to emit a plain ISO date and nothing else, but it
+/// is still a model: anything unparseable is dropped rather than guessed at.
+/// Parsed as local midnight to match how the app stores dates.
+DateTime? _parseIsoDate(Object? raw) {
+  if (raw is! String) return null;
+  final trimmed = raw.trim();
+  if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) return null;
+  final parts = trimmed.split('-').map(int.parse).toList();
+  final parsed = DateTime(parts[0], parts[1], parts[2]);
+  // Reject a roll-over from an impossible date such as 2026-02-31.
+  if (parsed.month != parts[1] || parsed.day != parts[2]) return null;
+  return parsed;
+}
+
 /// An AI-suggested task extracted from an email.
 class SuggestedTask {
   /// Creates a [SuggestedTask].
@@ -57,28 +75,11 @@ class SuggestedTask {
   factory SuggestedTask.fromJson(Map<String, dynamic> json) {
     return SuggestedTask(
       title: (json['title'] as String? ?? '').trim(),
-      dueDate: _parseDueDate(json['dueDate']),
+      dueDate: _parseIsoDate(json['dueDate']),
       dueDateHint: (json['dueDateHint'] as String?)?.trim(),
       priority: (json['priority'] as String? ?? 'none').trim().toLowerCase(),
       sourceEmailId: json['sourceEmailId'] as String?,
     );
-  }
-
-  /// Parses the model's `dueDate` into local midnight, or null.
-  ///
-  /// The model is instructed to emit a plain ISO `yyyy-mm-dd` and nothing else,
-  /// but it is still a model: anything unparseable is dropped rather than
-  /// guessed at, which leaves the user picking a date by hand exactly as they
-  /// do today. Parsed as local midnight to match how [Task] stores due dates.
-  static DateTime? _parseDueDate(Object? raw) {
-    if (raw is! String) return null;
-    final trimmed = raw.trim();
-    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) return null;
-    final parts = trimmed.split('-').map(int.parse).toList();
-    final parsed = DateTime(parts[0], parts[1], parts[2]);
-    // Reject a roll-over from an impossible date such as 2026-02-31.
-    if (parsed.month != parts[1] || parsed.day != parts[2]) return null;
-    return parsed;
   }
 
   /// Short imperative task title.
@@ -139,12 +140,109 @@ class JobUpdate {
   final String? sourceEmailId;
 }
 
+/// An AI-suggested recurring charge extracted from an email.
+///
+/// This is a *suggestion*, never a stored row. It is deliberately looser than
+/// [Subscription]: every field except the name may be null, because a model
+/// that could not find an amount in an email must say so rather than invent
+/// one. The review card hands these to the editor pre-filled and the user
+/// confirms them, so a null here costs one typed field, while a guess would
+/// put a wrong number on a screen about real money.
+class SuggestedSubscription {
+  /// Creates a [SuggestedSubscription].
+  const SuggestedSubscription({
+    required this.name,
+    this.amountCents,
+    this.currency,
+    this.cycle,
+    this.nextChargeDate,
+    this.sourceEmailId,
+  });
+
+  /// Parses a [SuggestedSubscription] from the Edge Function JSON.
+  ///
+  /// The model sends the amount as the literal text it read in the email
+  /// ("9.99"), not as cents. Converting it here means the arithmetic happens
+  /// in tested Dart via the same [parseAmountCents] the editor's own field
+  /// uses, instead of asking a language model to multiply by 100.
+  factory SuggestedSubscription.fromJson(Map<String, dynamic> json) {
+    return SuggestedSubscription(
+      name: (json['name'] as String? ?? '').trim(),
+      amountCents: _parseAmount(json['amount']),
+      currency: _parseCurrency(json['currency']),
+      cycle: _parseCycle(json['cycle']),
+      nextChargeDate: _parseIsoDate(json['nextChargeDate']),
+      sourceEmailId: json['sourceEmailId'] as String?,
+    );
+  }
+
+  static int? _parseAmount(Object? raw) {
+    // Accept a number too: a model told to send a string sometimes sends
+    // 9.99 anyway, and that is still a faithful reading of the email.
+    if (raw is num) return parseAmountCents(raw.toString());
+    if (raw is! String) return null;
+    return parseAmountCents(raw);
+  }
+
+  /// Normalises the currency to the exact `^[A-Z]{3}$` the column's CHECK
+  /// constraint allows, or null.
+  ///
+  /// Null on anything else, including a bare symbol. `$` is deliberately NOT
+  /// mapped to USD: it is equally CAD, AUD and several others, so resolving it
+  /// would be a guess about the user's money. An unresolved currency leaves
+  /// the editor on its default for the user to correct.
+  static String? _parseCurrency(Object? raw) {
+    if (raw is! String) return null;
+    final upper = raw.trim().toUpperCase();
+    if (!RegExp(r'^[A-Z]{3}$').hasMatch(upper)) return null;
+    return upper;
+  }
+
+  /// Strictly parses the billing cycle, returning null on anything
+  /// unrecognised.
+  ///
+  /// Deliberately not [BillingCycle.parse], which falls back to monthly. That
+  /// fallback is right for reading a stored row we can still mostly show, and
+  /// wrong here: it would silently turn "the model did not say" into a
+  /// confident "monthly" and quietly change what the totals claim.
+  static BillingCycle? _parseCycle(Object? raw) {
+    if (raw is! String) return null;
+    final value = raw.trim().toLowerCase();
+    for (final cycle in BillingCycle.values) {
+      if (cycle.name == value) return cycle;
+    }
+    return null;
+  }
+
+  /// The service or plan being charged for, e.g. "Netflix".
+  final String name;
+
+  /// The charge in cents, or null when the email did not state one clearly.
+  final int? amountCents;
+
+  /// Three-letter uppercase ISO code, or null when it could not be resolved.
+  final String? currency;
+
+  /// How often it recurs, or null when the email did not say.
+  final BillingCycle? cycle;
+
+  /// The next charge date at local midnight, or null.
+  final DateTime? nextChargeDate;
+
+  /// The Gmail message id this suggestion was derived from, if any.
+  ///
+  /// Carried through to the stored row, where the partial unique index on
+  /// `(user_id, source_email_id)` stops the same email being added twice.
+  final String? sourceEmailId;
+}
+
 /// The result of an inbox scan.
 class ScanResult {
   /// Creates a [ScanResult].
   const ScanResult({
     required this.tasks,
     required this.jobUpdates,
+    this.subscriptions = const [],
     this.scannedAccount,
     this.remaining = 0,
   });
@@ -153,6 +251,10 @@ class ScanResult {
   factory ScanResult.fromJson(Map<String, dynamic> json) {
     final rawTasks = json['tasks'] as List<dynamic>? ?? const [];
     final rawJobs = json['jobUpdates'] as List<dynamic>? ?? const [];
+    // A server that predates subscriptions omits this key entirely, which is
+    // exactly what happens between shipping this client and deploying the
+    // function. An absent key must mean "no suggestions", never an error.
+    final rawSubs = json['subscriptions'] as List<dynamic>? ?? const [];
     final rawRemaining = json['remaining'];
     return ScanResult(
       tasks: rawTasks
@@ -167,6 +269,13 @@ class ScanResult {
           // e.g. a rejection whose company the AI couldn't identify.
           .where((j) => j.summary.isNotEmpty || j.company.isNotEmpty)
           .toList(),
+      subscriptions: rawSubs
+          .whereType<Map<String, dynamic>>()
+          .map(SuggestedSubscription.fromJson)
+          // A nameless suggestion is unreviewable: the card would show a blank
+          // row and the editor would open with nothing identifying it.
+          .where((s) => s.name.isNotEmpty)
+          .toList(),
       scannedAccount: (json['scannedAccount'] as String?)?.trim(),
       remaining: rawRemaining is num ? rawRemaining.toInt() : 0,
     );
@@ -177,6 +286,10 @@ class ScanResult {
 
   /// Job-application updates detected.
   final List<JobUpdate> jobUpdates;
+
+  /// Recurring charges detected. Always empty against a server that predates
+  /// the feature, and never auto-created: these surface as review cards.
+  final List<SuggestedSubscription> subscriptions;
 
   /// The Gmail address that was scanned, as reported by the function.
   final String? scannedAccount;

@@ -93,6 +93,39 @@ List<Subscription> chargingSoon(
   return soon;
 }
 
+/// The Postgres INTEGER ceiling, which is the storage limit on `amount_cents`.
+const int maxAmountCents = 2147483647;
+
+/// Parses a decimal amount string (e.g. `12.99`) into integer cents by string
+/// manipulation, never `double * 100`, which is fragile and the whole reason
+/// the schema stores cents instead of a float.
+///
+/// Returns null for anything that is not a plain non-negative number with at
+/// most two decimal places, and for anything too large to store. Null means
+/// "this is not an amount", so every caller has to decide what to do about
+/// that rather than receiving a plausible wrong number.
+///
+/// This is the ONLY amount parser in the app. It is shared by the editor's
+/// text field and by the inbox scan, which reads amounts a model copied out
+/// of an email: both feed the same column, so both must agree on what is
+/// storable, down to the overflow ceiling.
+int? parseAmountCents(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return null;
+  final match = RegExp(r'^(\d+)(?:\.(\d{1,2}))?$').firstMatch(trimmed);
+  if (match == null) return null;
+  // tryParse, not parse: the regex happily matches thirty digits, and
+  // int.parse would throw straight out of a text field's validator.
+  final whole = int.tryParse(match.group(1)!);
+  if (whole == null) return null;
+  final fraction = int.parse((match.group(2) ?? '').padRight(2, '0'));
+  // Anything past the column's ceiling parses cleanly here and then fails on
+  // insert with an overflow the user could make no sense of. Reject it while
+  // it is still a form error.
+  if (whole > maxAmountCents ~/ 100) return null;
+  return whole * 100 + fraction;
+}
+
 /// Formats [cents] as a plain amount string, e.g. `12.00`.
 ///
 /// Deliberately returns no currency symbol: the code is stored per row and

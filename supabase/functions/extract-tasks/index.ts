@@ -33,8 +33,9 @@ const corsHeaders = {
 
 const SYSTEM_PROMPT =
   `You are an inbox assistant for a busy person who is also actively job-hunting.
-You read emails and produce TWO things: (1) actionable TASKS, and (2) JOB APPLICATION
-UPDATES. Be precise: if an email fits neither category, ignore it completely.
+You read emails and produce THREE things: (1) actionable TASKS, (2) JOB APPLICATION
+UPDATES, and (3) SUBSCRIPTIONS. Be precise: if an email fits no category, ignore it
+completely.
 
 The user message states TODAY as the user's local date, and every email carries its own
 sentDate. Resolve dates against those two only, never against your own idea of the date.
@@ -114,9 +115,53 @@ Each job update: {company, role, status, summary, sourceEmailId}.
 - summary: one concise, human sentence reflecting the ACTUAL outcome
   (e.g. "RoboService rejected your application for the Data Science working-student role.")
 
+=== SUBSCRIPTIONS ===
+A subscription is a RECURRING charge the recipient is already committed to: a plan,
+membership, or service that bills them again and again until they cancel. Emit one
+ONLY when the email shows the recipient's OWN active or starting subscription, such as
+a renewal notice, a price-change notice for their plan, a recurring-payment receipt, or
+a confirmation that their plan has begun.
+
+NEVER emit a subscription from (these are the expensive mistakes):
+- Marketing that advertises a plan they do NOT have: "upgrade to Pro", "plans from
+  9.99/month", "go premium", a discount offer, or a free-trial invitation. An email
+  saying a price EXISTS is not the recipient paying it.
+- A one-off purchase, a single order, or a one-time payment. Recurring is the whole test.
+- Someone else's subscription, or a plan the sender is trying to sell them.
+- A cancellation confirmation, or a plan that has already ended. Those are over.
+If you cannot tell whether the recipient actually holds the subscription, emit nothing.
+Never invent a service name and never guess a price. When in doubt, emit nothing.
+
+A subscription does NOT replace a task. If a renewal email also warrants a renewal task
+under TASKS rule 4, emit BOTH: the task and the subscription. They are separate outputs
+and neither suppresses the other.
+
+Each subscription: {name, amount, currency, cycle, nextChargeDate, sourceEmailId}.
+- name: the service as a person would say it ("Netflix", "Spotify Premium",
+  "McFIT membership"). Never a sentence.
+- amount: the recurring charge as a plain number STRING, exactly as the email states it,
+  digits with an optional dot decimal and nothing else: "9.99", "120", "1299.00".
+  Strip every currency symbol, space and thousands separator, and convert a comma
+  decimal to a dot, so "1.299,00 EUR" becomes "1299.00" and "9,99 EUR" becomes "9.99".
+  If the email does not state the recurring amount plainly, amount MUST be null.
+  A price you inferred, calculated or remembered is a failure. Do not convert between
+  currencies and do not turn a yearly total into a monthly one: report the number
+  written next to the billing period you report.
+- currency: the three-letter uppercase ISO code, e.g. "EUR", "USD", "GBP". Use the code
+  when the email states one, and map an unambiguous symbol: EUR for the euro sign, GBP
+  for the pound sign. A dollar sign on its own is NOT unambiguous (it is USD, CAD, AUD
+  and others), so unless the email says which, currency MUST be null. Null whenever you
+  are unsure.
+- cycle: exactly one of weekly | monthly | quarterly | yearly, matching how often it
+  recurs ("per year", "annual", "/yr" are all yearly). If the email does not say how
+  often it bills, cycle MUST be null. Never guess monthly because it is common.
+- nextChargeDate: the next billing date, as an ISO yyyy-mm-dd string, following the
+  DATES rules above exactly. Null unless the email states it plainly.
+
 Respond with ONLY a JSON object of this exact form:
 {"tasks":[{"title": string, "dueDate": string|null, "dueDateHint": string|null, "priority": string, "sourceEmailId": string}],
- "jobUpdates":[{"company": string, "role": string, "status": string, "summary": string, "sourceEmailId": string}]}`;
+ "jobUpdates":[{"company": string, "role": string, "status": string, "summary": string, "sourceEmailId": string}],
+ "subscriptions":[{"name": string, "amount": string|null, "currency": string|null, "cycle": string|null, "nextChargeDate": string|null, "sourceEmailId": string}]}`;
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -433,7 +478,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (pendingIds.length === 0) {
-      return jsonResponse({ tasks: [], jobUpdates: [], scannedAccount: account });
+      return jsonResponse({
+        tasks: [],
+        jobUpdates: [],
+        subscriptions: [],
+        scannedAccount: account,
+      });
     }
 
     const orderedIds = order === "oldest" ? [...pendingIds].reverse() : pendingIds;
@@ -479,7 +529,11 @@ Deno.serve(async (req: Request) => {
     const data = await groqRes.json();
     const content = data.choices?.[0]?.message?.content ?? "{}";
 
-    let parsed: { tasks?: unknown[]; jobUpdates?: unknown[] };
+    let parsed: {
+      tasks?: unknown[];
+      jobUpdates?: unknown[];
+      subscriptions?: unknown[];
+    };
     try {
       parsed = JSON.parse(content);
     } catch {
@@ -495,6 +549,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({
       tasks: parsed.tasks ?? [],
       jobUpdates: parsed.jobUpdates ?? [],
+      subscriptions: parsed.subscriptions ?? [],
       scannedAccount: account,
       analyzedCount,
       remaining,
