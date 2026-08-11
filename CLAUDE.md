@@ -18,11 +18,51 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-08): `staging` AND `main` @ `c0be6c4`, OAUTH VERIFICATION CANCELLED (Zaid's call, cost-driven), PRIVACY POLICY + GMAIL DISCONNECT SHIPPED, STAYING IN TESTING MODE
+## Current state (2026-08-08, git state re-verified 2026-08-11): `staging` AND `main` @ `324fa0e`, OAUTH VERIFICATION CANCELLED (Zaid's call, cost-driven), INCREMENTAL INBOX SCAN + PRIVACY POLICY + GMAIL DISCONNECT SHIPPED, STAYING IN TESTING MODE
 
-**Both branches at `c0be6c4`, pushed, clean, no divergence.** Everything from this round is
+**Both branches at `324fa0e`, pushed, clean, no divergence.** Everything from this round is
 committed and deployed; production verified serving this exact bundle at every step, not assumed
-from a green CI run.
+from a green CI run. Re-verified 2026-08-11: `https://lifeos.deadthrone.dev` serves
+`flutter_bootstrap.js?v=324fa0e`, `/privacy` returns 200.
+
+**Two verification notes from that re-check, both worth keeping:**
+- **A plain fetch can lie about which bundle is live.** The first `Invoke-WebRequest` against the
+  production root returned the PREVIOUS commit's stamp (`c0be6c4`) from a client-side cache, even
+  though `index.html` is served `no-store`. A cache-busted refetch (`?cb=<guid>`) showed the real
+  answer. Always cache-bust the URL when verifying a deploy; do not conclude "the deploy didn't
+  land" from one clean-looking fetch.
+- **`staging` can sit behind for a GitHub-side reason that is not a failure.** On 2026-08-11 the
+  `main` deploy run for `324fa0e` had ALL 15 steps `completed success`, including "Deploy via
+  rsync", while the RUN itself stayed `in_progress` for hours. Because `concurrency.group` is the
+  constant `deploy-vps` (deliberately, see the deploy-race fix), the `staging` run queued `pending`
+  behind it indefinitely and staging kept serving `c0be6c4`. Nothing of ours was broken. Check the
+  STEP list (`gh api .../jobs`), not just the run status, before investigating a "stuck" deploy.
+
+### ✅ ALSO SHIPPED AND LIVE — the incremental inbox scan (`46755f1`..`5971619`)
+**This round was missing from the handoff entirely until 2026-08-11; do not conclude the scan still
+reads a fixed 10-email window.** `extract-tasks` used to read the 10 newest inbox emails with no
+memory of where it left off, so any mail arriving faster than the user scanned fell out of the
+window unread and nothing said so.
+- **Coverage is a SET DIFFERENCE, not a watermark.** The function lists ids in a rolling 30-day
+  horizon and subtracts ids already in `processed_emails`. A watermark is a single timestamp and
+  cannot describe a pile worked from both ends, which is exactly what happens once the user picks
+  an order. The set difference makes skipping an email structurally impossible and needed **no
+  schema change**.
+- **`action: 'count'`** answers "how much mail is waiting" without fetching a single body or
+  calling the model, cheap enough to run on every screen open. `countPending` on the client can
+  never throw: any failure degrades to zero pending, which is exactly today's behaviour (a scan
+  just runs).
+- A batch is marked analysed **only after Groq genuinely succeeds**. `SYSTEM_PROMPT` untouched.
+- **The client-side `processed_emails` filter had to be REMOVED, and this is the subtle part.**
+  The server now marks a batch analysed immediately after Groq returns, using the same table, so
+  the old client-side filter would have run against ids the server had just recorded and stripped
+  every suggestion out of the response. `ProcessedEmailsRepository` and its demo counterpart lost
+  their last consumer and were deleted rather than left as orphaned providers.
+- Above 50 pending, a backlog choice sheet offers newest-first or oldest-first; below that a normal
+  scan runs with no extra tap. A remaining count surfaces after a scan so a truncated backlog is
+  visible instead of silent. The disclosure copy no longer claims "10 most recent emails", because
+  that stopped being true.
+- **Verified against 9 adversarial emails, 9/9 correct, no prompt changes needed.**
 
 ### ⛔ GOOGLE OAUTH VERIFICATION IS CANCELLED, NOT PAUSED. DO NOT RESUME WITHOUT ZAID EXPLICITLY REOPENING IT
 Zaid pursued verification this round to leave Testing mode (100-user cap, "unverified app" warning)
