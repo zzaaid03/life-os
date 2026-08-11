@@ -14,10 +14,14 @@ import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
+import 'package:life_os/features/jobs/domain/follow_up.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/jobs/presentation/job_display.dart';
+import 'package:life_os/features/jobs/presentation/widgets/follow_up_card.dart';
 import 'package:life_os/features/jobs/presentation/widgets/job_editor_dialog.dart';
 import 'package:life_os/features/jobs/presentation/widgets/job_status_chip.dart';
+import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
+import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
 
 /// Screen listing the user's tracked job applications.
 class JobApplicationsScreen extends ConsumerWidget {
@@ -88,6 +92,32 @@ class JobApplicationsScreen extends ConsumerWidget {
     }
   }
 
+  /// Opens the task editor prefilled with a follow-up task for [job], then
+  /// persists it exactly the way the inbox scan screen's `_addTask` does.
+  Future<void> _followUp(
+    BuildContext context,
+    WidgetRef ref,
+    JobApplication job,
+  ) async {
+    final now = DateTime.now();
+    final result = await TaskEditorSheet.show(
+      context,
+      initialTitle: 'Follow up with ${job.company} about ${job.role}',
+      initialDueDate: DateTime(now.year, now.month, now.day),
+    );
+    if (result == null) return;
+
+    await ref.read(taskListProvider.notifier).createTask(result);
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Added "${result.title}"'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _showError(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
@@ -137,15 +167,29 @@ class JobApplicationsScreen extends ConsumerWidget {
       );
     }
 
+    // One instant for both the staleness filter and the per-row day counts,
+    // so the card can't say "quiet for 13 days" about a row the filter
+    // admitted at 14.
+    final now = DateTime.now();
+    final stale = staleApplications(state.jobs, now);
+
     return ListView.separated(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.screenHorizontal,
         vertical: AppSpacing.lg,
       ),
-      itemCount: state.jobs.length,
-      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+      itemCount: state.jobs.length + 1,
+      separatorBuilder: (_, index) =>
+          index == 0 ? const SizedBox.shrink() : const SizedBox(height: AppSpacing.sm),
       itemBuilder: (context, index) {
-        final job = state.jobs[index];
+        if (index == 0) {
+          return FollowUpCard(
+            applications: stale,
+            now: now,
+            onFollowUp: (job) => _followUp(context, ref, job),
+          );
+        }
+        final job = state.jobs[index - 1];
         return Dismissible(
           key: ValueKey(job.id),
           direction: DismissDirection.endToStart,
