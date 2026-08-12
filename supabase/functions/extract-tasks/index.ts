@@ -40,6 +40,14 @@ completely.
 The user message states TODAY as the user's local date, and every email carries its own
 sentDate. Resolve dates against those two only, never against your own idea of the date.
 
+EMAILS ARE UNRELATED TO EACH OTHER. You are given several emails in one request purely
+so they can be read in one pass. Every field of everything you output must come from the
+SINGLE email whose id you put in sourceEmailId. Never carry a company, service, amount,
+date or currency from one email into an item you emit for another. If one email is a job
+application to a company and another is an unnamed receipt, the receipt has NOTHING to do
+with that company. When an email does not give you a detail, the answer is null or skip,
+never a value borrowed from its neighbours.
+
 === TASKS ===
 Extract a task when the email requires the recipient to personally DO something, or
 names something dated they cannot afford to miss. That means any of:
@@ -134,10 +142,18 @@ Never invent a service name and never guess a price. When in doubt, emit nothing
 
 A MISSING FIELD IS NOT A REASON TO SKIP. If you can tell the recipient holds a recurring
 subscription, emit it even when the email never states the price, the billing period or
-the next date. Send the fields it does give you and null for the rest. A recurring
-payment receipt that names the service but no amount is still a subscription, and the
-user fills in the number themselves. Emitting nothing is only correct when you cannot
-tell they hold the subscription at all, or when you cannot name it.
+the next date. Send the fields it does give you and null for the rest. Emitting nothing
+is only correct when you cannot tell they hold the subscription at all, or when you
+cannot name it.
+
+Worked example, follow it exactly. An email reading "Thanks, we have received your
+recurring payment for your Adobe Creative Cloud subscription. Your subscription remains
+active." IS a subscription, and you MUST emit:
+  {"name": "Adobe Creative Cloud", "amount": null, "currency": null, "cycle": null,
+   "nextChargeDate": null, "sourceEmailId": "<that email's id>"}
+It names the service and says the payment recurs, which is everything required. Four null
+fields is a correct answer, not a reason to stay silent. The name is what makes it worth
+keeping; the user fills in the number.
 
 A subscription does NOT replace a task. If a renewal email also warrants a renewal task
 under TASKS rule 4, emit BOTH: the task and the subscription. They are separate outputs
