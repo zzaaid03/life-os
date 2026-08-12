@@ -187,13 +187,30 @@ class SuggestedSubscription {
   /// Normalises the currency to the exact `^[A-Z]{3}$` the column's CHECK
   /// constraint allows, or null.
   ///
-  /// Null on anything else, including a bare symbol. `$` is deliberately NOT
-  /// mapped to USD: it is equally CAD, AUD and several others, so resolving it
-  /// would be a guess about the user's money. An unresolved currency leaves
-  /// the editor on its default for the user to correct.
+  /// The model is told to copy what the email wrote and NOT to interpret it,
+  /// so resolving a symbol happens here instead. That split is deliberate: the
+  /// first version asked the model to leave an ambiguous symbol alone and it
+  /// confidently returned USD for an email that only ever wrote `$`. A rule
+  /// the model has to remember is a rule it can ignore; this one it cannot.
+  ///
+  /// `€` and `£` resolve because they name exactly one currency. `$` does NOT:
+  /// it is equally USD, CAD and AUD, so it stays null and the editor opens on
+  /// its default for the user to confirm. Guessing here would put a wrong
+  /// currency on a screen about real money.
+  static const Map<String, String> _unambiguousSymbols = {
+    '€': 'EUR',
+    '£': 'GBP',
+    '¥': 'JPY',
+    '₪': 'ILS',
+  };
+
   static String? _parseCurrency(Object? raw) {
     if (raw is! String) return null;
-    final upper = raw.trim().toUpperCase();
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    final symbol = _unambiguousSymbols[trimmed];
+    if (symbol != null) return symbol;
+    final upper = trimmed.toUpperCase();
     if (!RegExp(r'^[A-Z]{3}$').hasMatch(upper)) return null;
     return upper;
   }

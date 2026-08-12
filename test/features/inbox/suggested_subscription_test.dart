@@ -43,9 +43,22 @@ void main() {
         expect(s.currency, isNull);
       });
 
-      test('a euro sign is null', () {
+      test('a euro sign resolves to EUR, it names one currency', () {
         final s = SuggestedSubscription.fromJson({'name': 'X', 'currency': '€'});
-        expect(s.currency, isNull);
+        expect(s.currency, equals('EUR'));
+      });
+
+      test('a pound sign resolves to GBP', () {
+        final s = SuggestedSubscription.fromJson({'name': 'X', 'currency': '£'});
+        expect(s.currency, equals('GBP'));
+      });
+
+      test('a padded symbol still resolves', () {
+        final s = SuggestedSubscription.fromJson({
+          'name': 'X',
+          'currency': ' € ',
+        });
+        expect(s.currency, equals('EUR'));
       });
 
       test('a word is null', () {

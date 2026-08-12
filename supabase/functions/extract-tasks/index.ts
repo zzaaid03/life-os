@@ -132,13 +132,25 @@ NEVER emit a subscription from (these are the expensive mistakes):
 If you cannot tell whether the recipient actually holds the subscription, emit nothing.
 Never invent a service name and never guess a price. When in doubt, emit nothing.
 
+A MISSING FIELD IS NOT A REASON TO SKIP. If you can tell the recipient holds a recurring
+subscription, emit it even when the email never states the price, the billing period or
+the next date. Send the fields it does give you and null for the rest. A recurring
+payment receipt that names the service but no amount is still a subscription, and the
+user fills in the number themselves. Emitting nothing is only correct when you cannot
+tell they hold the subscription at all, or when you cannot name it.
+
 A subscription does NOT replace a task. If a renewal email also warrants a renewal task
 under TASKS rule 4, emit BOTH: the task and the subscription. They are separate outputs
-and neither suppresses the other.
+and neither suppresses the other. Emitting the subscription does not excuse you from the
+task, and this is a real requirement, not a preference.
 
 Each subscription: {name, amount, currency, cycle, nextChargeDate, sourceEmailId}.
 - name: the service as a person would say it ("Netflix", "Spotify Premium",
-  "McFIT membership"). Never a sentence.
+  "McFIT membership"). Never a sentence. If the body never names the service, take the
+  name from the sender shown in the email's "from" field. NEVER invent a placeholder
+  such as "monthly subscription", "Membership", "Your plan" or "Subscription": a row the
+  user cannot recognise months later is worse than no row. If neither the body nor the
+  sender gives you a real name, skip this subscription entirely.
 - amount: the recurring charge as a plain number STRING, exactly as the email states it,
   digits with an optional dot decimal and nothing else: "9.99", "120", "1299.00".
   Strip every currency symbol, space and thousands separator, and convert a comma
@@ -147,11 +159,13 @@ Each subscription: {name, amount, currency, cycle, nextChargeDate, sourceEmailId
   A price you inferred, calculated or remembered is a failure. Do not convert between
   currencies and do not turn a yearly total into a monthly one: report the number
   written next to the billing period you report.
-- currency: the three-letter uppercase ISO code, e.g. "EUR", "USD", "GBP". Use the code
-  when the email states one, and map an unambiguous symbol: EUR for the euro sign, GBP
-  for the pound sign. A dollar sign on its own is NOT unambiguous (it is USD, CAD, AUD
-  and others), so unless the email says which, currency MUST be null. Null whenever you
-  are unsure.
+- currency: COPY what the email writes and do not translate it. If the email writes a
+  three-letter code, send that code ("EUR", "USD", "GBP"). If the email only shows a
+  symbol, send only that symbol ("$", "€", "£") exactly as it appears.
+  Never convert a symbol into a code yourself, and never infer a currency from the
+  sender, the language of the email, or the country you think they are in. A dollar sign
+  is not USD until the email says USD. If the email shows no currency at all, send null.
+  Deciding what a symbol means is not your job; something else does that.
 - cycle: exactly one of weekly | monthly | quarterly | yearly, matching how often it
   recurs ("per year", "annual", "/yr" are all yearly). If the email does not say how
   often it bills, cycle MUST be null. Never guess monthly because it is common.
