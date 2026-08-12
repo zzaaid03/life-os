@@ -266,12 +266,22 @@ class ScanResult {
 
   /// Parses a [ScanResult] from the Edge Function response body.
   factory ScanResult.fromJson(Map<String, dynamic> json) {
-    final rawTasks = json['tasks'] as List<dynamic>? ?? const [];
-    final rawJobs = json['jobUpdates'] as List<dynamic>? ?? const [];
+    // Read every list defensively. `as List<dynamic>?` THROWS when the value
+    // is present but not a list, and the model decides that shape, not us: a
+    // single malformed response would otherwise take down the whole scan with
+    // an error that says nothing about the cause.
+    final rawTasks = json['tasks'] is List
+        ? json['tasks'] as List<dynamic>
+        : const <dynamic>[];
+    final rawJobs = json['jobUpdates'] is List
+        ? json['jobUpdates'] as List<dynamic>
+        : const <dynamic>[];
     // A server that predates subscriptions omits this key entirely, which is
     // exactly what happens between shipping this client and deploying the
     // function. An absent key must mean "no suggestions", never an error.
-    final rawSubs = json['subscriptions'] as List<dynamic>? ?? const [];
+    final rawSubs = json['subscriptions'] is List
+        ? json['subscriptions'] as List<dynamic>
+        : const <dynamic>[];
     final rawRemaining = json['remaining'];
     return ScanResult(
       tasks: rawTasks

@@ -138,11 +138,17 @@ class InboxScanController extends StateNotifier<InboxScanState> {
     } on GmailNotConnectedException {
       state = state.copyWith(phase: InboxScanPhase.idle);
       rethrow;
-    } catch (_) {
+    } catch (e) {
+      // Keep the real reason. This used to be `catch (_)` with a fixed
+      // sentence, which meant a Groq outage, a quota rejection and a
+      // malformed response all looked identical from the screen, and the
+      // only way to tell them apart was the dashboard. A scan failure is
+      // rare and the user is the developer, so the cause is worth more than
+      // the tidier wording.
       state = state.copyWith(
         phase: InboxScanPhase.error,
         errorMessage:
-            'We couldn\'t scan your inbox right now. Please try again.',
+            'We couldn\'t scan your inbox right now. Please try again.\n\n$e',
       );
     }
   }
