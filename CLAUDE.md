@@ -18,7 +18,112 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-12): `staging` AND `main` @ `7fccd91`, SUBSCRIPTIONS 2a + 2b BOTH MERGED, LIVE, AND REAL-EMAIL TESTED
+## Current state (2026-08-13): `staging` @ `ff79e65` LOCAL ONLY, `main` @ `e162447`, ROUND 3 (WEEKLY REVIEW) LANE 1 DONE, LANES 2-4 NOT YET WRITTEN
+
+**`main` and `origin/*` are all at `e162447`. `staging` has ONE local commit on top, `ff79e65`,
+which is NOT pushed.** Tree clean. Nothing is deployed, no migration, no edge function touched
+this round. Pushing is deliberately deferred until the round's remaining lanes land, since the
+contract is inert on its own.
+
+### ✅ FIRST ACTION OF THE SESSION, AND IT FOUND A LIVE BUG: `ios-6` IS BUILT
+`ios-5` was six days old, from `7e680bc`, **35 commits behind**. Built `ios-6` from `e162447`
+(run `31703868694`, green, 4m49s, https://github.com/zzaaid03/life-os/releases/tag/ios-6).
+
+**The version gap was not the real problem. Every inbox scan on Zaid's iPhone had been silently
+returning ZERO results since roughly 2026-08-08**, and would have kept doing so. Chain, verified
+in code, not inferred:
+1. The client at `7e680bc` still has the **client-side `processed_emails` filter** in
+   `inbox_scan_provider.dart` (the `getProcessedIds` block).
+2. Production `extract-tasks` calls `markProcessed(userId, batchIds)` at `index.ts:580`, writing
+   every batch id **before it responds**.
+3. The old client then asks "which of these have I seen", the server has just marked all of them,
+   so `seen` contains every id and both `tasks` and `jobUpdates` filter to empty.
+4. It does not error. A successful scan that finds nothing is indistinguishable from a clean inbox,
+   and the surrounding `catch (_)` would hide a genuine failure too.
+**Fresh IPA fixes it** (the current client has no such filter). Expect the first scan on `ios-6` to
+surface a backlog, since the server has been marking mail processed for days while the old client
+threw the results away. **Zaid has NOT confirmed he imported `ios-6` yet.**
+**Android is in the same state and worse** (no APK in weeks). Zaid explicitly said **do not build the
+APK this round**, IPA only. Do not build one unprompted.
+
+### 🚧 ROUND 3, WEEKLY REVIEW: DESIGN FULLY LOCKED, LANE 1 BUILT AND VERIFIED
+**Zaid's decisions this session, do not re-litigate:**
+- **Its own screen, always reachable**, plus a home pointer that persists until opened. Those two
+  answers together resolve to: the screen is always there, and home shows a "new review ready"
+  indicator that clears once tapped.
+- **All four sections**: tasks finished/slipped, job hunt, subscriptions, goals.
+- **Jobs reports only what the rows support.** There is **no status-history table anywhere in the
+  schema** (checked). `job_applications` has `status` and `updated_at` but nothing records when a
+  status changed or what it was before, so "moved to interview this week" is NOT computable. That
+  is the same bug class as the old daily-brief "upcoming" label. Adding a history table was offered
+  and Zaid declined for now; it stays available as its own round.
+- **Pure Dart on the client, NOT an edge function.** This overrides the older roadmap line that said
+  "assembled in TypeScript, same grounded pattern as `daily-brief`". Reason: the client already has
+  every table loaded (verified: `task_remote_data_source.getAll` fetches all non-deleted tasks,
+  completed and archived included), and `billing.dart`, `follow_up.dart` and the goal-progress
+  providers already hold the formulas. A TypeScript version would put money math in two languages
+  where they can diverge, and would need a one-shot deploy to shared production. `daily-brief` is a
+  function for historical reasons only: it used to call Groq and stayed server-side after the rewrite.
+- **A review week runs local Monday 00:00 to the next Monday 00:00, and a week is only reviewable
+  once it has ENDED.** So every number is final, never "this week so far", which is what makes
+  "stays until seen" mean something concrete. Only the most recent ended week is shown, no backlog.
+
+**Lane 1 shipped as `ff79e65`:** `lib/features/review/domain/weekly_review.dart` plus
+`test/weekly_review_test.dart`. `flutter analyze` clean, **130 tests pass, up from 115.**
+It reuses `staleApplications`, `chargingSoon` and `monthlyTotalsByCurrency` rather than restating
+them (the worker found `monthlyTotalsByCurrency`, which the planner had not; it gates on
+`countsTowardTotals`, so cancelled rows are correctly excluded).
+
+**The worker's report was accurate and its analyze/test runs were real. Planner review still found
+two defects it did not:**
+1. **DST.** `mostRecentEndedWeekStart` and `weekEnd` both used `Duration` arithmetic across week
+   boundaries. 168 hours across a daylight-saving change lands on 23:00 of the wrong day, not local
+   midnight, which bites twice a year in Germany. Rebuilt with `DateTime`'s own constructor, the
+   pattern `reminder_schedule.dart` already settled. Pinned by a test on both 2026 transitions.
+2. **`isEmpty` could never be true, and that was the PLANNER's spec error, not the worker's.** The
+   prompt said "every list in every section is empty" and it was implemented literally. But
+   `pipeline`, `monthlyTotals` and `untouched` are standing snapshots, not week activity: with 36
+   applications and one subscription they are permanently non-empty, so `WeeklyReview.isEmpty` was
+   permanently false and the screen's empty state was unreachable dead code. Each section's
+   `isEmpty` now excludes its standing snapshot. Pinned by a named test.
+
+### ➡️ NEXT, IMMEDIATELY: LANES 2-4, PARALLEL, DISJOINT FILES
+Not yet written; the planner ran out of context after verifying Lane 1. They consume Lane 1's types,
+which is why they were deliberately held until the contract compiled. File sets are already disjoint:
+- **Lane 2, the screen.** `lib/features/review/presentation/screens/weekly_review_screen.dart` plus
+  the route in `app_router.dart`. Renders the four sections and the `isEmpty` empty state. Currency
+  totals must render as **one line per currency, never combined** (no FX source exists).
+- **Lane 3, the home pointer and seen state.** A per-user-ID SharedPreferences flag, same pattern as
+  `onboarding_provider.dart` and `announcements_provider.dart` (both have the `loaded` guard and the
+  race guard on `state.userId != userId` after each await, copy it). Touches `home_screen.dart`.
+  It must store which week was last seen, not a bare bool, or a new week cannot re-raise the pointer.
+- **Lane 4, demo mode and the release note.** Demo mode must stay **zero-network**: check
+  `demo_mode.dart` for whether any new provider needs an override. Add a `Release` to
+  `release_notes.dart` (bump the version) so real users get told.
+Then: `flutter analyze`, `flutter test`, review each diff, commit per lane, push `staging`, and only
+then ask Zaid about merging.
+
+### Carried forward, untouched this session
+Brand lockup visual check in light/dark. Android APK freshness (see the warning above).
+`_formatDate` renders `M/D/YYYY`, ambiguous for a German reader, pre-existing across subscriptions
+and now the review will inherit it if it formats dates the same way. The zaidj.tech lab demo has now
+missed two feature rounds (subscriptions, and soon this one).
+
+### Lessons from this session
+- **Ask "is the installed build compatible with the deployed server", not just "is it current".** The
+  iOS staleness looked like a routine freshness chore. It was a silent correctness bug, because a
+  client-side filter was removed on the same day the server started writing the table that filter
+  reads. **A client/server split that is safe in one direction is not automatically safe in the
+  other:** the handoff correctly recorded why deploying the function while `main` lagged was safe,
+  and nobody asked the reverse question about the build already on the phone.
+- **A planner spec can be the defect.** The `isEmpty` bug passed the worker's tests because the tests
+  encoded the spec, and the spec was wrong. A worked test can only ever confirm the rule it was given.
+  When reviewing, re-derive what the field is FOR, don't just check it matches the prompt.
+- **Check what already exists before specifying a reimplementation.** `billing.dart` already had
+  `chargingSoon` AND `monthlyTotalsByCurrency`; `follow_up.dart` already had `staleApplications`. The
+  round shrank a lot once those were found, and the worker found one the planner had missed.
+
+## SUPERSEDED — Current state (2026-08-12): `staging` AND `main` @ `7fccd91`, SUBSCRIPTIONS 2a + 2b BOTH MERGED, LIVE, AND REAL-EMAIL TESTED
 
 **Both branches at `7fccd91`, pushed, clean, no divergence.** Merge was a straight fast-forward
 (`269bc82..7fccd91`, 11 commits, sole author Zaid Jarrar, no agent attribution). Production verified
