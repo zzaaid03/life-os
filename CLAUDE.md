@@ -18,7 +18,66 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-11, later): `staging` @ `c3dc5be`, `main` @ `269bc82`, SUBSCRIPTIONS 2a MERGED AND LIVE, 2b BUILT AND DEPLOYED, PROMPT UNTESTED AGAINST REAL EMAIL
+## Current state (2026-08-12): `staging` AND `main` @ `7fccd91`, SUBSCRIPTIONS 2a + 2b BOTH MERGED, LIVE, AND REAL-EMAIL TESTED
+
+**Both branches at `7fccd91`, pushed, clean, no divergence.** Merge was a straight fast-forward
+(`269bc82..7fccd91`, 11 commits, sole author Zaid Jarrar, no agent attribution). Production verified
+serving `flutter_bootstrap.js?v=7fccd91` cache-busted, not from a green CI run alone. `extract-tasks`
+was already deployed and live before the merge, so app and function match.
+
+**The whole subscriptions feature (2a + 2b) is now closed.** Zaid ran roughly six real scans against
+his actual inbox across this round, and every fix below was found and closed against real email, not
+synthetic tests. This is the most iteration a single edge-function prompt has been through in one
+round in this project's history — six deploys, each driven by a real failure a real scan produced.
+
+### The bugs found, in the order they were found, and why each matters going forward
+1. **A bare `$` resolved to USD.** The rule was stated as an instruction the model had to remember,
+   and it didn't. **Fixed by moving the judgment out of the prompt into Dart**: the model now copies
+   the literal symbol and `_parseCurrency` in `inbox_scan_service.dart` resolves `€`/`£` (unambiguous)
+   and leaves `$` null (equally USD/CAD/AUD). A rule a model has to remember is a rule it can ignore;
+   this one it can't.
+2. **Invented placeholder names** ("monthly subscription", "Membership", later "Unknown"). Banning
+   specific words was whack-a-mole and the model kept finding new ones. **Fixed by rewriting the rule
+   around the outcome**: a name must identify a real service or the row is skipped, full stop, "including
+   but not limited to" a word list rather than a closed list.
+3. **A missing-amount email was silently dropped instead of emitting a null-amount row.** The abstract
+   instruction ("a missing field is not a reason to skip") failed on its own. **Fixed with a worked
+   example**: the exact input email and the exact correct JSON output, verbatim in the prompt.
+4. **Emails contaminated each other** — a subscription got named after a company from a DIFFERENT
+   email in the same batch (a real job application). **Fixed with an explicit rule that emails in one
+   request are unrelated and every field must come from the single sourceEmailId**, added generally,
+   not just for subscriptions, since it protects tasks and job updates too.
+5. **A real production incident: `502`, Groq's 12,000 TPM limit.** `SYSTEM_PROMPT` nearly doubled this
+   round (~1,400 to ~2,700 tokens), which is a fixed cost paid on every scan. Combined with the batch
+   size (20 emails, up to 1,500 chars of body each), a normal-sized batch tripped the ceiling. **Fixed
+   by dropping `kScanBatchSize` from 20 to 12** (the dominant lever) plus trimming redundant prompt
+   sentences. This is the one bug that would have hit EVERY user, not just an edge case.
+6. **The error screen hid its own cause.** `catch (_)` in `inbox_scan_provider.dart` replaced every
+   failure with one fixed sentence, so bug #5 was undiagnosable until this was fixed first. The real
+   exception now prints under the friendly message. Also hardened `ScanResult.fromJson`'s three list
+   casts (`as List<dynamic>?` throws on a non-list; now type-checked first) so a malformed model
+   response degrades to empty instead of crashing the whole scan.
+
+**The pattern worth remembering for any future prompt work in this file:** every abstract instruction
+that shipped this round failed on the first real test at least once. Every worked example (exact input,
+exact correct JSON output) held on the first try. **Write worked examples by default for anything the
+prompt author can't verify pre-deploy, not as a fallback after an abstract rule fails.**
+
+**What's confirmed working, each on real inbox mail, not synthetic tests:** the dollar-sign-stays-null
+fix; the missing-amount honest-null row (`Adobe Creative Cloud`, "Amount not stated"); a renewal
+producing BOTH a task and a subscription from one real email; job extraction stable and correct across
+six separate scans (~25 real applications, multiple statuses, no contamination); section-hiding in the
+client already correct with no code change needed (an empty section never rendered).
+
+**The job-update rules are still byte-identical to before this entire round** — diffed against `269bc82`
+(the pre-subscriptions commit) after every single one of the six deploys, not just the first.
+
+### Known, deliberately not fixed this round
+`_formatDate` in `subscriptions_screen.dart` (and now the scan's `_SubscriptionCard`) renders
+`M/D/YYYY`, ambiguous for Zaid as a German-based reader. Pre-existing across the whole feature; its own
+small round, not a drive-by.
+
+## SUPERSEDED — Current state (2026-08-11, later): `staging` @ `c3dc5be`, `main` @ `269bc82`, SUBSCRIPTIONS 2a MERGED AND LIVE, 2b BUILT AND DEPLOYED, PROMPT UNTESTED AGAINST REAL EMAIL
 
 **`staging` is 4 commits ahead of `main`, both pushed, tree clean.** Zaid confirmed the 2a
 device test passed (decimal amount, two currencies as separate lines, cancel leaves the total),
@@ -1517,6 +1576,33 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **A worked example (exact input, exact correct JSON output) beats an abstract instruction almost
+  every time in this prompt, and the subscriptions round proved it six times over.** Every abstract
+  rule shipped that round failed on its first real-email test at least once: "copy the currency
+  symbol literally" produced USD anyway; "a missing field is not a reason to skip" produced silence
+  on a real subscription; a name-placeholder ban stated as a word list ("never invent 'Membership'")
+  got defeated by the model reaching for a word not on the list ("Unknown"). Every one of these was
+  fixed by adding the literal input and the literal correct output to the prompt, and every one of
+  those held on the very next test. Default to a worked example for anything the prompt author
+  cannot verify before deploying, not as a fallback reached for after an abstract rule already failed.
+- **Banning specific bad outputs by name is whack-a-mole; ban the category instead.** The
+  subscriptions naming rule listed banned placeholder words one at a time ("monthly subscription",
+  "Membership") and the model kept finding a synonym not on the list ("Unknown"). The fix that
+  actually held was reframing the rule around the outcome ("a name must identify a specific real
+  service or skip the row"), with the word list downgraded to "including but not limited to". If a
+  fix is "add the new bad word to the ban list", the rule is shaped wrong.
+- **A prompt's fixed cost is paid on every request, and doubling it can turn a working batch size
+  into a production incident with no logic bug anywhere.** `SYSTEM_PROMPT` nearly doubled adding
+  subscriptions (~1,400 to ~2,700 tokens). Nothing in the new rules was wrong; the batch size (20
+  emails) that worked fine against the old prompt tripped Groq's 12,000 TPM ceiling against the new
+  one. Before shipping a substantially longer system prompt, re-check the batch size's token budget
+  against the model's per-request limit, don't assume yesterday's batch size still fits.
+- **`catch (_)` that replaces a real exception with one fixed sentence makes the NEXT bug
+  undiagnosable, not just this one.** The token-limit incident above was invisible for a full
+  round-trip because the provider swallowed the real exception and showed a generic message no
+  matter the cause. Fixing the swallowed-error bug had to happen FIRST, before the actual bug
+  underneath it could even be identified. When a user-facing catch block exists in code you're
+  touching, check whether it preserves the real error before assuming today's bug is the only one.
 - **"Emit a date only when the email states one plainly" is not enough of a rule if the model was
   never given a date to compare against.** The widened-scan design said `dueDate` should be an
   anti-hallucination gate, emit null unless the email says a date outright. But emails reached the
