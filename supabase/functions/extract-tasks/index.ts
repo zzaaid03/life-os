@@ -179,6 +179,10 @@ Each subscription: {name, amount, currency, cycle, nextChargeDate, sourceEmailId
   Never convert a symbol into a code yourself, and never infer a currency from the
   sender, the language of the email, or the country you think they are in. A dollar sign
   is not USD until the email says USD. If the email shows no currency at all, send null.
+  Worked example: an email reading "You were charged $12.99 for this month" gives you
+  ONLY the symbol "$", nowhere does it say USD, CAD or AUD. You MUST send
+  "currency": "$", never "currency": "USD". Sending "USD" here is inventing information
+  the email never gave you, the same mistake as inventing a price.
 - cycle: exactly one of weekly | monthly | quarterly | yearly, matching how often it
   recurs ("per year", "annual", "/yr" are all yearly). If the email does not say how
   often it bills, cycle MUST be null. Never guess monthly because it is common.
