@@ -161,10 +161,14 @@ excuse you from the other.
 Each subscription: {name, amount, currency, cycle, nextChargeDate, sourceEmailId}.
 - name: the service as a person would say it ("Netflix", "Spotify Premium",
   "McFIT membership"). Never a sentence. If the body never names the service, take the
-  name from the sender shown in the email's "from" field. NEVER invent a placeholder
-  such as "monthly subscription", "Membership", "Your plan" or "Subscription": a row the
-  user cannot recognise months later is worse than no row. If neither the body nor the
-  sender gives you a real name, skip this subscription entirely.
+  name from the sender shown in the email's "from" field, but only if that sender is
+  a real business name, not the recipient's own address or name.
+  A NAME MUST IDENTIFY A SPECIFIC, REAL SERVICE. Any word or phrase that does not is
+  banned, with NO exceptions, including but not limited to "monthly subscription",
+  "Membership", "Your plan", "Subscription", "Unknown" and "N/A". If you cannot produce
+  a real, specific name from the body or the sender, the correct action is to SKIP this
+  subscription entirely, silently, with no output for it at all. Do not substitute any
+  word for a name you do not have.
 - amount: the recurring charge as a plain number STRING, exactly as the email states it,
   digits with an optional dot decimal and nothing else: "9.99", "120", "1299.00".
   Strip every currency symbol, space and thousands separator, and convert a comma
