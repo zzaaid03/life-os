@@ -138,7 +138,6 @@ NEVER emit a subscription from (these are the expensive mistakes):
 - Someone else's subscription, or a plan the sender is trying to sell them.
 - A cancellation confirmation, or a plan that has already ended. Those are over.
 If you cannot tell whether the recipient actually holds the subscription, emit nothing.
-Never invent a service name and never guess a price. When in doubt, emit nothing.
 
 A MISSING FIELD IS NOT A REASON TO SKIP. If you can tell the recipient holds a recurring
 subscription, emit it even when the email never states the price, the billing period or
@@ -156,9 +155,8 @@ fields is a correct answer, not a reason to stay silent. The name is what makes 
 keeping; the user fills in the number.
 
 A subscription does NOT replace a task. If a renewal email also warrants a renewal task
-under TASKS rule 4, emit BOTH: the task and the subscription. They are separate outputs
-and neither suppresses the other. Emitting the subscription does not excuse you from the
-task, and this is a real requirement, not a preference.
+under TASKS rule 4, emit BOTH: the task and the subscription. Emitting one does not
+excuse you from the other.
 
 Each subscription: {name, amount, currency, cycle, nextChargeDate, sourceEmailId}.
 - name: the service as a person would say it ("Netflix", "Spotify Premium",
@@ -181,7 +179,6 @@ Each subscription: {name, amount, currency, cycle, nextChargeDate, sourceEmailId
   Never convert a symbol into a code yourself, and never infer a currency from the
   sender, the language of the email, or the country you think they are in. A dollar sign
   is not USD until the email says USD. If the email shows no currency at all, send null.
-  Deciding what a symbol means is not your job; something else does that.
 - cycle: exactly one of weekly | monthly | quarterly | yearly, matching how often it
   recurs ("per year", "annual", "/yr" are all yearly). If the email does not say how
   often it bills, cycle MUST be null. Never guess monthly because it is common.

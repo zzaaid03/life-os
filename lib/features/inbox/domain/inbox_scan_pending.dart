@@ -43,7 +43,13 @@ const int kScanHorizonDays = 30;
 /// Kept small on purpose. The extractor's accuracy is per email, so a bigger
 /// batch multiplies both cost and any false-positive rate rather than
 /// improving anything.
-const int kScanBatchSize = 20;
+///
+/// Lowered from 20 after a real batch tripped Groq's 12,000 tokens-per-minute
+/// cap (`502`, "Request too large"). SYSTEM_PROMPT alone is now ~2,700 tokens
+/// after the subscriptions round, and each email body can run up to 1,500
+/// characters, so 20 of them plus the prompt and the facts block landed right
+/// at the ceiling. 12 leaves real headroom without a second small scan.
+const int kScanBatchSize = 12;
 
 /// The result of asking how much mail is waiting, without analysing any of it.
 ///
