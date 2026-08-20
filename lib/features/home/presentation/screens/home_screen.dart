@@ -22,6 +22,8 @@ import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/onboarding/domain/announcements_provider.dart';
 import 'package:life_os/features/onboarding/presentation/announcements_sheet.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
+import 'package:life_os/features/review/domain/review_seen_provider.dart';
+import 'package:life_os/features/review/domain/weekly_review.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
 import 'package:life_os/features/subscriptions/domain/billing.dart';
 import 'package:life_os/features/subscriptions/domain/providers/subscription_provider.dart';
@@ -77,6 +79,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .animate()
               .fadeIn(duration: 400.ms, delay: 200.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 200.ms),
+          const _WeeklyReviewPointerCard()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 250.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 250.ms),
           const SizedBox(height: AppSpacing.xxxl),
           const SectionHeader(title: 'Quick Actions'),
           const _QuickActionsGrid()
@@ -165,8 +171,7 @@ class _DailyBriefCardState extends ConsumerState<_DailyBriefCard> {
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-              onPressed: () =>
-                  ref.read(dailyBriefProvider.notifier).refresh(),
+              onPressed: () => ref.read(dailyBriefProvider.notifier).refresh(),
             ),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
@@ -199,6 +204,49 @@ class _DailyBriefCardState extends ConsumerState<_DailyBriefCard> {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A pointer to a not-yet-opened weekly review.
+///
+/// Renders nothing while the seen-state hasn't loaded yet, and nothing once
+/// the current week's review has been opened, so it never flashes or lingers
+/// past the point it means something.
+class _WeeklyReviewPointerCard extends ConsumerWidget {
+  const _WeeklyReviewPointerCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reviewSeenState = ref.watch(reviewSeenProvider);
+    final now = DateTime.now();
+    // Nothing at all when there is no pointer to show, including the gap
+    // above it: an unconditional spacer would leave a stray hole under the
+    // daily brief on every day the review has already been opened.
+    if (!reviewSeenState.hasUnseenReview(now)) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: DashboardCard(
+        icon: Icons.fact_check_outlined,
+        title: 'Weekly Review',
+        onTap: () {
+          final userId = reviewSeenState.userId;
+          final weekStart = mostRecentEndedWeekStart(now);
+          if (userId != null) {
+            ref.read(reviewSeenProvider.notifier).markSeen(userId, weekStart);
+          }
+          context.push(AppRoutes.weeklyReview);
+        },
+        child: Text(
+          'Your review for last week is ready.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
         ),
       ),
     );
