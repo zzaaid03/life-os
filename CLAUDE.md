@@ -110,6 +110,13 @@ em dash in a comment at `home_screen.dart` that survived the `6c69f34` sweep.
 - **Clamp on the server for anything an installed client depends on.** A client-side-only batch fix
   would have been correct code that fixed nobody, because the broken builds are on phones that
   cannot be updated without a new IPA and a manual sideload.
+- **A `cancelled` deploy run is not automatically a problem: the concurrency QUEUE holds one.**
+  `deploy.yml` uses the constant group `deploy-vps` with `cancel-in-progress: false`, which protects
+  a run that is already executing but does NOT protect a run that is merely waiting. Push three
+  commits quickly and the middle one's run is cancelled by the newest, which is correct and desired
+  (there is no point rsyncing an already-superseded bundle). Two runs were cancelled this way on
+  2026-08-20 and nothing was wrong. **Verify the LIVE bundle with a cache-busted fetch instead of
+  reading run outcomes**: production was confirmed serving `d129b35` that way.
 - **`git add -A` is dangerous in a round with parallel workers.** Worker output was already sitting
   in the tree, and a broad `add` swept three unreviewed lanes into a planner commit. Twice. Backed
   out with `git reset --mixed` both times, nothing lost. **Stage explicit paths when workers are
