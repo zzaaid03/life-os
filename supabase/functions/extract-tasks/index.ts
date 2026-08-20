@@ -468,7 +468,16 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => null);
-    const maxResults = Math.min(Math.max(Number(body?.maxResults) || 10, 1), 50);
+    // Clamped SERVER-SIDE, deliberately. openai/gpt-oss-120b has an 8,000
+    // TPM ceiling on the free tier, down from 12,000 on the old model, and
+    // SYSTEM_PROMPT alone is ~2,700 tokens of that on every request. Clamping
+    // here rather than only in the client protects builds already installed
+    // on phones, which cannot be updated without a new IPA.
+    const kMaxBatch = 6;
+    const maxResults = Math.min(
+      Math.max(Number(body?.maxResults) || 10, 1),
+      kMaxBatch,
+    );
     const debug = body?.debug === true;
     // Clamped to the real-world range and defaulting to 0, so a missing or junk
     // value degrades to UTC dates rather than throwing the scan away.
@@ -546,7 +555,7 @@ Deno.serve(async (req: Request) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "openai/gpt-oss-120b",
           temperature: 0,
           response_format: { type: "json_object" },
           messages: [

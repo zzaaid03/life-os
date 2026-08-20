@@ -44,12 +44,16 @@ const int kScanHorizonDays = 30;
 /// batch multiplies both cost and any false-positive rate rather than
 /// improving anything.
 ///
-/// Lowered from 20 after a real batch tripped Groq's 12,000 tokens-per-minute
-/// cap (`502`, "Request too large"). SYSTEM_PROMPT alone is now ~2,700 tokens
-/// after the subscriptions round, and each email body can run up to 1,500
-/// characters, so 20 of them plus the prompt and the facts block landed right
-/// at the ceiling. 12 leaves real headroom without a second small scan.
-const int kScanBatchSize = 12;
+/// Lowered from 20 to 12 after a real batch tripped Groq's 12,000
+/// tokens-per-minute cap (`502`, "Request too large"), then to 6 on
+/// 2026-08-20 when `llama-3.3-70b-versatile` was decommissioned and the
+/// replacement, `openai/gpt-oss-120b`, turned out to have an 8,000 TPM
+/// ceiling instead. SYSTEM_PROMPT alone is ~2,700 tokens of that on every
+/// request, and each email body can run up to 1,500 characters.
+///
+/// `extract-tasks` clamps to the same number server-side, so an older build
+/// still on a phone cannot exceed it.
+const int kScanBatchSize = 6;
 
 /// The result of asking how much mail is waiting, without analysing any of it.
 ///
