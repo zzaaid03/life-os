@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
 import 'package:life_os/features/subscriptions/domain/billing.dart';
@@ -378,7 +379,7 @@ class _SubscriptionCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         '$_cycleLabel'
-                        '${subscription.nextChargeDate != null ? ' · next ${_formatDate(subscription.nextChargeDate!)}' : ''}',
+                        '${subscription.nextChargeDate != null ? ' · next ${formatDay(subscription.nextChargeDate!)}' : ''}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withValues(
                             alpha: 0.6,
@@ -403,8 +404,6 @@ class _SubscriptionCard extends StatelessWidget {
       ),
     );
   }
-
-  String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
 }
 
 /// A centered message rendered inside a scrollable so pull-to-refresh works

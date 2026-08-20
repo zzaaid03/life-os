@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_consent_provider.dart';
@@ -744,7 +745,7 @@ class _SubscriptionCard extends StatelessWidget {
       final amount = '${formatAmount(amountCents)}${currency != null ? ' $currency' : ''}';
       final cyclePart = cycle != null ? ' / ${cycle.name}' : '';
       final datePart = nextChargeDate != null
-          ? ' · next ${nextChargeDate.month}/${nextChargeDate.day}/${nextChargeDate.year}'
+          ? ' · next ${formatDay(nextChargeDate)}'
           : '';
       detail = '$amount$cyclePart$datePart';
     } else {

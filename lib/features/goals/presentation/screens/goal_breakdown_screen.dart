@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/goals/data/goal_breakdown_service.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
@@ -306,7 +307,7 @@ class _GoalBreakdownScreenState extends ConsumerState<GoalBreakdownScreen> {
                     Expanded(
                       child: Text(
                         _targetDate != null
-                            ? '${_targetDate!.month}/${_targetDate!.day}/${_targetDate!.year}'
+                            ? formatDay(_targetDate!)
                             : 'No target date (30-day horizon)',
                         style: theme.textTheme.bodyMedium,
                       ),
@@ -494,7 +495,7 @@ class _ReviewCard extends StatelessWidget {
                           ),
                           const SizedBox(width: AppSpacing.xxs),
                           Text(
-                            '${item.dueDate.month}/${item.dueDate.day}/${item.dueDate.year}',
+                            formatDay(item.dueDate),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: theme.colorScheme.onSurface.withValues(
                                 alpha: 0.5,

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 
 /// A centered dialog card for creating or editing a task.
@@ -460,7 +461,7 @@ class _DueDateButton extends StatelessWidget {
             Expanded(
               child: Text(
                 dueDate != null
-                    ? '${dueDate!.month}/${dueDate!.day}/${dueDate!.year}'
+                    ? formatDay(dueDate!)
                     : 'Select a due date',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: hasError ? theme.colorScheme.error : null,

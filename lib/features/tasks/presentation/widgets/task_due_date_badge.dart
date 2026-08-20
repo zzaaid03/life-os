@@ -11,6 +11,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 
 /// A compact badge showing when a task is due.
 class TaskDueDateBadge extends StatelessWidget {
@@ -77,8 +78,7 @@ class TaskDueDateBadge extends StatelessWidget {
   }
 
   String _dateLabel(int diffDays) {
-    final d = dueDate!;
-    return '${d.month}/${d.day}';
+    return formatDay(dueDate!);
   }
 
   String _dayName(DateTime date) {

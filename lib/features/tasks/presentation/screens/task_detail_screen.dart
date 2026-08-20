@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
@@ -98,7 +99,7 @@ class TaskDetailScreen extends ConsumerWidget {
               icon: Icons.calendar_today_rounded,
               label: 'Due Date',
               value: task.dueDate != null
-                  ? '${task.dueDate!.month}/${task.dueDate!.day}/${task.dueDate!.year}'
+                  ? formatDay(task.dueDate!)
                   : 'No date',
             ),
             const SizedBox(height: AppSpacing.md),
@@ -106,20 +107,19 @@ class TaskDetailScreen extends ConsumerWidget {
               _DetailRow(
                 icon: Icons.check_circle_outline_rounded,
                 label: 'Completed',
-                value:
-                    '${task.completedAt!.month}/${task.completedAt!.day}/${task.completedAt!.year}',
+                value: formatDay(task.completedAt!),
               ),
             const SizedBox(height: AppSpacing.xl),
             _DetailRow(
               icon: Icons.schedule_rounded,
               label: 'Created',
-              value: _formatDateTime(task.createdAt),
+              value: formatDayTime(task.createdAt),
             ),
             const SizedBox(height: AppSpacing.md),
             _DetailRow(
               icon: Icons.update_rounded,
               label: 'Updated',
-              value: _formatDateTime(task.updatedAt),
+              value: formatDayTime(task.updatedAt),
             ),
             const SizedBox(height: AppSpacing.xxxl),
             const _PlaceholderSection(
@@ -188,10 +188,6 @@ class TaskDetailScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _formatDateTime(DateTime dt) {
-    return '${dt.month}/${dt.day}/${dt.year} at ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }
 

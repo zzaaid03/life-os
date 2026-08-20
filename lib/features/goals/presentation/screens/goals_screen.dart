@@ -11,6 +11,7 @@ import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/goals/domain/providers/goal_provider.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
@@ -313,7 +314,7 @@ class _GoalCard extends ConsumerWidget {
                     ),
                     const SizedBox(width: AppSpacing.xxs),
                     Text(
-                      'Target: ${goal.targetDate!.month}/${goal.targetDate!.day}/${goal.targetDate!.year}',
+                      'Target: ${formatDay(goal.targetDate!)}',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.5,
@@ -539,7 +540,7 @@ class _GoalEditorDialogState extends State<_GoalEditorDialog> {
                         Expanded(
                           child: Text(
                             _targetDate != null
-                                ? '${_targetDate!.month}/${_targetDate!.day}/${_targetDate!.year}'
+                                ? formatDay(_targetDate!)
                                 : 'No date',
                             style: theme.textTheme.bodyMedium,
                           ),

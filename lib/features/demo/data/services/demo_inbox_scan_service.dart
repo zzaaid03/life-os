@@ -3,6 +3,7 @@
 /// `extract-tasks` edge function.
 library;
 
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
@@ -29,7 +30,7 @@ class DemoInboxScanService extends InboxScanService {
 
     String dueHint(int days) {
       final date = now.add(Duration(days: days));
-      return '${_weekday(date.weekday)} (${date.month}/${date.day})';
+      return '${_weekday(date.weekday)} (${formatDay(date)})';
     }
 
     return ScanResult(

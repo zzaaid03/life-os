@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/review/domain/providers/weekly_review_provider.dart';
 import 'package:life_os/features/review/domain/weekly_review.dart';
 import 'package:life_os/features/subscriptions/domain/billing.dart';
@@ -78,7 +79,7 @@ class _WeekRangeLabel extends StatelessWidget {
     final lastDay = review.weekEnd.subtract(const Duration(days: 1));
 
     return Text(
-      '${_formatDay(review.weekStart)} to ${_formatDay(lastDay)}',
+      '${formatDay(review.weekStart)} to ${formatDay(lastDay)}',
       style: theme.textTheme.labelLarge?.copyWith(
         color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
       ),
@@ -335,7 +336,7 @@ class _SubscriptionsSection extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     '${subscription.name}'
-                    '${subscription.nextChargeDate != null ? ' · ${_formatDay(subscription.nextChargeDate!)}' : ''}',
+                    '${subscription.nextChargeDate != null ? ' · ${formatDay(subscription.nextChargeDate!)}' : ''}',
                     style: theme.textTheme.bodyMedium,
                   ),
                 ],
@@ -422,27 +423,4 @@ class _GoalsSection extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Formats a date as "18 Aug".
-///
-/// Deliberately not `M/D/YYYY`, which the subscriptions screens use: Zaid
-/// reads dates in Germany, where 1/9/2026 means 9 January to a US reader and
-/// 1 September to him. A named month cannot be read two ways.
-String _formatDay(DateTime date) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return '${date.day} ${months[date.month - 1]}';
 }

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
 import 'package:life_os/features/subscriptions/domain/billing.dart';
 
@@ -385,7 +386,7 @@ class _SubscriptionEditorDialogState extends State<SubscriptionEditorDialog> {
                         Expanded(
                           child: Text(
                             _nextChargeDate != null
-                                ? '${_nextChargeDate!.month}/${_nextChargeDate!.day}/${_nextChargeDate!.year}'
+                                ? formatDay(_nextChargeDate!)
                                 : 'No date',
                             style: theme.textTheme.bodyMedium,
                           ),
