@@ -163,6 +163,25 @@ const List<Release> kReleases = [
       ),
     ],
   ),
+  Release(
+    version: 6,
+    slides: [
+      AnnouncementSlide(
+        icon: Icons.calendar_view_week_outlined,
+        headline: 'A review for the week you just had',
+        body:
+            'A new screen sums up the week that just ended: tasks '
+            'finished and slipped, your job hunt, subscriptions and goals.',
+      ),
+      AnnouncementSlide(
+        icon: Icons.notifications_active_outlined,
+        headline: 'Ready when a new one lands',
+        body:
+            'Home shows a marker as soon as a fresh weekly review is '
+            'ready. It clears once you open it.',
+      ),
+    ],
+  ),
 ];
 
 /// The most recent release version. Bumping [kReleases] with a new entry

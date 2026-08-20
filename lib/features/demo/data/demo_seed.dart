@@ -8,6 +8,7 @@ library;
 import 'package:life_os/features/files/data/models/stored_file.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
+import 'package:life_os/features/review/domain/weekly_review.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 
 /// Fixed user id for the demo persona.
@@ -101,6 +102,12 @@ List<Task> buildDemoTasks() {
   DateTime dayOffset(int days) =>
       DateTime(now.year, now.month, now.day).add(Duration(days: days));
 
+  // Anchored to the most recently ENDED week so the weekly review always has
+  // something to show, regardless of which weekday the demo is opened on.
+  final reviewWeekStart = mostRecentEndedWeekStart(now);
+  DateTime reviewWeekDay(int days, {int hours = 12}) =>
+      reviewWeekStart.add(Duration(days: days, hours: hours));
+
   return [
     Task(
       id: 'demo-task-follow-nimbus',
@@ -177,18 +184,27 @@ List<Task> buildDemoTasks() {
       userId: demoUserId,
       title: 'Finish Apex Analytics take-home',
       status: TaskStatus.completed,
-      completedAt: now.subtract(const Duration(days: 2)),
-      createdAt: now.subtract(const Duration(days: 3)),
-      updatedAt: now.subtract(const Duration(days: 2)),
+      completedAt: reviewWeekDay(2),
+      createdAt: reviewWeekDay(1),
+      updatedAt: reviewWeekDay(2),
     ),
     Task(
       id: 'demo-task-halcyon-phone-screen',
       userId: demoUserId,
       title: 'Attend Halcyon Health phone screen',
       status: TaskStatus.completed,
-      completedAt: now.subtract(const Duration(days: 4)),
-      createdAt: now.subtract(const Duration(days: 5)),
-      updatedAt: now.subtract(const Duration(days: 4)),
+      completedAt: reviewWeekDay(4),
+      createdAt: reviewWeekDay(3),
+      updatedAt: reviewWeekDay(4),
+    ),
+    Task(
+      id: 'demo-task-review-slipped-followup',
+      userId: demoUserId,
+      title: 'Send follow-up to Halcyon Health after the phone screen',
+      priority: TaskPriority.medium,
+      dueDate: reviewWeekDay(5, hours: 0),
+      createdAt: reviewWeekDay(4),
+      updatedAt: reviewWeekDay(4),
     ),
   ];
 }
