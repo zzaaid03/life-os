@@ -45,15 +45,21 @@ const int kScanHorizonDays = 30;
 /// improving anything.
 ///
 /// Lowered from 20 to 12 after a real batch tripped Groq's 12,000
-/// tokens-per-minute cap (`502`, "Request too large"), then to 6 on
+/// tokens-per-minute cap (`502`, "Request too large"), then to 7 on
 /// 2026-08-20 when `llama-3.3-70b-versatile` was decommissioned and the
 /// replacement, `openai/gpt-oss-120b`, turned out to have an 8,000 TPM
-/// ceiling instead. SYSTEM_PROMPT alone is ~2,700 tokens of that on every
-/// request, and each email body can run up to 1,500 characters.
+/// ceiling instead. Every free Groq chat model shares that 8,000, so no
+/// model swap can raise it.
+///
+/// The budget, worst case: ~2,700 tokens of SYSTEM_PROMPT plus a small
+/// facts block on every request, then ~420 per email (a body caps at 1,500
+/// characters), then the reply, whose reasoning tokens also count. Seven
+/// lands near 7,000 of the 8,000. It fits one scan and deliberately not
+/// two inside the same minute.
 ///
 /// `extract-tasks` clamps to the same number server-side, so an older build
 /// still on a phone cannot exceed it.
-const int kScanBatchSize = 6;
+const int kScanBatchSize = 7;
 
 /// The result of asking how much mail is waiting, without analysing any of it.
 ///

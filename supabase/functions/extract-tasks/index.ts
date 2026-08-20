@@ -473,7 +473,7 @@ Deno.serve(async (req: Request) => {
     // SYSTEM_PROMPT alone is ~2,700 tokens of that on every request. Clamping
     // here rather than only in the client protects builds already installed
     // on phones, which cannot be updated without a new IPA.
-    const kMaxBatch = 6;
+    const kMaxBatch = 7;
     const maxResults = Math.min(
       Math.max(Number(body?.maxResults) || 10, 1),
       kMaxBatch,
