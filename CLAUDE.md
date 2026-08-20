@@ -6,7 +6,8 @@ extracts tasks, and tracks job applications. **Follow the global agent workflow 
 
 ## Stack & layout
 Flutter 3.44 / Dart 3.12, Riverpod, GoRouter, Drift (local), Supabase (backend + AI Edge Functions
-using Groq, model `llama-3.3-70b-versatile`). Feature-first architecture — mirror `lib/features/tasks/`
+using Groq, model `openai/gpt-oss-120b` since 2026-08-20, when `llama-3.3-70b-versatile`
+was decommissioned). Feature-first architecture — mirror `lib/features/tasks/`
 for new features. Supabase project ref: `ganbmkphtzdvxxnmprku`. CLI via `npx supabase`.
 **CHANGED 2026-07-23 — the old "no Docker, unlinked CLI" note is OBSOLETE:** the CLI is now LINKED to
 the shared production project (`supabase/.temp/linked-project.json`, gitignored) and Docker IS
@@ -18,7 +19,104 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-13): `staging` @ `ff79e65` LOCAL ONLY, `main` @ `e162447`, ROUND 3 (WEEKLY REVIEW) LANE 1 DONE, LANES 2-4 NOT YET WRITTEN
+## Current state (2026-08-20): `staging` AND `main` @ `0ae5978`, PUSHED, WEEKLY REVIEW SHIPPED, GROQ MODEL SWAPPED AFTER A PRODUCTION OUTAGE
+
+**Both branches at `0ae5978`, pushed, tree clean, no divergence.** Merge to `main` was a straight
+fast-forward from `e162447`, sole author Zaid Jarrar, no agent attribution. `ios-7` built green from
+this commit (https://github.com/zzaaid03/life-os/releases/tag/ios-7). No migration this round.
+**No Android APK was built, Zaid said IPA only. Do not build one unprompted.**
+
+### THE ROUND OPENED WITH A LIVE PRODUCTION OUTAGE, AND IT WAS NOT WHAT THE 502 LOOKED LIKE
+Zaid's scan on `ios-6` returned `502` with detail `model_not_found`:
+`llama-3.3-70b-versatile` **was decommissioned by Groq on 2026-08-16.**
+
+**All four functions that call a model carried that same hardcoded string, so all four were dead,
+not just the scan.** `extract-tasks` and `goal-breakdown` failed loudly; **`infer-facts` and
+`label-file` failed SILENTLY** (both correctly write nothing on failure), which is why four days
+passed with no signal. The "never blank a field on failure" rule protected the data and also hid
+the outage. That tradeoff is worth remembering, not fixing.
+
+**Fixed in `903206c` + `0ae5978`:** every call site now uses **`openai/gpt-oss-120b`**, Groq's own
+recommended replacement, which supports the `json_object` response format all four depend on.
+
+**Batch size dropped from 12 to 7, and the reason generalises.** `gpt-oss-120b`'s free-tier ceiling
+is **8,000 TPM, down from 12,000** on the dead model. **Researched and confirmed: every free Groq
+chat model shares that same 8,000** (`gpt-oss-120b`, `gpt-oss-20b`, `qwen3.6-27b` are identical), so
+**no model swap can ever raise it** - the limit is the account tier, not the model. Do not go
+model-shopping for headroom again. Budget at 7, worst case: ~2,700 system prompt + ~200 facts +
+7 x ~420 per email + the reply, whose gpt-oss reasoning tokens ALSO count, lands near 7,000 of 8,000.
+**One scan fits, two inside the same minute do not.** A second rapid scan returns a rate-limit 502,
+which reads exactly like the outage but is not one.
+
+**The clamp is SERVER-SIDE in `extract-tasks` (`kMaxBatch`), not only the Dart constant.** The
+function previously honoured whatever the client asked for up to 50, so a client-only fix would have
+left every already-installed build still asking for 12 and still failing, unfixable without a new
+IPA. The Dart `kScanBatchSize` matches for consistency; the server is what actually protects users.
+
+### PENDING MANUAL STEP, DO NOT ASSUME IT IS DONE
+**`extract-tasks` deploy is UNCONFIRMED.** `goal-breakdown`, `infer-facts` and `label-file` all
+returned `Deployed Functions` and are live. `extract-tasks`'s first deploy output was buried under
+npm notices and the retry was blocked by the sandbox. Zaid was asked to run:
+`npx supabase functions deploy extract-tasks --workdir . --project-ref ganbmkphtzdvxxnmprku`
+Re-running is safe (identical code is a no-op, a failed deploy uploads nothing partial). The cheap
+external check is a real scan: `model_not_found` again means it never deployed.
+
+### STILL UNVERIFIED, AND ONE SCAN ANSWERS ALL THREE
+Nobody has run a successful scan since 2026-08-08. **The `ios-6` zero-results bug is still not
+confirmed fixed** - the scan never got far enough to tell us, because the model died first. One
+scan on `ios-7` answers: does the model swap work, does 7 fit under the ceiling, and was the
+zero-results bug real and fixed. **Also watch extraction QUALITY:** the six real-inbox prompt fixes
+from the subscriptions round were all tuned against llama-3.3, and the model underneath them has
+changed. Any drift is the model, not the rules.
+
+### THE WEEKLY REVIEW SHIPPED, ROUND 3 IS CLOSED
+Lane 1 (`ff79e65`) was already done. This session added four commits:
+- **`046cb65`, planner-written seam.** The route, `AppRoutes.weeklyReview`, and a placeholder
+  screen, committed BEFORE the lanes ran. Lane 3 needed the route constant that Lane 2 was scoped
+  to own, so as originally scoped Lane 3 could not have compiled alone.
+- **`6a153e9`, the screen.** Four sections, each hidden when empty, real reachable empty state,
+  **one line per currency, never combined**. Jobs reports added / gone quiet / pipeline counts and
+  **claims no status transitions**, since no history table exists.
+- **`3423347`, the home pointer.** Per-user SharedPreferences storing **which week was last seen**,
+  not a bool, so a newly ended week re-raises it.
+- **`0545a1d`, demo seed + release note version 6.**
+
+**Planner review found three defects the clean worker reports did not:**
+1. An **en dash in user-facing UI copy** (the week range), violating the writing rule.
+2. **`_formatDate` duplicated twice in one file, both `M/D/YYYY`.** The old handoff predicted the
+   review would inherit this ambiguity from subscriptions, and it did. The review now renders
+   `18 Aug`. **The subscriptions screens still render `M/D/YYYY` and are untouched** - still its own
+   small round.
+3. **Lane 3 left an unconditional spacer** above a card that correctly hides itself, leaving a stray
+   gap under the daily brief every day the review had already been opened.
+
+Lane 4 found a real one on its own: the demo's completed tasks were dated 2 and 4 days back, which
+on most weekdays lands in the CURRENT week, not the ended one the review shows, so the sandbox would
+have rendered an empty review most days. Now anchored to `mostRecentEndedWeekStart`.
+
+### Carried forward, untouched this session
+Brand lockup visual check in light/dark. Android APK freshness. `_formatDate` `M/D/YYYY` across the
+subscriptions screens. The zaidj.tech lab demo has now missed three feature rounds. A pre-existing
+em dash in a comment at `home_screen.dart` that survived the `6c69f34` sweep.
+
+### Lessons from this session
+- **A vendor can decommission a model out from under you, and the blast radius is every call site,
+  not the one that shouted.** One hardcoded model string lived in four functions. Two failed loudly
+  and two failed silently, so the loud one looked like the whole problem. **When a shared constant
+  breaks, grep for it before fixing the instance you were handed.**
+- **A free-tier limit can be attached to the ACCOUNT, not the model, which makes "just switch
+  models" a non-answer.** The instinct on hitting a TPM ceiling is to shop for a roomier model. All
+  three free Groq chat models are identical at 8,000. Check whether the limit is per-model before
+  spending a round on migration.
+- **Clamp on the server for anything an installed client depends on.** A client-side-only batch fix
+  would have been correct code that fixed nobody, because the broken builds are on phones that
+  cannot be updated without a new IPA and a manual sideload.
+- **`git add -A` is dangerous in a round with parallel workers.** Worker output was already sitting
+  in the tree, and a broad `add` swept three unreviewed lanes into a planner commit. Twice. Backed
+  out with `git reset --mixed` both times, nothing lost. **Stage explicit paths when workers are
+  running, and check `git show --stat` before moving on.**
+
+## SUPERSEDED - Current state (2026-08-13): `staging` @ `ff79e65` LOCAL ONLY, `main` @ `e162447`, ROUND 3 (WEEKLY REVIEW) LANE 1 DONE, LANES 2-4 NOT YET WRITTEN
 
 **`main` and `origin/*` are all at `e162447`. `staging` has ONE local commit on top, `ff79e65`,
 which is NOT pushed.** Tree clean. Nothing is deployed, no migration, no edge function touched
