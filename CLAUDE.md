@@ -53,13 +53,12 @@ function previously honoured whatever the client asked for up to 50, so a client
 left every already-installed build still asking for 12 and still failing, unfixable without a new
 IPA. The Dart `kScanBatchSize` matches for consistency; the server is what actually protects users.
 
-### PENDING MANUAL STEP, DO NOT ASSUME IT IS DONE
-**`extract-tasks` deploy is UNCONFIRMED.** `goal-breakdown`, `infer-facts` and `label-file` all
-returned `Deployed Functions` and are live. `extract-tasks`'s first deploy output was buried under
-npm notices and the retry was blocked by the sandbox. Zaid was asked to run:
-`npx supabase functions deploy extract-tasks --workdir . --project-ref ganbmkphtzdvxxnmprku`
-Re-running is safe (identical code is a no-op, a failed deploy uploads nothing partial). The cheap
-external check is a real scan: `model_not_found` again means it never deployed.
+### ALL FOUR FUNCTIONS ARE DEPLOYED AND VERIFIED, 2026-08-20
+`extract-tasks`, `goal-breakdown`, `infer-facts` and `label-file` all returned `Deployed Functions`
+(Zaid ran the `extract-tasks` one himself after the planner's retry was sandbox-blocked; the
+`WARNING: Docker is not running` line on every deploy is harmless, bundling happens remotely).
+**Verified from outside with a control:** all four return `401` to an unauthenticated POST while a
+nonexistent function returns `404`, so the probe distinguishes "exists and gated" from "missing".
 
 ### STILL UNVERIFIED, AND ONE SCAN ANSWERS ALL THREE
 Nobody has run a successful scan since 2026-08-08. **The `ios-6` zero-results bug is still not
