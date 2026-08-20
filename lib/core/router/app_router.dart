@@ -28,6 +28,7 @@ import 'package:life_os/features/permissions/presentation/screens/files_permissi
 import 'package:life_os/features/permissions/presentation/screens/notification_permission_screen.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:life_os/features/profile/presentation/screens/create_profile_screen.dart';
+import 'package:life_os/features/review/presentation/screens/weekly_review_screen.dart';
 import 'package:life_os/features/search/presentation/screens/search_screen.dart';
 import 'package:life_os/features/settings/presentation/screens/privacy_policy_screen.dart';
 import 'package:life_os/features/settings/presentation/screens/settings_screen.dart';
@@ -70,6 +71,9 @@ abstract final class AppRoutes {
   static const String inboxScan = '/inbox-scan';
   static const String jobApplications = '/job-applications';
   static const String subscriptions = '/subscriptions';
+
+  /// The weekly review of the most recently ended week.
+  static const String weeklyReview = '/weekly-review';
 
   // Life features
   static const String goals = '/goals';
@@ -267,6 +271,11 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.subscriptions,
         name: 'subscriptions',
         builder: (context, state) => const SubscriptionsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.weeklyReview,
+        name: 'weeklyReview',
+        builder: (context, state) => const WeeklyReviewScreen(),
       ),
 
       // Life features: standalone, no nav bar
