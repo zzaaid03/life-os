@@ -19,7 +19,76 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-20): `staging` AND `main` @ `0ae5978`, PUSHED, WEEKLY REVIEW SHIPPED, GROQ MODEL SWAPPED AFTER A PRODUCTION OUTAGE
+## Current state (2026-08-20, later): `staging` AND `main` @ `d949234`, PUSHED, DATE FORMAT UNIFIED, LAB CAUGHT UP, SCAN CONFIRMED WORKING
+
+**Both branches at `d949234`, pushed, tree clean, no divergence.** Merge to `main` was a straight
+fast-forward from `69a79ae`, 12 files, sole author Zaid Jarrar, no agent attribution. Production
+verified serving `flutter_bootstrap.js?v=d949234` cache-busted. No migration, no edge-function deploy
+this round.
+
+### THE OPEN QUESTION FROM LAST ROUND IS RESOLVED: THE SCAN WORKS
+Zaid fixed a SideStore pairing issue unrelated to the app (see below) and confirmed **a scan on
+`ios-7` completed successfully.** This closes three things at once, all previously unverified since
+2026-08-08: the Groq model swap to `openai/gpt-oss-120b` works, a batch of 7 fits under the 8,000 TPM
+free-tier ceiling, and the `ios-6` zero-results bug (the client-side `processed_emails` filter that
+silently zeroed every scan) is genuinely fixed. **Do not re-investigate any of these three.**
+
+### THE DATE FORMAT BUG IS NOW FULLY UNIFIED, NOT JUST THE FOUR SITES FROM THE ORIGINAL SCOPE
+The round was scoped to four files based on the review-session findings. **The worker's own grep,
+run as instructed before finishing, found eight more copies of `M/D/YYYY`** it correctly did not
+touch because they were out of scope, and reported them instead of fixing them. All twelve are now
+one shared helper, `lib/core/utils/date_format.dart` (`formatDay`, `formatDayTime`), used everywhere:
+task detail, task editor, task due-date badge, subscription screen, subscription editor, inbox scan
+card, goal breakdown (x2), goals screen (x2), the weekly review, and the demo scan preview. **There
+is no longer a private `_formatDate` anywhere in `lib/`.** Verified by grep, not just by the worker's
+report. `formatDay` deliberately omits the year (`"18 Aug"`), matching what the weekly review already
+shipped; a task or goal date more than ~11 months old would render ambiguously across a year
+boundary, a known, accepted simplification, not an oversight.
+
+### THE zaidj.tech LAB IS CAUGHT UP, TWO ROUNDS OF DRIFT CLOSED
+Different repo (`C:\Users\Zaid\Desktop\zaidj.tech`), now at `main` @ `14ebdf5`, pushed, deployed,
+verified live. Two commits:
+- **`8698beb`, the ported interactive demo.** Added a Subscriptions review-card screen (Add opens a
+  pre-filled editor, never saves directly; one candidate has a stated amount, one has none, shown
+  honestly) and a Weekly Review screen (four sections, currency totals one line each, no combined
+  figure, no claimed status transitions). **One defect caught in review: the new week label was a
+  hardcoded calendar date (`"Aug 11 to Aug 17"`).** Every other date in this demo is deliberately
+  relative (`"Tomorrow"`, `"In 5 days"`) specifically so it never looks stale on a future visit.
+  Fixed to `"Last week, now ended"` to match that convention.
+- **`14ebdf5`, the specimen writeup.** Corrected the stale "inbox scanning does two things" framing
+  and added the missing subscriptions and weekly-review paragraphs. **Caught something outside its
+  own scope while reading the whole file for voice**, per the standing rule: the frontmatter `stack`
+  line and the "why this model" paragraph still named `Llama 3.3 70B`, decommissioned by Groq days
+  earlier in a round this lane had no visibility into. Fixed in the same commit rather than opening
+  a third lane for two lines, a real factual error sitting next to text just written is not
+  scope creep, it's the same correctness bug.
+
+### A Groq deprecation email arrived and does NOT apply to this app
+Groq deprecated the `compound` / `compound-mini` models (decommissioning 2026-09-21). Grepped every
+edge function: none of them ever called `compound`, all four use `openai/gpt-oss-120b`. No action
+needed, nothing scheduled to break on the 21st. Worth remembering only if a future feature ever
+reaches for Groq's agentic/tool-using model line.
+
+### Carried forward, untouched this session
+Brand lockup visual check in light/dark. Android APK freshness (none built in weeks; Zaid has
+explicitly said IPA only, do not build one unprompted).
+
+### Lessons from this session
+- **A worker correctly stopping at scope and reporting instead of fixing is what makes a bug-class
+  fix possible later without re-discovery.** The date-format lane's own grep found eight more sites
+  it was not scoped to touch and listed them in its report rather than guessing whether to fix them.
+  That list is what let the same fix extend cleanly to all twelve sites in one pass instead of
+  needing a second round of rediscovery.
+- **A new screen that hardcodes a calendar date breaks an established anti-staleness convention
+  silently.** The rest of the ported demo has never used an absolute date, only relative phrasing,
+  specifically so a portfolio visitor never sees an obviously wrong date. A new screen can violate a
+  project-wide convention it was never told about explicitly; read a neighbor file's existing pattern
+  before writing new user-facing date/time strings, not just the ticket's stated requirement.
+- **Reading a whole file for voice consistency surfaces bugs a scoped diff review would miss.** The
+  specimen-writeup lane was told to touch two paragraphs and read the entire file first per
+  instructions; that's what surfaced a stale model name in a section three paragraphs away that
+  nothing in the prompt mentioned. Scoped-diff review alone would not have caught it.
+## SUPERSEDED - Current state (2026-08-20): `staging` AND `main` @ `0ae5978`, PUSHED, WEEKLY REVIEW SHIPPED, GROQ MODEL SWAPPED AFTER A PRODUCTION OUTAGE
 
 **Both branches at `0ae5978`, pushed, tree clean, no divergence.** Merge to `main` was a straight
 fast-forward from `e162447`, sole author Zaid Jarrar, no agent attribution. `ios-7` built green from
