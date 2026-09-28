@@ -545,7 +545,9 @@ Deno.serve(async (req: Request) => {
       ? `${todayLine}\n\n${factsBlock}\n\nEmails:\n${JSON.stringify(emails)}`
       : `${todayLine}\n\nEmails:\n${JSON.stringify(emails)}`;
 
-    const aiRes = await chatJson(SYSTEM_PROMPT, userContent);
+    // A batch can return tasks, job updates and subscriptions for 7 emails,
+    // so it gets more room than the default.
+    const aiRes = await chatJson(SYSTEM_PROMPT, userContent, 4096);
 
     if (!aiRes.ok) {
       return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);

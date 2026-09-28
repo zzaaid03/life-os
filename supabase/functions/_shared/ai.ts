@@ -31,10 +31,19 @@ export type AiResult =
 
 /// Sends one system + user message pair in JSON mode and returns the reply
 /// text. Transport errors throw, exactly like a bare fetch would.
-export async function chatJson(system: string, user: string): Promise<AiResult> {
+///
+/// maxTokens caps the reply. Without it the provider may count the model's
+/// whole output allowance against the tokens-per-minute limit, which on a
+/// small free-tier budget can reject every request before it runs.
+export async function chatJson(
+  system: string,
+  user: string,
+  maxTokens = 2048,
+): Promise<AiResult> {
   const body: Record<string, unknown> = {
     model: AI_MODEL,
     temperature: 0,
+    max_tokens: maxTokens,
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
@@ -64,7 +73,9 @@ export async function chatJson(system: string, user: string): Promise<AiResult> 
     }
 
     if (!res.ok) {
-      return { ok: false, status: res.status, detail: await res.text() };
+      // The model name is included so a failure shows which model the
+      // secrets actually resolved to.
+      return { ok: false, status: res.status, detail: `${AI_MODEL}: ${await res.text()}` };
     }
 
     const data = await res.json();
