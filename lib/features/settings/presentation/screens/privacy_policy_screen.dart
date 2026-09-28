@@ -32,7 +32,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Last updated 8 August 2026',
+                'Last updated 28 September 2026',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
@@ -102,9 +102,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     'or use any advertising or analytics tracking. Data is '
                     'processed by two outside services strictly to run the '
                     'app: Google (for sign-in and, if connected, reading '
-                    'your inbox) and Groq (an AI provider that processes '
-                    'email content, file notes, and your own data to '
-                    'generate the tasks and suggestions described above). '
+                    'your inbox) and Mistral AI (an AI provider that '
+                    'processes email content, file notes, and your own data '
+                    'to generate the tasks and suggestions described above). '
+                    'Life OS uses the free Mistral plan, under which Mistral '
+                    'may use the content it processes to train its models. '
                     'Your data is stored with Supabase, our database and '
                     'file storage provider.',
               ),

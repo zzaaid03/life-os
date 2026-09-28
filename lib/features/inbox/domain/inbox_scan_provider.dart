@@ -140,7 +140,7 @@ class InboxScanController extends StateNotifier<InboxScanState> {
       rethrow;
     } catch (e) {
       // Keep the real reason. This used to be `catch (_)` with a fixed
-      // sentence, which meant a Groq outage, a quota rejection and a
+      // sentence, which meant a model outage, a quota rejection and a
       // malformed response all looked identical from the screen, and the
       // only way to tell them apart was the dashboard. A scan failure is
       // rare and the user is the developer, so the cause is worth more than

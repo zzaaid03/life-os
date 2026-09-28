@@ -1,7 +1,7 @@
 /// Goal breakdown service.
 ///
 /// Thin client over the deployed `goal-breakdown` Supabase Edge Function.
-/// The function asks Groq for an ordered list of concrete tasks toward a
+/// The function asks the AI model for an ordered list of concrete tasks toward a
 /// goal and computes each task's suggested due date server-side.
 library;
 
