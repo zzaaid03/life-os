@@ -40,19 +40,15 @@ const int kScanHorizonDays = 30;
 
 /// How many emails one scan sends to the model.
 ///
-/// Kept small on purpose. The extractor's accuracy is per email, so a bigger
-/// batch multiplies both cost and any false-positive rate rather than
-/// improving anything.
-///
-/// Seven was set to fit an old provider's 8,000 tokens-per-minute cap and
-/// is kept as is; the current provider's limits are far roomier.
-/// A request costs roughly 2,700 tokens of SYSTEM_PROMPT plus ~420 per email
-/// (a body caps at 1,500 characters). The server clamps to the same value
-/// (`kMaxBatch` in `extract-tasks`), so raising it means changing both.
+/// Raised from 7 to 50 once the old 8,000 tokens-per-minute cap was gone.
+/// A full batch is roughly 2,700 tokens of SYSTEM_PROMPT plus ~420 per email
+/// (a body caps at 1,500 characters), about 24,000 in total. More emails in
+/// one request also means more chance of one email's details leaking into
+/// another's result, so lower this first if extraction quality drops.
 ///
 /// `extract-tasks` clamps to the same number server-side, so an older build
 /// still on a phone cannot exceed it.
-const int kScanBatchSize = 7;
+const int kScanBatchSize = 50;
 
 /// The result of asking how much mail is waiting, without analysing any of it.
 ///

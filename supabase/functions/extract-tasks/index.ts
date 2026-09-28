@@ -468,11 +468,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => null);
-    // Clamped SERVER-SIDE, deliberately. Seven was sized for the old
-    // provider's 8,000 TPM ceiling (SYSTEM_PROMPT alone is ~2,700 tokens).
-    // Clamping here rather than only in the client protects builds already
+    // Clamped SERVER-SIDE, deliberately, to match kScanBatchSize in the
+    // client. Clamping here rather than only in the client protects builds already
     // installed on phones, which cannot be updated without a new IPA.
-    const kMaxBatch = 7;
+    const kMaxBatch = 50;
     const maxResults = Math.min(
       Math.max(Number(body?.maxResults) || 10, 1),
       kMaxBatch,
@@ -545,9 +544,10 @@ Deno.serve(async (req: Request) => {
       ? `${todayLine}\n\n${factsBlock}\n\nEmails:\n${JSON.stringify(emails)}`
       : `${todayLine}\n\nEmails:\n${JSON.stringify(emails)}`;
 
-    // A batch can return tasks, job updates and subscriptions for 7 emails,
-    // so it gets more room than the default.
-    const aiRes = await chatJson(SYSTEM_PROMPT, userContent, 4096);
+    // A batch can return tasks, job updates and subscriptions for up to 50
+    // emails. A reply cut off by the cap is invalid JSON, the batch is never
+    // marked analysed and every later scan would retry it, so leave headroom.
+    const aiRes = await chatJson(SYSTEM_PROMPT, userContent, 16384);
 
     if (!aiRes.ok) {
       return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
