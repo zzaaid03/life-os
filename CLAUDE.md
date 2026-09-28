@@ -6,8 +6,8 @@ extracts tasks, and tracks job applications. **Follow the global agent workflow 
 
 ## Stack & layout
 Flutter 3.44 / Dart 3.12, Riverpod, GoRouter, Drift (local), Supabase (backend + AI Edge Functions
-using Groq, model `openai/gpt-oss-120b` since 2026-08-20, when `llama-3.3-70b-versatile`
-was decommissioned). Feature-first architecture — mirror `lib/features/tasks/`
+via ONE shared client, `supabase/functions/_shared/ai.ts`, on OpenAI `gpt-6-luna` since 2026-09-28;
+Groq and Mistral are both gone, see Current state). Feature-first architecture — mirror `lib/features/tasks/`
 for new features. Supabase project ref: `ganbmkphtzdvxxnmprku`. CLI via `npx supabase`.
 **CHANGED 2026-07-23 — the old "no Docker, unlinked CLI" note is OBSOLETE:** the CLI is now LINKED to
 the shared production project (`supabase/.temp/linked-project.json`, gitignored) and Docker IS
@@ -19,7 +19,43 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-08-20, later): `staging` AND `main` @ `d949234`, PUSHED, DATE FORMAT UNIFIED, LAB CAUGHT UP, SCAN CONFIRMED WORKING
+## Current state (2026-09-28): `staging` AND `main` @ `0311efa`, PUSHED, AI PROVIDER IS NOW OPENAI `gpt-6-luna`, SCAN BATCH 50
+
+**Both branches at `0311efa`, pushed, clean.** Merge was a fast-forward from `dbb8119`, 5 commits,
+sole author Zaid Jarrar, no agent attribution. `ios-8` build dispatched from `main` @ `0311efa`
+(run 36420564016); confirm it went green and Zaid installed it.
+
+### ONE SHARED AI CLIENT, PROVIDER IS PURE CONFIG
+`supabase/functions/_shared/ai.ts` exports `chatJson(system, user, maxTokens)`. All four model-calling
+functions (`extract-tasks`, `goal-breakdown`, `infer-facts`, `label-file`) use it; none has its own
+fetch any more. Secrets: `AI_API_KEY` (required), `AI_BASE_URL` (default `https://api.openai.com/v1`),
+`AI_MODEL` (default `gpt-6-luna`; Zaid ALSO set it as a secret on 2026-09-28, so the secret wins),
+`AI_REASONING_EFFORT` (default `none`). Changing provider = secrets + redeploy all four, no code.
+- Sends `max_completion_tokens` (reasoning models reject `max_tokens`), and `temperature: 0` ONLY when
+  reasoning is `none` (OpenAI rejects temperature while reasoning is on). Retries a 429 3x (~7s).
+- A provider error returns `"<model>: <provider body>"` in `detail`, shown raw on the scan screen on
+  purpose. That raw line is what diagnosed the whole Mistral saga; do not hide it.
+- Every prompt contains the word "JSON", which OpenAI's json_object mode requires. Keep it that way.
+- `GROQ_API_KEY` secret deleted, Groq key revoked, Mistral key deleted (Zaid, 2026-09-28).
+- Privacy policy names OpenAI. API data is not used for training by default, so no training sentence.
+
+### SCAN BATCH IS 50 (was 7)
+`kScanBatchSize` (client) and `kMaxBatch` (server) both 50; scan reply cap 16384 tokens so a busy batch
+cannot be truncated mid-JSON (a truncated reply is never marked analysed and would retry forever).
+**Watch:** cross-email contamination (more emails per request), long replies vs the edge-function
+timeout, and Gmail's per-user rate limit (50 parallel `messages.get` = 250 quota units, right at the
+limit). If any shows up: lower the batch, or chunk the Gmail fetch. Old IPAs keep asking for 7 until
+Zaid installs the new build; the server clamp only caps, it never raises.
+
+### WHY NOT MISTRAL (do not retry it on the free plan)
+The "Experiment plan, 500K TPM, 1B tokens/month" premise was stale: today it is just a free plan
+showing 20K TPM / 1 RPS. EVERY request, even a 20-token one sent by hand, returned
+`429 rate_limited code 1300`, usage page stayed at zero. Mistral support: **free mode is best-effort
+with no reserved capacity; free requests are rejected whenever paid users need the model.** Not a
+code, key, or edge-function problem. Production scans were broken ~1.5h during the attempt; Zaid
+explicitly declined a Groq rollback.
+
+## SUPERSEDED - Current state (2026-08-20, later): `staging` AND `main` @ `d949234`, PUSHED, DATE FORMAT UNIFIED, LAB CAUGHT UP, SCAN CONFIRMED WORKING
 
 **Both branches at `d949234`, pushed, tree clean, no divergence.** Merge to `main` was a straight
 fast-forward from `69a79ae`, 12 files, sole author Zaid Jarrar, no agent attribution. Production
@@ -1854,6 +1890,14 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **Isolate a provider failure with ONE tiny request sent by hand before changing code.** Three code
+  and config rounds (model alias, reply cap) were spent on Mistral 429s before a 20-token PowerShell
+  request proved the account itself was refused. Do that test FIRST, and before any deploy to a new
+  provider (it also catches OpenAI's `insufficient_quota` 429, which looks identical).
+- **A free AI tier's advertised limits are not capacity.** "Best-effort" free plans can reject every
+  request while showing generous limits. For anything users depend on, use a paid key with a budget cap.
+- **Setting a new provider's key before deploying is load-bearing**: deploy first and all four
+  functions 500 at once. Also delete or update any old `AI_MODEL` secret, it overrides the default.
 - **A worked example (exact input, exact correct JSON output) beats an abstract instruction almost
   every time in this prompt, and the subscriptions round proved it six times over.** Every abstract
   rule shipped that round failed on its first real-email test at least once: "copy the currency
