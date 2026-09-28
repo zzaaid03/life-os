@@ -44,8 +44,8 @@ const int kScanHorizonDays = 30;
 /// batch multiplies both cost and any false-positive rate rather than
 /// improving anything.
 ///
-/// Seven was set to fit the old provider's 8,000 tokens-per-minute cap and
-/// is kept as is after the move to Mistral, whose free tier is far roomier.
+/// Seven was set to fit an old provider's 8,000 tokens-per-minute cap and
+/// is kept as is; the current provider's limits are far roomier.
 /// A request costs roughly 2,700 tokens of SYSTEM_PROMPT plus ~420 per email
 /// (a body caps at 1,500 characters). The server clamps to the same value
 /// (`kMaxBatch` in `extract-tasks`), so raising it means changing both.

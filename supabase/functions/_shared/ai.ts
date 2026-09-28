@@ -4,22 +4,23 @@
 // all come from Supabase secrets, so switching provider is a secrets change
 // plus a redeploy, not a code change:
 //   AI_API_KEY           required
-//   AI_BASE_URL          default https://api.mistral.ai/v1
-//   AI_MODEL             default mistral-small-latest
-//   AI_REASONING_EFFORT  default "none". Mistral Small 4 is a hybrid reasoning
-//                        model: with reasoning on, message.content becomes a
-//                        list of chunks and output tokens grow a lot. Set it
-//                        to an empty string for a provider that rejects the
-//                        field.
+//   AI_BASE_URL          default https://api.openai.com/v1
+//   AI_MODEL             default gpt-6-luna
+//   AI_REASONING_EFFORT  default "none". gpt-6-luna is a reasoning model whose
+//                        own default is "medium"; "none" keeps replies fast
+//                        and cheap for plain extraction. Any other value also
+//                        drops temperature, which OpenAI rejects while
+//                        reasoning is on. Set it to an empty string for a
+//                        provider that does not know the field.
 
 const AI_API_KEY = Deno.env.get("AI_API_KEY");
-const AI_BASE_URL = (Deno.env.get("AI_BASE_URL") ?? "https://api.mistral.ai/v1")
+const AI_BASE_URL = (Deno.env.get("AI_BASE_URL") ?? "https://api.openai.com/v1")
   .replace(/\/+$/, "");
-const AI_MODEL = Deno.env.get("AI_MODEL") ?? "mistral-small-latest";
+const AI_MODEL = Deno.env.get("AI_MODEL") ?? "gpt-6-luna";
 const AI_REASONING_EFFORT = Deno.env.get("AI_REASONING_EFFORT") ?? "none";
 
-// Mistral's free tier allows about one request per second, so a 429 is
-// usually cleared by waiting a moment. Three retries covers ~7s of backoff.
+// A 429 from a busy provider usually clears within seconds. Three retries
+// covers ~7s of backoff.
 const MAX_RETRIES = 3;
 const MAX_WAIT_MS = 10_000;
 
@@ -32,9 +33,8 @@ export type AiResult =
 /// Sends one system + user message pair in JSON mode and returns the reply
 /// text. Transport errors throw, exactly like a bare fetch would.
 ///
-/// maxTokens caps the reply. Without it the provider may count the model's
-/// whole output allowance against the tokens-per-minute limit, which on a
-/// small free-tier budget can reject every request before it runs.
+/// maxTokens caps the reply, reasoning tokens included, so one bad request
+/// can never produce an unbounded bill.
 export async function chatJson(
   system: string,
   user: string,
@@ -42,8 +42,7 @@ export async function chatJson(
 ): Promise<AiResult> {
   const body: Record<string, unknown> = {
     model: AI_MODEL,
-    temperature: 0,
-    max_tokens: maxTokens,
+    max_completion_tokens: maxTokens,
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
@@ -51,6 +50,7 @@ export async function chatJson(
     ],
   };
   if (AI_REASONING_EFFORT) body.reasoning_effort = AI_REASONING_EFFORT;
+  if (!AI_REASONING_EFFORT || AI_REASONING_EFFORT === "none") body.temperature = 0;
 
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`${AI_BASE_URL}/chat/completions`, {
@@ -79,20 +79,7 @@ export async function chatJson(
     }
 
     const data = await res.json();
-    return { ok: true, content: messageText(data.choices?.[0]?.message?.content) };
+    const content = data.choices?.[0]?.message?.content;
+    return { ok: true, content: typeof content === "string" ? content : "{}" };
   }
-}
-
-// Plain string normally. If reasoning is ever switched on, Mistral returns a
-// list of chunks; keep only the text ones so the thinking never reaches
-// JSON.parse.
-function messageText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter((c) => c?.type === "text" && typeof c.text === "string")
-      .map((c) => c.text)
-      .join("");
-  }
-  return "{}";
 }

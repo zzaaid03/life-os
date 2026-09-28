@@ -102,11 +102,9 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     'or use any advertising or analytics tracking. Data is '
                     'processed by two outside services strictly to run the '
                     'app: Google (for sign-in and, if connected, reading '
-                    'your inbox) and Mistral AI (an AI provider that '
-                    'processes email content, file notes, and your own data '
-                    'to generate the tasks and suggestions described above). '
-                    'Life OS uses the free Mistral plan, under which Mistral '
-                    'may use the content it processes to train its models. '
+                    'your inbox) and OpenAI (an AI provider that processes '
+                    'email content, file notes, and your own data to '
+                    'generate the tasks and suggestions described above). '
                     'Your data is stored with Supabase, our database and '
                     'file storage provider.',
               ),
