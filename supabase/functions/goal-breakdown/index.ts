@@ -1,19 +1,19 @@
 // Supabase Edge Function: goal-breakdown
 //
 // Given a goal (title, optional description, optional target date), asks
-// Groq (Llama 3.3 70B) for an ordered list of 4-8 concrete, actionable,
+// the AI model for an ordered list of 4-8 concrete, actionable,
 // sequential tasks toward that goal. The AI is NOT asked for dates — this
 // function computes each task's suggestedDueDate itself by spreading tasks
 // evenly between today and the target date (or a 30-day horizon if no
 // target date was given).
 //
-// Secrets: GROQ_API_KEY (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are
+// Secrets: AI_API_KEY, see _shared/ai.ts (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are
 // auto-injected, but unused here — this function only needs the caller's
 // JWT to confirm they're authenticated).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { aiConfigured, chatJson } from "../_shared/ai.ts";
 
-const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -193,8 +193,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    if (!GROQ_API_KEY) {
-      return jsonResponse({ error: "GROQ_API_KEY is not configured." }, 500);
+    if (!aiConfigured) {
+      return jsonResponse({ error: "AI_API_KEY is not configured." }, 500);
     }
 
     const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -289,32 +289,13 @@ Deno.serve(async (req: Request) => {
       ? `${baseUserContent}\n\n${contextBlock}`
       : baseUserContent;
 
-    const groqRes = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          temperature: 0,
-          response_format: { type: "json_object" },
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: userContent },
-          ],
-        }),
-      },
-    );
+    const aiRes = await chatJson(SYSTEM_PROMPT, userContent);
 
-    if (!groqRes.ok) {
-      return jsonResponse({ error: "Groq API error", detail: await groqRes.text() }, 502);
+    if (!aiRes.ok) {
+      return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
     }
 
-    const data = await groqRes.json();
-    const content = data.choices?.[0]?.message?.content ?? "{}";
+    const content = aiRes.content;
 
     let parsed: { tasks?: RawTask[]; usedContext?: unknown };
     try {

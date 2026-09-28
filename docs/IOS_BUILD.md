@@ -90,7 +90,7 @@ Copy the values from Zaid's Windows machine at `C:\Users\Zaid\Desktop\life-os\.e
 These three are **browser-public** values — they already ship inside the public web bundle and
 are downloadable by anyone at `/assets/.env`. Typing them on a borrowed Mac leaks nothing.
 
-**Never put any other key in this file.** Server secrets (Groq API key, Supabase service_role)
+**Never put any other key in this file.** Server secrets (the AI provider API key, Supabase service_role)
 live in Supabase Edge Function secrets and must never appear here. If something seems to need a
 fourth value, stop and ask Zaid.
 

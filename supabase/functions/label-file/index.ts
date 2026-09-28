@@ -4,12 +4,12 @@
 // file name and user-typed note only, and stores them on ai_label. Never
 // reads file contents (no Storage download) and never labels a private file.
 //
-// Secrets: GROQ_API_KEY (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are
+// Secrets: AI_API_KEY, see _shared/ai.ts (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are
 // auto-injected).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { aiConfigured, chatJson } from "../_shared/ai.ts";
 
-const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -47,8 +47,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    if (!GROQ_API_KEY) {
-      return jsonResponse({ error: "GROQ_API_KEY is not configured." }, 500);
+    if (!aiConfigured) {
+      return jsonResponse({ error: "AI_API_KEY is not configured." }, 500);
     }
 
     const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -83,7 +83,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // The per-file private toggle means this file's data must never reach a
-    // third party — skip the Groq call entirely, don't just discard the result.
+    // third party, so skip the model call entirely, don't just discard the result.
     if (row.is_private) {
       return jsonResponse({ skipped: "private" });
     }
@@ -93,29 +93,10 @@ Deno.serve(async (req: Request) => {
 
     let labels: string[] = [];
     try {
-      const groqRes = await fetch(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${GROQ_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "openai/gpt-oss-120b",
-            temperature: 0,
-            response_format: { type: "json_object" },
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: userContent },
-            ],
-          }),
-        },
-      );
+      const aiRes = await chatJson(SYSTEM_PROMPT, userContent);
 
-      if (groqRes.ok) {
-        const data = await groqRes.json();
-        const content = data.choices?.[0]?.message?.content ?? "{}";
+      if (aiRes.ok) {
+        const content = aiRes.content;
         const parsed = JSON.parse(content);
         if (Array.isArray(parsed.labels)) {
           labels = parsed.labels.filter((l: unknown): l is string => typeof l === "string");
@@ -128,7 +109,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (labels.length === 0) {
-      // Write nothing. Groq failing, or genuinely having nothing to add, must
+      // Write nothing. The model failing, or genuinely having nothing to add, must
       // not blank a label this file already had: the update would silently
       // narrow what search can find and there is no way to notice from the UI.
       return jsonResponse({ aiLabel: null });

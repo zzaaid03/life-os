@@ -1,18 +1,18 @@
 // Supabase Edge Function: infer-facts
 //
 // Reads the caller's own tasks, goals, job applications and file notes,
-// asks Groq for durable facts that are traceable to real rows, validates
+// asks the AI model for durable facts that are traceable to real rows, validates
 // every returned fact, and upserts survivors into public.user_facts keyed
 // on (user_id, fact_key). Never touches suppressed_at or first_seen_at on
 // conflict — those are how a user's rejection of a wrong fact stays
 // permanent. Below a sparse-data floor, writes nothing and calls no model.
 //
 // Deploy:  npx supabase functions deploy infer-facts --workdir . --project-ref ganbmkphtzdvxxnmprku
-// Secrets: GROQ_API_KEY (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected).
+// Secrets: AI_API_KEY, see _shared/ai.ts (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { aiConfigured, chatJson } from "../_shared/ai.ts";
 
-const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -268,8 +268,8 @@ Deno.serve(async (req: Request) => {
     }
     const contextBlock = lines.join("\n");
 
-    if (!GROQ_API_KEY) {
-      return jsonResponse({ error: "GROQ_API_KEY is not configured." }, 500);
+    if (!aiConfigured) {
+      return jsonResponse({ error: "AI_API_KEY is not configured." }, 500);
     }
 
     interface RawFact {
@@ -280,29 +280,10 @@ Deno.serve(async (req: Request) => {
 
     let rawFacts: RawFact[] = [];
     try {
-      const groqRes = await fetch(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${GROQ_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "openai/gpt-oss-120b",
-            temperature: 0,
-            response_format: { type: "json_object" },
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: contextBlock },
-            ],
-          }),
-        },
-      );
+      const aiRes = await chatJson(SYSTEM_PROMPT, contextBlock);
 
-      if (groqRes.ok) {
-        const data = await groqRes.json();
-        const content = data.choices?.[0]?.message?.content ?? "{}";
+      if (aiRes.ok) {
+        const content = aiRes.content;
         const parsed = JSON.parse(content);
         if (Array.isArray(parsed.facts)) {
           rawFacts = parsed.facts;

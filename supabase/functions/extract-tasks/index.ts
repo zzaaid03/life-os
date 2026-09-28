@@ -1,7 +1,7 @@
 // Supabase Edge Function: extract-tasks
 //
 // Reads the user's recent Gmail SERVER-SIDE and classifies each email into
-// actionable TASKS and JOB-APPLICATION updates using Groq (Llama 3.3 70B).
+// actionable TASKS and JOB-APPLICATION updates using the AI model (see _shared/ai.ts).
 //
 // Two ways to get a Gmail access token:
 //   1. App path (production): the caller is an authenticated Supabase user and
@@ -13,12 +13,12 @@
 // Email bodies never touch the client and are never stored — only derived
 // tasks/summaries are returned.
 //
-// Secrets: GROQ_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+// Secrets: AI_API_KEY (see _shared/ai.ts), GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 //          (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { aiConfigured, chatJson } from "../_shared/ai.ts";
 
-const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -352,7 +352,7 @@ async function filterPendingIds(
   }
 }
 
-// Marks a batch as analysed after a SUCCESSFUL Groq response only. A write
+// Marks a batch as analysed after a SUCCESSFUL model response only. A write
 // failure here is logged and swallowed — the user getting their tasks matters
 // more than the mark, and the cost of a missed mark is just re-analysis.
 async function markProcessed(userId: string | undefined, ids: string[]): Promise<void> {
@@ -409,7 +409,7 @@ function truncate(s: string, max = 80): string {
 
 /// Assembles a short "About this user" block from user_facts, for the model's
 /// background only. Returns "" on no user id, a query error, or zero facts —
-/// a facts problem must never change what's sent to Groq beyond this block.
+/// a facts problem must never change what's sent to the model beyond this block.
 async function buildFactsBlock(
   userId: string | undefined,
 ): Promise<{ block: string; factsCount: number }> {
@@ -463,16 +463,15 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    if (!GROQ_API_KEY) {
-      return jsonResponse({ error: "GROQ_API_KEY is not configured." }, 500);
+    if (!aiConfigured) {
+      return jsonResponse({ error: "AI_API_KEY is not configured." }, 500);
     }
 
     const body = await req.json().catch(() => null);
-    // Clamped SERVER-SIDE, deliberately. openai/gpt-oss-120b has an 8,000
-    // TPM ceiling on the free tier, down from 12,000 on the old model, and
-    // SYSTEM_PROMPT alone is ~2,700 tokens of that on every request. Clamping
-    // here rather than only in the client protects builds already installed
-    // on phones, which cannot be updated without a new IPA.
+    // Clamped SERVER-SIDE, deliberately. Seven was sized for the old
+    // provider's 8,000 TPM ceiling (SYSTEM_PROMPT alone is ~2,700 tokens).
+    // Clamping here rather than only in the client protects builds already
+    // installed on phones, which cannot be updated without a new IPA.
     const kMaxBatch = 7;
     const maxResults = Math.min(
       Math.max(Number(body?.maxResults) || 10, 1),
@@ -546,32 +545,13 @@ Deno.serve(async (req: Request) => {
       ? `${todayLine}\n\n${factsBlock}\n\nEmails:\n${JSON.stringify(emails)}`
       : `${todayLine}\n\nEmails:\n${JSON.stringify(emails)}`;
 
-    const groqRes = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          temperature: 0,
-          response_format: { type: "json_object" },
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: userContent },
-          ],
-        }),
-      },
-    );
+    const aiRes = await chatJson(SYSTEM_PROMPT, userContent);
 
-    if (!groqRes.ok) {
-      return jsonResponse({ error: "Groq API error", detail: await groqRes.text() }, 502);
+    if (!aiRes.ok) {
+      return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
     }
 
-    const data = await groqRes.json();
-    const content = data.choices?.[0]?.message?.content ?? "{}";
+    const content = aiRes.content;
 
     let parsed: {
       tasks?: unknown[];
@@ -584,8 +564,8 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Model returned invalid JSON", raw: content }, 502);
     }
 
-    // Only mark the batch analysed once Groq has genuinely succeeded — never
-    // on a Gmail/Groq/JSON failure above, and never on the count path.
+    // Only mark the batch analysed once the model has genuinely succeeded, never
+    // on a Gmail/model/JSON failure above, and never on the count path.
     await markProcessed(userId, batchIds);
     const analyzedCount = batchIds.length;
     const remaining = Math.max(pendingIds.length - analyzedCount, 0);
