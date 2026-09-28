@@ -23,7 +23,8 @@ allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run 
 
 **Both branches at `0311efa`, pushed, clean.** Merge was a fast-forward from `dbb8119`, 5 commits,
 sole author Zaid Jarrar, no agent attribution. `ios-8` build dispatched from `main` @ `0311efa`
-(run 36420564016); confirm it went green and Zaid installed it.
+(run 36420564016) built GREEN, release `ios-8`; production web verified serving `0311efa`
+(cache-busted). Not yet confirmed: Zaid imported `ios-8`, and a full 50-email scan result looked clean.
 
 ### ONE SHARED AI CLIENT, PROVIDER IS PURE CONFIG
 `supabase/functions/_shared/ai.ts` exports `chatJson(system, user, maxTokens)`. All four model-calling
