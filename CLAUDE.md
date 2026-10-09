@@ -19,7 +19,46 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-09-28): `staging` AND `main` @ `0311efa`, PUSHED, AI PROVIDER IS NOW OPENAI `gpt-6-luna`, SCAN BATCH 50
+## Current state (2026-10-09): `staging` AND `main` @ `2fbc040`, GROCERY LIST + AI RECIPES + COOK MODE SHIPPED
+
+**Both branches at `2fbc040` (plus this docs commit), pushed.** Fast-forward of 14 commits, sole author
+Zaid Jarrar. `ios-11` built from `main`. Zaid tested everything on staging and `ios-10`: "perfect".
+Full design record and decisions: `_planning/GROCERIES_SCOPE.md` (read it before touching recipes).
+
+### What shipped
+- **Grocery list** (`lib/features/groceries/`, migration 019): Home card → `/groceries`, tabs List | Recipes.
+  Hard delete, free-text quantity, optimistic tick with revert.
+- **AI recipes** (`lib/features/recipes/`, migration 020, edge function `recipe-chef`): ask / chips /
+  "use what I have" / Surprise me → recipe page (emoji + gradient Hero badge, servings scaling in Dart,
+  add to grocery list with dedup pre-ticks, save, tweak) → **cook mode** (mise en place, one step per page,
+  multiple concurrent timers that notify with the phone locked, read aloud via flutter_tts, wakelock,
+  ask the chef mid-cook, finish page with times-cooked). Food preferences line in Settings
+  (`profiles.food_preferences`, read SERVER-side by recipe-chef, echoed as `preferencesApplied`).
+- `recipe-chef` = one function, actions `generate` (temp 0.9) / `tweak` (0.4) / `ask` (0.3).
+  `sanitizeRecipe()` is the contract with the Dart `Recipe` model; never hand raw model JSON to the app.
+  Surprise picks cuisine + style server-side (models are bad at randomness) and avoids saved titles.
+- `chatJson` gained an optional `temperature` (default 0, other four functions unchanged, not redeployed).
+
+### A real latent bug fixed in passing
+`LocalNotificationService.syncSchedule` called `cancelAll()`, so ANY other notification would have been
+wiped every time a task changed. Reminders now cancel only ids below `kCookTimerIdBase` (100000);
+cook timers live above it. `cancelAll` was renamed `cancelReminders`. **Any future notification type
+must take its own id range.**
+
+### Known, accepted
+Leaving the Groceries screen mid-generation drops that result. A timer that finishes after leaving
+cook mode alerts only via the OS notification. No AI food photos (Zaid chose emoji + gradient).
+
+### Lessons from this round
+- **One big round worked because the planner wrote AND executed the risky contract first**: the AI
+  prompt with a worked example, the sanitizer (run against the example and hostile input with Deno),
+  scaling + timer logic with 25 tests, and seams for every cross-lane widget. Six parallel UI lanes
+  then compiled independently with zero clobbering.
+- **Look for shared-resource collisions when adding a second user of a platform API.** Notifications
+  had one user (reminders) whose "replace everything" sync silently assumed it owned the whole OS queue.
+- **temperature 0 kills creative features**: a deterministic "Surprise me" returns the same dish every time.
+
+## SUPERSEDED - Current state (2026-09-28): `staging` AND `main` @ `0311efa`, PUSHED, AI PROVIDER IS NOW OPENAI `gpt-6-luna`, SCAN BATCH 50
 
 **Both branches at `0311efa`, pushed, clean.** Merge was a fast-forward from `dbb8119`, 5 commits,
 sole author Zaid Jarrar, no agent attribution. `ios-8` build dispatched from `main` @ `0311efa`
