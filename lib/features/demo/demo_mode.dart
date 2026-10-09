@@ -10,6 +10,7 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/demo/data/demo_fact_repository.dart';
+import 'package:life_os/features/demo/data/demo_grocery_repository.dart';
 import 'package:life_os/features/demo/data/demo_subscription_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_auth_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_daily_brief_notifier.dart';
@@ -25,6 +26,7 @@ import 'package:life_os/features/files/data/repositories/file_repository.dart';
 import 'package:life_os/features/files/data/services/file_picker_service.dart';
 import 'package:life_os/features/goals/data/goal_breakdown_service.dart';
 import 'package:life_os/features/goals/data/repositories/supabase_goal_repository.dart';
+import 'package:life_os/features/groceries/data/repositories/grocery_repository.dart';
 import 'package:life_os/features/home/domain/daily_brief_provider.dart';
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
@@ -74,6 +76,7 @@ List<Override> buildDemoOverrides() {
     subscriptionRepositoryProvider.overrideWithValue(
       DemoSubscriptionRepository(),
     ),
+    groceryRepositoryProvider.overrideWithValue(DemoGroceryRepository()),
     // Demo mode must never touch the OS: no permission prompt, no alarms
     // left scheduled on a stranger's phone after they close the sandbox.
     notificationServiceProvider.overrideWithValue(NoopNotificationService()),

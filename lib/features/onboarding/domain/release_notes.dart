@@ -182,6 +182,25 @@ const List<Release> kReleases = [
       ),
     ],
   ),
+  Release(
+    version: 7,
+    slides: [
+      AnnouncementSlide(
+        icon: Icons.shopping_cart_outlined,
+        headline: 'A grocery list',
+        body:
+            'Open it from the new card on Home. Add what you need, with '
+            'an amount if you want one.',
+      ),
+      AnnouncementSlide(
+        icon: Icons.check_circle_outline,
+        headline: 'Tick things off as you shop',
+        body:
+            'Tap an item once it is in the basket, then clear all the '
+            'ticked ones in one go when you get home.',
+      ),
+    ],
+  ),
 ];
 
 /// The most recent release version. Bumping [kReleases] with a new entry
