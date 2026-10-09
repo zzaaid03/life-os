@@ -17,6 +17,7 @@ import 'package:life_os/features/auth/presentation/screens/welcome_screen.dart';
 import 'package:life_os/features/demo/demo_mode.dart';
 import 'package:life_os/features/goals/presentation/screens/goal_breakdown_screen.dart';
 import 'package:life_os/features/goals/presentation/screens/goals_screen.dart';
+import 'package:life_os/features/groceries/presentation/screens/groceries_screen.dart';
 import 'package:life_os/features/home/presentation/screens/home_screen.dart';
 import 'package:life_os/features/inbox/presentation/screens/inbox_scan_screen.dart';
 import 'package:life_os/features/jobs/presentation/screens/job_applications_screen.dart';
@@ -74,6 +75,9 @@ abstract final class AppRoutes {
 
   /// The weekly review of the most recently ended week.
   static const String weeklyReview = '/weekly-review';
+
+  /// The grocery list (and, from slice 2, recipes).
+  static const String groceries = '/groceries';
 
   // Life features
   static const String goals = '/goals';
@@ -276,6 +280,11 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.weeklyReview,
         name: 'weeklyReview',
         builder: (context, state) => const WeeklyReviewScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.groceries,
+        name: 'groceries',
+        builder: (context, state) => const GroceriesScreen(),
       ),
 
       // Life features: standalone, no nav bar
