@@ -29,6 +29,8 @@ import 'package:life_os/features/permissions/presentation/screens/files_permissi
 import 'package:life_os/features/permissions/presentation/screens/notification_permission_screen.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
 import 'package:life_os/features/profile/presentation/screens/create_profile_screen.dart';
+import 'package:life_os/features/recipes/presentation/screens/cook_mode_screen.dart';
+import 'package:life_os/features/recipes/presentation/screens/recipe_detail_screen.dart';
 import 'package:life_os/features/review/presentation/screens/weekly_review_screen.dart';
 import 'package:life_os/features/search/presentation/screens/search_screen.dart';
 import 'package:life_os/features/settings/presentation/screens/privacy_policy_screen.dart';
@@ -78,6 +80,12 @@ abstract final class AppRoutes {
 
   /// The grocery list (and, from slice 2, recipes).
   static const String groceries = '/groceries';
+
+  /// One recipe (extra: `RecipeViewArgs`).
+  static const String recipeDetail = '/recipes/view';
+
+  /// Full-screen cook mode (extra: `CookModeArgs`).
+  static const String cookMode = '/recipes/cook';
 
   // Life features
   static const String goals = '/goals';
@@ -285,6 +293,24 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.groceries,
         name: 'groceries',
         builder: (context, state) => const GroceriesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.recipeDetail,
+        name: 'recipeDetail',
+        builder: (context, state) => RecipeDetailScreen(args: state.extra),
+      ),
+      GoRoute(
+        path: AppRoutes.cookMode,
+        name: 'cookMode',
+        // A fade, not a slide: cook mode is a different mode, not a deeper
+        // page, and a slide fights the badge's Hero flight.
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: CookModeScreen(args: state.extra),
+          transitionDuration: const Duration(milliseconds: 450),
+          transitionsBuilder: (context, animation, secondary, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
 
       // Life features: standalone, no nav bar
