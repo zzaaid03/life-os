@@ -35,10 +35,15 @@ export type AiResult =
 ///
 /// maxTokens caps the reply, reasoning tokens included, so one bad request
 /// can never produce an unbounded bill.
+///
+/// temperature only applies while reasoning is off (OpenAI rejects it
+/// otherwise). 0 suits extraction; creative callers such as recipe-chef pass
+/// more, or "surprise me" would return the identical dish every time.
 export async function chatJson(
   system: string,
   user: string,
   maxTokens = 2048,
+  temperature = 0,
 ): Promise<AiResult> {
   const body: Record<string, unknown> = {
     model: AI_MODEL,
@@ -50,7 +55,7 @@ export async function chatJson(
     ],
   };
   if (AI_REASONING_EFFORT) body.reasoning_effort = AI_REASONING_EFFORT;
-  if (!AI_REASONING_EFFORT || AI_REASONING_EFFORT === "none") body.temperature = 0;
+  if (!AI_REASONING_EFFORT || AI_REASONING_EFFORT === "none") body.temperature = temperature;
 
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`${AI_BASE_URL}/chat/completions`, {
