@@ -201,6 +201,32 @@ const List<Release> kReleases = [
       ),
     ],
   ),
+  Release(
+    version: 8,
+    slides: [
+      AnnouncementSlide(
+        icon: Icons.restaurant_menu_outlined,
+        headline: 'Meet the chef',
+        body:
+            'Ask for any dish, tell it what is in your fridge, or tap '
+            'Surprise me and see what comes back.',
+      ),
+      AnnouncementSlide(
+        icon: Icons.menu_book_outlined,
+        headline: 'Recipes that fit you',
+        body:
+            'Change the servings, send the ingredients to your grocery '
+            'list, or ask the chef to tweak it to your taste.',
+      ),
+      AnnouncementSlide(
+        icon: Icons.timer_outlined,
+        headline: 'Cook step by step',
+        body:
+            'Cook mode reads each step aloud, runs timers that ring even '
+            'with your phone locked, and lets you ask the chef mid-cook.',
+      ),
+    ],
+  ),
 ];
 
 /// The most recent release version. Bumping [kReleases] with a new entry
