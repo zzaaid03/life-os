@@ -17,6 +17,7 @@ import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/goals/domain/providers/goal_provider.dart';
+import 'package:life_os/features/groceries/domain/providers/grocery_provider.dart';
 import 'package:life_os/features/home/domain/daily_brief_provider.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/onboarding/domain/announcements_provider.dart';
@@ -116,6 +117,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .animate()
               .fadeIn(duration: 400.ms, delay: 550.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 550.ms),
+          const SizedBox(height: AppSpacing.md),
+          const _GroceriesSection()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 600.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 600.ms),
           const SizedBox(height: AppSpacing.massive),
         ],
       ),
@@ -705,6 +711,71 @@ class _SubscriptionsCard extends ConsumerWidget {
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// The home dashboard's groceries block. Unlike subscriptions it is always
+/// shown, even with an empty list, so the user always has a way in.
+class _GroceriesSection extends StatelessWidget {
+  const _GroceriesSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(title: 'Groceries'),
+        SizedBox(height: AppSpacing.md),
+        _GroceriesCard(),
+      ],
+    );
+  }
+}
+
+/// A compact dashboard card showing how many grocery items are left to
+/// buy, tapping through to the grocery list screen.
+class _GroceriesCard extends ConsumerWidget {
+  const _GroceriesCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(groceryListProvider);
+    final count = state.uncheckedCount;
+
+    final String subtitle;
+    if (state.status == GroceryListStatus.error) {
+      subtitle = 'Tap to open';
+    } else if (state.status == GroceryListStatus.loading &&
+        state.items.isEmpty) {
+      subtitle = 'Loading…';
+    } else if (count == 0) {
+      subtitle = 'Nothing to buy';
+    } else if (count == 1) {
+      subtitle = '1 item to buy';
+    } else {
+      subtitle = '$count items to buy';
+    }
+
+    return DashboardCard(
+      icon: Icons.shopping_cart_outlined,
+      title: 'Groceries',
+      trailing: count > 0
+          ? Text(
+              '$count',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : null,
+      onTap: () => context.push(AppRoutes.groceries),
+      child: Text(
+        subtitle,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+      ),
     );
   }
 }
