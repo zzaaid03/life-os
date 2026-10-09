@@ -15,6 +15,8 @@ import 'package:life_os/features/notifications/domain/providers/reminder_setting
 import 'package:life_os/features/onboarding/domain/release_notes.dart';
 import 'package:life_os/features/onboarding/presentation/announcements_sheet.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
+import 'package:life_os/features/recipes/domain/providers/recipe_providers.dart';
+import 'package:life_os/features/settings/presentation/widgets/food_preferences_dialog.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -95,6 +97,13 @@ class SettingsScreen extends ConsumerWidget {
                       .read(reminderSettingsProvider.notifier)
                       .setEnabled(userId, !current);
                 },
+              ),
+              _SettingsTile(
+                icon: Icons.restaurant_menu_outlined,
+                title: 'Food preferences',
+                subtitle: ref.watch(foodPreferencesProvider).value ??
+                    'Not set, the recipe chef will assume anything goes',
+                onTap: () => FoodPreferencesDialog.show(context),
               ),
               _SettingsTile(
                 icon: Icons.language_rounded,
