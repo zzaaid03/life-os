@@ -12,6 +12,10 @@ class LocalNotificationService implements NotificationService {
   static const String _androidChannelName = 'Task reminders';
   static const String _androidChannelDescription =
       'Reminders for tasks with a due date.';
+  static const String _cookChannelId = 'cook_timers';
+  static const String _cookChannelName = 'Cooking timers';
+  static const String _cookChannelDescription =
+      'Tells you when a cooking timer runs out.';
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -71,7 +75,7 @@ class LocalNotificationService implements NotificationService {
 
   @override
   Future<void> syncSchedule(List<PendingReminder> reminders) async {
-    await cancelAll();
+    await cancelReminders();
 
     // On Android 14+ the exact-alarm grant is not automatic, and the plugin's
     // documented behaviour without it is to log an error and NOT schedule the
@@ -125,5 +129,59 @@ class LocalNotificationService implements NotificationService {
   }
 
   @override
-  Future<void> cancelAll() => _plugin.cancelAll();
+  Future<void> cancelReminders() async {
+    // Not _plugin.cancelAll(): that would also kill a cook timer counting
+    // down right now, every time any task changes.
+    final pending = await _plugin.pendingNotificationRequests();
+    for (final request in pending) {
+      if (request.id < kCookTimerIdBase) {
+        await _plugin.cancel(id: request.id);
+      }
+    }
+  }
+
+  @override
+  Future<void> scheduleCookTimer({
+    required int id,
+    required DateTime fireAt,
+    required String title,
+    required String body,
+  }) async {
+    if (kIsWeb) return;
+    try {
+      await initialize();
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          _cookChannelId,
+          _cookChannelName,
+          channelDescription: _cookChannelDescription,
+          importance: Importance.max,
+          priority: Priority.max,
+        ),
+        iOS: DarwinNotificationDetails(
+          interruptionLevel: InterruptionLevel.timeSensitive,
+        ),
+      );
+      await _plugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: tz.TZDateTime.from(fireAt, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: await _androidScheduleMode(),
+      );
+    } catch (e) {
+      debugPrint('Cook timer notification not scheduled: $e');
+    }
+  }
+
+  @override
+  Future<void> cancelCookTimer(int id) async {
+    if (kIsWeb) return;
+    try {
+      await _plugin.cancel(id: id);
+    } catch (e) {
+      debugPrint('Cook timer notification not cancelled: $e');
+    }
+  }
 }

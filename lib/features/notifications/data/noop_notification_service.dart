@@ -17,5 +17,16 @@ class NoopNotificationService implements NotificationService {
   Future<void> syncSchedule(List<PendingReminder> reminders) async {}
 
   @override
-  Future<void> cancelAll() async {}
+  Future<void> cancelReminders() async {}
+
+  @override
+  Future<void> scheduleCookTimer({
+    required int id,
+    required DateTime fireAt,
+    required String title,
+    required String body,
+  }) async {}
+
+  @override
+  Future<void> cancelCookTimer(int id) async {}
 }

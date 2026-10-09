@@ -97,7 +97,7 @@ class ReminderSyncController {
       await service.initialize();
 
       if (!settings.enabled) {
-        await service.cancelAll();
+        await service.cancelReminders();
         _lastSignature = signature;
         return;
       }
