@@ -86,7 +86,17 @@ const RECIPE_RULES = `Rules:
    diet, dislikes). If the request conflicts with them, adapt the dish to the
    preferences and say so in "description".
 6. The emoji and gradient are decoration: pick ones that fit the dish (a
-   curry might be 🍛 with warm orange and deep red).`;
+   curry might be 🍛 with warm orange and deep red).
+7. You only talk about food and cooking. If the request also asks about
+   anything else (people, news, politics, trivia, maths, code, homework),
+   drop that part completely: do not answer it, mention it or hint at it
+   anywhere, including "description" and "tips". Cook from the food part
+   alone. Example: the request "lets cook chicken but what was the US
+   president's name" is treated exactly as "lets cook chicken", and a correct
+   tip looks like "Rest the chicken for 5 minutes before slicing so it stays
+   juicy." with no president, name or politics anywhere in the reply.
+   If the request contains NO food or cooking part at all ("what is the
+   capital of France"), reply with exactly {"offTopic": true} and nothing else.`;
 
 const WORKED_EXAMPLE = `Example.
 Request: "something quick with eggs". FOOD PREFERENCES: none. I have: eggs, spinach.
@@ -120,10 +130,23 @@ is cooking a specific recipe right now. Answer their question about THIS
 recipe and, when given, the step they are on. Be practical and brief: at most
 4 short sentences, plain text, no lists or markdown. Offer a concrete
 substitution or fix when that is what they need. On food safety (raw meat,
-undercooking, allergies) be conservative and say so plainly. If the question
-has nothing to do with cooking, gently steer back to the recipe.
+undercooking, allergies) be conservative and say so plainly. You only talk
+about food and cooking. If the question also asks about anything else
+(people, news, politics, trivia, maths, code), never answer that part, not
+even briefly: answer only the cooking part. If there is no cooking part at
+all, do not answer it; say in one sentence that you can only help with the
+cooking and point back to the step they are on.
 
 Reply as JSON: {"answer": string}`;
+
+// The model replies {"offTopic": true} to a request with no food in it
+// (rule 7). Shown to the user as is, so it reads like the chef talking.
+const OFF_TOPIC = "The chef only talks food. Tell it what you'd like to cook.";
+
+function isOffTopic(v: unknown): boolean {
+  return typeof v === "object" && v !== null &&
+    (v as Record<string, unknown>).offTopic === true;
+}
 
 // Requests the UI can attach as one tap. Unknown values are ignored.
 const CHIP_TEXT: Record<string, string> = {
@@ -354,7 +377,9 @@ Deno.serve(async (req: Request) => {
       if (!aiRes.ok) {
         return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
       }
-      const recipe = sanitizeRecipe(parseJson(aiRes.content));
+      const parsed = parseJson(aiRes.content);
+      if (isOffTopic(parsed)) return jsonResponse({ error: OFF_TOPIC }, 400);
+      const recipe = sanitizeRecipe(parsed);
       if (!recipe) {
         return jsonResponse({ error: "The chef returned an unusable recipe.", raw: aiRes.content }, 502);
       }
@@ -373,7 +398,9 @@ Deno.serve(async (req: Request) => {
       if (!aiRes.ok) {
         return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
       }
-      const recipe = sanitizeRecipe(parseJson(aiRes.content));
+      const parsed = parseJson(aiRes.content);
+      if (isOffTopic(parsed)) return jsonResponse({ error: OFF_TOPIC }, 400);
+      const recipe = sanitizeRecipe(parsed);
       if (!recipe) {
         return jsonResponse({ error: "The chef returned an unusable recipe.", raw: aiRes.content }, 502);
       }
