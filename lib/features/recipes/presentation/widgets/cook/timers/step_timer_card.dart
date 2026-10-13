@@ -157,6 +157,10 @@ class _Controls extends StatelessWidget {
 
   static const Size _big = Size.fromHeight(64);
   static const Size _normal = Size.fromHeight(56);
+  static const EdgeInsets _rowPadding = EdgeInsets.symmetric(horizontal: 8);
+
+  static Widget _fit(String label) =>
+      FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, softWrap: false));
 
   @override
   Widget build(BuildContext context) {
@@ -196,6 +200,8 @@ class _Controls extends StatelessWidget {
       );
     }
 
+    // Three buttons share one row on a narrow phone, so they get tighter
+    // padding and labels that shrink instead of wrapping or overflowing.
     final running = t.isRunning;
     return Row(
       children: [
@@ -204,8 +210,8 @@ class _Controls extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: () => running ? onPause(t.id) : onResume(t.id),
             icon: Icon(running ? Icons.pause_rounded : Icons.play_arrow_rounded),
-            label: Text(running ? 'Pause' : 'Resume'),
-            style: FilledButton.styleFrom(minimumSize: _normal, textStyle: textStyle),
+            label: _fit(running ? 'Pause' : 'Resume'),
+            style: FilledButton.styleFrom(minimumSize: _normal, padding: _rowPadding, textStyle: textStyle),
           ),
         ),
         if (running) ...[
@@ -214,8 +220,8 @@ class _Controls extends StatelessWidget {
             flex: 3,
             child: OutlinedButton(
               onPressed: () => onAddMinute(t.id),
-              style: OutlinedButton.styleFrom(minimumSize: _normal, textStyle: textStyle),
-              child: const Text('+1 min'),
+              style: OutlinedButton.styleFrom(minimumSize: _normal, padding: _rowPadding, textStyle: textStyle),
+              child: _fit('+1 min'),
             ),
           ),
         ],
@@ -224,8 +230,8 @@ class _Controls extends StatelessWidget {
           flex: 2,
           child: TextButton(
             onPressed: () => onReset(t.id),
-            style: TextButton.styleFrom(minimumSize: _normal, textStyle: textStyle),
-            child: const Text('Reset'),
+            style: TextButton.styleFrom(minimumSize: _normal, padding: _rowPadding, textStyle: textStyle),
+            child: _fit('Reset'),
           ),
         ),
       ],
