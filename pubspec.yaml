@@ -71,6 +71,9 @@ flutter:
   assets:
     - .env
     - assets/branding/logo_mark_1024.png
+    # Inter ships inside the app so no font is fetched from Google at runtime
+    # (blocked by privacy browsers such as DuckDuckGo). See main.dart.
+    - assets/google_fonts/
 
 flutter_launcher_icons:
   android: true

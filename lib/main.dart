@@ -10,9 +10,11 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/core/theme/app_colors.dart';
@@ -45,6 +47,15 @@ Future<void> main() async {
 /// Performs the normal startup sequence and launches the app.
 Future<void> _initializeAndRun() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inter is bundled under assets/google_fonts/. Never download fonts from
+  // fonts.gstatic.com: privacy browsers (DuckDuckGo, Brave) and blockers
+  // refuse Google domains, and the app would render with missing text.
+  GoogleFonts.config.allowRuntimeFetching = false;
+  LicenseRegistry.addLicense(() async* {
+    final license = await rootBundle.loadString('assets/google_fonts/OFL.txt');
+    yield LicenseEntryWithLineBreaks(['google_fonts'], license);
+  });
 
   // Without this, web uses hash-style URLs (#/privacy) and a real path
   // typed directly into the address bar (a Google OAuth reviewer, an

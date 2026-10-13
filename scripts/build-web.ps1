@@ -10,7 +10,9 @@ if (-not (Test-Path ".env")) {
 }
 
 Write-Host "Building web release for APP_ENV=$Env ..."
-flutter build web --release --dart-define=APP_ENV=$Env
+# Keep in sync with build-web.sh (CI uses that one). --no-web-resources-cdn
+# serves CanvasKit from our own domain instead of www.gstatic.com.
+flutter build web --release --no-web-resources-cdn --dart-define=APP_ENV=$Env
 
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
@@ -29,6 +31,22 @@ $IndexPath = "build\web\index.html"
 
 $BootstrapPath = "build\web\flutter_bootstrap.js"
 (Get-Content $BootstrapPath -Raw) -replace 'main\.dart\.js', "main.dart.js?v=$Stamp" | Set-Content $BootstrapPath -NoNewline
+
+# Version the local CanvasKit folder by engine revision (see build-web.sh).
+$Bootstrap = Get-Content $BootstrapPath -Raw
+if ($Bootstrap -notmatch '"engineRevision":"([0-9a-f]{10})') {
+    Write-Error "engineRevision not found in flutter_bootstrap.js"
+    exit 1
+}
+$Engine = $Matches[1]
+Rename-Item "build\web\canvaskit" "canvaskit-$Engine"
+$Bootstrap = $Bootstrap.Replace('_flutter.loader.load({', "_flutter.loader.load({ config: { canvasKitBaseUrl: `"canvaskit-$Engine/`" },")
+if (-not $Bootstrap.Contains("canvasKitBaseUrl: `"canvaskit-$Engine/`"")) {
+    Write-Error "could not point the loader at canvaskit-$Engine/"
+    exit 1
+}
+$Bootstrap | Set-Content $BootstrapPath -NoNewline
+Write-Host "CanvasKit served from canvaskit-$Engine/"
 
 $OutputPath = Join-Path (Get-Location) "build\web"
 Write-Host "Build output: $OutputPath"
