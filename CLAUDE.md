@@ -19,7 +19,33 @@ later `supabase config push` could overwrite hosted auth settings, including the
 allow-list that mobile sign-in depends on. Runs on Chrome for dev (`flutter run -d chrome`);
 **Android and iOS both now build and run on a real device (2026-07-23).**
 
-## Current state (2026-10-09): `staging` AND `main` @ `2fbc040`, GROCERY LIST + AI RECIPES + COOK MODE SHIPPED
+## Current state (2026-10-13): `staging` AND `main` @ `5a6f513`, BUGFIX ROUND MERGED, WORKS IN PRIVACY BROWSERS
+
+**Both branches at `5a6f513`, pushed, production verified serving it (cache-busted).** Fast-forward of
+4 commits, sole author Zaid Jarrar. Zaid tested the first three on staging: "all looks fine".
+No iOS build cut yet for these (offer `ios-12`; the timer + nav fixes need one on the phone).
+- `55a1280` cook-mode timer row (Pause / +1 min / Reset) overflowed on narrow phones: tighter padding,
+  labels in `FittedBox(scaleDown)`.
+- `04749db` **tab lag**: the shell was a plain `ShellRoute`, so every tab switch was a full page push
+  with the ~400ms Cupertino slide, rebuilt from scratch, replaying ~12 Home fade-ins. Now
+  `StatefulShellRoute.indexedStack` (tabs built once, kept alive, keep scroll/search text), plus a
+  no-op `BackdropFilter` removed from `FloatingNavBar`. Not done (only if lag remains): calendar
+  `_tasksByDay` memoising, `select` on derived task providers, search thumbnail `base64Decode` in build.
+- `55514ef` **recipe-chef off-topic guard, DEPLOYED**: rule 7 in `RECIPE_RULES` (mixed request: cook
+  the food part, never answer or mention the rest, worked example in the prompt); a request with no
+  food returns `{"offTopic": true}` and the server answers 400 "The chef only talks food...", which the
+  app already displays. `ASK_SYSTEM` tightened the same way.
+- `5a6f513` **DuckDuckGo / Brave / blockers showed only the static fallback page**: CanvasKit came
+  from `www.gstatic.com` and Inter from `fonts.gstatic.com`. Reproduced with headless Chrome blocking
+  Google domains (production never painted a frame). Now `--no-web-resources-cdn`, the build script
+  moves `canvaskit/` to `canvaskit-<engineRev10>/` and injects `config.canvasKitBaseUrl` into the
+  loader (asserts it did, fails the build otherwise), and Inter ships in `assets/google_fonts/` with
+  `GoogleFonts.config.allowRuntimeFetching = false`. **Any new font weight/style (e.g. SemiBoldItalic)
+  must be added as a TTF there or it fails to load.** Known leftover: the engine still asks
+  fonts.gstatic.com for Roboto (harmless) and emoji fallback fonts (recipe emoji may be boxes in a
+  blocking browser).
+
+## SUPERSEDED - Current state (2026-10-09): `staging` AND `main` @ `2fbc040`, GROCERY LIST + AI RECIPES + COOK MODE SHIPPED
 
 **Both branches at `2fbc040` (plus this docs commit), pushed.** Fast-forward of 14 commits, sole author
 Zaid Jarrar. `ios-11` built from `main`. Zaid tested everything on staging and `ios-10`: "perfect".
@@ -1930,6 +1956,11 @@ rrsync-restricted key. Zaid was told; filed as low priority, not actioned.
    jarrarzaid3@ / zaidgpt3@ can sign in, on ANY host.
 
 ## Hard-won gotchas (do NOT relearn these)
+- **A Flutter web app that loads its engine or fonts from a Google CDN is dead in privacy browsers.**
+  Test "works in any browser" by blocking `gstatic.com`/`googleapis.com` in a headless browser, and
+  never add a runtime dependency on a third-party domain for something the app cannot start without.
+- **`dart format` on a recipes file rewraps it**: those files were written at a wider line length,
+  and formatting them adds noise plus a `curly_braces` lint. Do not run it on files you only touched.
 - **Isolate a provider failure with ONE tiny request sent by hand before changing code.** Three code
   and config rounds (model alias, reply cap) were spent on Mistral 429s before a 20-token PowerShell
   request proved the account itself was refused. Do that test FIRST, and before any deploy to a new
