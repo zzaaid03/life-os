@@ -61,51 +61,45 @@ class FloatingNavBar extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.xl),
-          child: BackdropFilter(
-            filter: const ColorFilter.mode(
-              Colors.transparent,
-              BlendMode.srcOver,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(
-                  icon: AppIcons.home,
-                  filledIcon: AppIcons.homeFilled,
-                  label: 'Home',
-                  route: AppRoutes.home,
-                  isActive: currentLocation == AppRoutes.home,
-                ),
-                _NavItem(
-                  icon: AppIcons.timeline,
-                  filledIcon: AppIcons.timeline,
-                  label: 'Timeline',
-                  route: AppRoutes.timeline,
-                  isActive: currentLocation == AppRoutes.timeline,
-                ),
-                _NavItem(
-                  icon: AppIcons.life,
-                  filledIcon: AppIcons.lifeFilled,
-                  label: 'Life',
-                  route: AppRoutes.life,
-                  isActive: currentLocation == AppRoutes.life,
-                ),
-                _NavItem(
-                  icon: AppIcons.search,
-                  filledIcon: AppIcons.search,
-                  label: 'Search',
-                  route: AppRoutes.search,
-                  isActive: currentLocation == AppRoutes.search,
-                ),
-                _NavItem(
-                  icon: AppIcons.settings,
-                  filledIcon: AppIcons.settingsFilled,
-                  label: 'Settings',
-                  route: AppRoutes.settings,
-                  isActive: currentLocation == AppRoutes.settings,
-                ),
-              ],
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _NavItem(
+                icon: AppIcons.home,
+                filledIcon: AppIcons.homeFilled,
+                label: 'Home',
+                route: AppRoutes.home,
+                isActive: currentLocation == AppRoutes.home,
+              ),
+              _NavItem(
+                icon: AppIcons.timeline,
+                filledIcon: AppIcons.timeline,
+                label: 'Timeline',
+                route: AppRoutes.timeline,
+                isActive: currentLocation == AppRoutes.timeline,
+              ),
+              _NavItem(
+                icon: AppIcons.life,
+                filledIcon: AppIcons.lifeFilled,
+                label: 'Life',
+                route: AppRoutes.life,
+                isActive: currentLocation == AppRoutes.life,
+              ),
+              _NavItem(
+                icon: AppIcons.search,
+                filledIcon: AppIcons.search,
+                label: 'Search',
+                route: AppRoutes.search,
+                isActive: currentLocation == AppRoutes.search,
+              ),
+              _NavItem(
+                icon: AppIcons.settings,
+                filledIcon: AppIcons.settingsFilled,
+                label: 'Settings',
+                route: AppRoutes.settings,
+                isActive: currentLocation == AppRoutes.settings,
+              ),
+            ],
           ),
         ),
       ),

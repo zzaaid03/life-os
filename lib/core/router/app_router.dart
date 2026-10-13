@@ -223,39 +223,66 @@ GoRouter createRouter(Ref ref) {
         builder: (context, state) => const FilesPermissionScreen(),
       ),
 
-      // Main app, wrapped in AppShell with floating nav + FAB
-      ShellRoute(
-        builder: (context, state, child) => AppShell(child: child),
-        routes: [
-          GoRoute(
-            path: AppRoutes.home,
-            name: 'home',
-            builder: (context, state) => const HomeScreen(),
+      // Main app, wrapped in AppShell with floating nav + FAB. Each tab is
+      // its own branch in an IndexedStack: built once, kept alive, and
+      // switched instantly instead of pushed with a slide transition.
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AppShell(child: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.home,
+                name: 'home',
+                builder: (context, state) => const HomeScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: AppRoutes.timeline,
-            name: 'timeline',
-            builder: (context, state) => const TimelineScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.timeline,
+                name: 'timeline',
+                builder: (context, state) => const TimelineScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: AppRoutes.life,
-            name: 'life',
-            builder: (context, state) => const LifeScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.life,
+                name: 'life',
+                builder: (context, state) => const LifeScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: AppRoutes.search,
-            name: 'search',
-            builder: (context, state) => const SearchScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.search,
+                name: 'search',
+                builder: (context, state) => const SearchScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: AppRoutes.settings,
-            name: 'settings',
-            builder: (context, state) => const SettingsScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.settings,
+                name: 'settings',
+                builder: (context, state) => const SettingsScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: AppRoutes.tasks,
-            name: 'tasks',
-            builder: (context, state) => const TaskListScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.tasks,
+                name: 'tasks',
+                builder: (context, state) => const TaskListScreen(),
+              ),
+            ],
           ),
         ],
       ),
