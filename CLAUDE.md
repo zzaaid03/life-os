@@ -84,6 +84,8 @@ These turn Zaid's four goals into rules. A diff that breaks one is not done.
 - Store datetimes as UTC, display local. Server code that says "today" needs the client's
   `tzOffsetMinutes`; due dates are local midnight stored as UTC.
 - Make migrations idempotent (`IF NOT EXISTS`, `DROP ... IF EXISTS`, `OR REPLACE`). SQL gets re-run.
+- A `DROP TABLE` migration starts with a row-count check that raises, and uses no CASCADE.
+  "Empty" tables sometimes aren't (029 found a leftover row).
 - RLS test harnesses: `SET LOCAL role` outside a transaction is ignored and you test as superuser.
   Rehearse migrations with `supabase start` in a TEMP dir, never in the repo.
 - A negative test ("I can't see it") proves nothing unless some screen could have shown it.
