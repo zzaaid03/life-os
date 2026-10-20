@@ -86,10 +86,9 @@ Future<void> _initializeAndRun() async {
       providerRefreshToken.isNotEmpty &&
       userId != null) {
     try {
-      await Supabase.instance.client.from('google_credentials').upsert(
-        {'user_id': userId, 'refresh_token': providerRefreshToken},
-        onConflict: 'user_id',
-      );
+      await GoogleCredentialsRepository(
+        Supabase.instance.client,
+      ).saveRefreshToken(refreshToken: providerRefreshToken);
       debugPrint('[gmail] refresh token saved for $userId');
     } catch (e) {
       debugPrint('[gmail] failed to save refresh token: $e');

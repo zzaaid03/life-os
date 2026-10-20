@@ -247,9 +247,7 @@ class SettingsScreen extends ConsumerWidget {
     final userId = ref.read(authProvider).userId;
     if (userId == null) return;
 
-    await ref
-        .read(googleCredentialsRepositoryProvider)
-        .deleteCredentials(userId);
+    await ref.read(googleCredentialsRepositoryProvider).deleteCredentials();
     ref.invalidate(gmailConnectedProvider);
 
     if (context.mounted) {

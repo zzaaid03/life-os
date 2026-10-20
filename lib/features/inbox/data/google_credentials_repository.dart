@@ -1,9 +1,9 @@
 /// Google credentials repository.
 ///
-/// Persists the user's Google OAuth refresh token in the
-/// `public.google_credentials` table so the `extract-tasks` Edge Function
+/// Persists the user's Google OAuth refresh token (via RPC into
+/// `public.google_credentials`) so the `extract-tasks` Edge Function
 /// can mint fresh Gmail access tokens server-side, without the app ever
-/// having to hold a live access token. Per-user RLS protects each row.
+/// having to hold a live access token. The functions only ever act on the caller.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -12,45 +12,56 @@ import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Repository for the `google_credentials` table.
+/// Repository for the user's stored Google credentials.
+///
+/// The client has no access to the `google_credentials` table itself (the
+/// refresh token must never reach the browser). Every call goes through a
+/// SECURITY DEFINER function that acts on `auth.uid()` only. Failures are
+/// logged (never the token) and rethrown so callers can tell "failed" from
+/// "nothing there".
 class GoogleCredentialsRepository {
   /// Creates a [GoogleCredentialsRepository].
   const GoogleCredentialsRepository(this._client);
 
   final SupabaseClient _client;
 
-  /// The Supabase table name.
-  static const String _table = 'google_credentials';
-
-  /// Upserts the [refreshToken] for [userId], keyed on `user_id`.
-  Future<void> saveRefreshToken({
-    required String userId,
-    required String refreshToken,
-  }) async {
-    await _client.from(_table).upsert({
-      'user_id': userId,
-      'refresh_token': refreshToken,
-    }, onConflict: 'user_id');
+  /// Saves the [refreshToken] for the signed-in user (insert or update).
+  Future<void> saveRefreshToken({required String refreshToken}) async {
+    try {
+      await _client.rpc<void>(
+        'save_google_refresh_token',
+        params: {'p_refresh_token': refreshToken},
+      );
+    } catch (e) {
+      debugPrint('[gmail] save_google_refresh_token failed: $e');
+      rethrow;
+    }
   }
 
-  /// Whether a stored credential row exists for [userId].
-  Future<bool> hasCredentials(String userId) async {
-    final response = await _client
-        .from(_table)
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-    return response != null;
+  /// Whether the signed-in user has a stored credential.
+  Future<bool> hasCredentials() async {
+    try {
+      final response = await _client.rpc<bool>('google_connected');
+      return response == true;
+    } catch (e) {
+      debugPrint('[gmail] google_connected failed: $e');
+      rethrow;
+    }
   }
 
-  /// Deletes the stored refresh token for [userId].
+  /// Deletes the signed-in user's stored refresh token.
   ///
   /// This revokes Life OS's own ability to mint Gmail access tokens for the
   /// user; it does not touch the grant on the Google account side (the user
   /// can also do that from myaccount.google.com). A missing row is a no-op,
   /// not an error, so disconnecting twice is harmless.
-  Future<void> deleteCredentials(String userId) async {
-    await _client.from(_table).delete().eq('user_id', userId);
+  Future<void> deleteCredentials() async {
+    try {
+      await _client.rpc<void>('disconnect_google');
+    } catch (e) {
+      debugPrint('[gmail] disconnect_google failed: $e');
+      rethrow;
+    }
   }
 }
 
@@ -68,7 +79,7 @@ final googleCredentialsRepositoryProvider =
 final gmailConnectedProvider = FutureProvider.autoDispose<bool>((ref) async {
   final userId = ref.watch(authProvider).userId;
   if (userId == null) return false;
-  return ref.watch(googleCredentialsRepositoryProvider).hasCredentials(userId);
+  return ref.watch(googleCredentialsRepositoryProvider).hasCredentials();
 });
 
 /// Captures the Google refresh token from raw Supabase auth events and
@@ -106,7 +117,7 @@ final googleCredentialsCaptureProvider = Provider<void>((ref) {
     lastSavedToken = refreshToken;
 
     repository
-        .saveRefreshToken(userId: userId, refreshToken: refreshToken)
+        .saveRefreshToken(refreshToken: refreshToken)
         .then((_) {
           debugPrint('[gmail] refresh token saved for $userId (listener)');
         })
