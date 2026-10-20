@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/widgets/error_snackbar.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
@@ -25,6 +26,7 @@ class TaskListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final taskState = ref.watch(taskListProvider);
+    listenForRefreshError(ref, context, taskListProvider.select((s) => s.status == TaskListStatus.loaded ? s.error : null));
     final todayTasks = ref.watch(todayTasksProvider);
     final upcomingTasks = ref.watch(upcomingTasksProvider);
     final completedTasks = ref.watch(completedTasksProvider);

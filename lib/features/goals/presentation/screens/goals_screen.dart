@@ -12,6 +12,7 @@ import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/utils/date_format.dart';
+import 'package:life_os/core/widgets/error_snackbar.dart';
 import 'package:life_os/features/goals/data/models/goal.dart';
 import 'package:life_os/features/goals/domain/providers/goal_provider.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
@@ -54,6 +55,7 @@ class GoalsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(goalListProvider);
+    listenForRefreshError(ref, context, goalListProvider.select((s) => s.status == GoalListStatus.loaded ? s.error : null));
 
     return Scaffold(
       appBar: AppBar(

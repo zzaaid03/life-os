@@ -5,6 +5,7 @@
 /// provider existed (where `ref.listen` never fires).
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:life_os/features/auth/data/models/auth_state.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/groceries/data/models/grocery_item.dart';
@@ -32,7 +33,7 @@ class GroceryListState {
   /// An error message, if loading failed.
   final String? error;
 
-  /// Items still to buy.
+  /// Items still to buy. Correct only while getAll stays unbounded.
   int get uncheckedCount => items.where((i) => !i.checked).length;
 
   /// Whether any item is checked, i.e. "clear checked" has something to do.
@@ -54,18 +55,27 @@ class GroceryListNotifier extends StateNotifier<GroceryListState> {
   /// Loads the list for [userId].
   Future<void> load(String userId) async {
     _userId = userId;
+    if (state.items.isNotEmpty && state.error != null) {
+      state = GroceryListState(
+        status: GroceryListStatus.loaded,
+        items: state.items,
+      );
+    }
     try {
       final items = await _repository.getAll(userId);
       state = GroceryListState(
         status: GroceryListStatus.loaded,
         items: sortForDisplay(items),
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Grocery list load failed: $e');
       // A failed refresh keeps what is on screen rather than blanking it.
       if (state.items.isNotEmpty) {
         state = GroceryListState(
           status: GroceryListStatus.loaded,
           items: state.items,
+          error:
+              "Couldn't refresh your grocery list. Check your connection and try again.",
         );
       } else {
         state = const GroceryListState(

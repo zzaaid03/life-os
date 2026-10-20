@@ -12,6 +12,7 @@ import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/utils/date_format.dart';
+import 'package:life_os/core/widgets/error_snackbar.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
@@ -49,7 +50,9 @@ class JobApplicationsScreen extends ConsumerWidget {
           );
       await ref.read(jobListProvider.notifier).refresh();
     } catch (_) {
-      if (context.mounted) _showError(context, 'Could not create the entry.');
+      if (context.mounted) {
+        showErrorSnackBar(context, 'Could not create the entry.');
+      }
     }
   }
 
@@ -74,7 +77,9 @@ class JobApplicationsScreen extends ConsumerWidget {
           );
       await ref.read(jobListProvider.notifier).refresh();
     } catch (_) {
-      if (context.mounted) _showError(context, 'Could not save the changes.');
+      if (context.mounted) {
+        showErrorSnackBar(context, 'Could not save the changes.');
+      }
     }
   }
 
@@ -87,7 +92,9 @@ class JobApplicationsScreen extends ConsumerWidget {
       await ref.read(jobApplicationRepositoryProvider).delete(job.id);
       await ref.read(jobListProvider.notifier).refresh();
     } catch (_) {
-      if (context.mounted) _showError(context, 'Could not delete the entry.');
+      if (context.mounted) {
+        showErrorSnackBar(context, 'Could not delete the entry.');
+      }
       // Reload so a failed optimistic dismiss reappears.
       await ref.read(jobListProvider.notifier).refresh();
     }
@@ -119,15 +126,16 @@ class JobApplicationsScreen extends ConsumerWidget {
     );
   }
 
-  void _showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(jobListProvider);
+    listenForRefreshError(
+      ref,
+      context,
+      jobListProvider.select(
+        (s) => s.status == JobListStatus.loaded ? s.error : null,
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -180,8 +188,9 @@ class JobApplicationsScreen extends ConsumerWidget {
         vertical: AppSpacing.lg,
       ),
       itemCount: state.jobs.length + 1,
-      separatorBuilder: (_, index) =>
-          index == 0 ? const SizedBox.shrink() : const SizedBox(height: AppSpacing.sm),
+      separatorBuilder: (_, index) => index == 0
+          ? const SizedBox.shrink()
+          : const SizedBox(height: AppSpacing.sm),
       itemBuilder: (context, index) {
         if (index == 0) {
           return FollowUpCard(
@@ -201,8 +210,10 @@ class JobApplicationsScreen extends ConsumerWidget {
               color: AppColors.error.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
-            child: const Icon(Icons.delete_outline_rounded,
-                color: AppColors.error),
+            child: const Icon(
+              Icons.delete_outline_rounded,
+              color: AppColors.error,
+            ),
           ),
           confirmDismiss: (_) async {
             return await showDialog<bool>(
@@ -279,65 +290,65 @@ class _JobCard extends StatelessWidget {
 
   Widget _buildContent(ThemeData theme) {
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title is never blank: fall back to the role, then a
-                    // status-based headline, when the company is unknown.
-                    Text(
-                      _title,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title is never blank: fall back to the role, then a
+                  // status-based headline, when the company is unknown.
+                  Text(
+                    _title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
-                    // Only show the role as a subtitle when it isn't already
-                    // serving as the title (i.e. a company is present).
-                    if (job.company.trim().isNotEmpty &&
-                        job.role.trim().isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        job.role,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
+                  ),
+                  // Only show the role as a subtitle when it isn't already
+                  // serving as the title (i.e. a company is present).
+                  if (job.company.trim().isNotEmpty &&
+                      job.role.trim().isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      job.role,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
                         ),
                       ),
-                    ],
+                    ),
                   ],
-                ),
+                ],
               ),
-              const SizedBox(width: AppSpacing.sm),
-              JobStatusChip(status: job.status),
-            ],
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            JobStatusChip(status: job.status),
+          ],
+        ),
+        if (job.summary != null && job.summary!.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            job.summary!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              height: 1.4,
+            ),
           ),
-          if (job.summary != null && job.summary!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              job.summary!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                height: 1.4,
-              ),
-            ),
-          ],
-          if (job.statusFromEmailAt != null) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Updated from email · '
-              '${formatDay(job.statusFromEmailAt!.toLocal())}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
-              ),
-            ),
-          ],
         ],
+        if (job.statusFromEmailAt != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Updated from email · '
+            '${formatDay(job.statusFromEmailAt!.toLocal())}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -381,9 +392,7 @@ class _MessageList extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xxl,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
                 child: Text(
                   subtitle,
                   textAlign: TextAlign.center,

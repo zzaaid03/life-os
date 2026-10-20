@@ -14,6 +14,7 @@ import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/widgets/error_snackbar.dart';
 import 'package:life_os/features/groceries/domain/providers/grocery_provider.dart';
 import 'package:life_os/features/recipes/data/models/recipe.dart';
 import 'package:life_os/features/recipes/data/recipe_chef_service.dart';
@@ -242,6 +243,7 @@ class _RecipesTabState extends ConsumerState<RecipesTab>
     super.build(context);
     final last = ref.watch(lastGeneratedRecipeProvider);
     final saved = ref.watch(savedRecipesProvider);
+    listenForRefreshError(ref, context, savedRecipesProvider.select((s) => s.status == SavedRecipesStatus.loaded ? s.error : null));
     final showLast = last != null && (_phase == _Phase.ask || _phase == _Phase.error);
 
     return RefreshIndicator(

@@ -12,6 +12,7 @@ import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/utils/date_format.dart';
+import 'package:life_os/core/widgets/error_snackbar.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
 import 'package:life_os/features/subscriptions/domain/billing.dart';
@@ -45,7 +46,7 @@ class SubscriptionsScreen extends ConsumerWidget {
           );
     } catch (_) {
       if (context.mounted) {
-        _showError(context, 'Could not create the subscription.');
+        showErrorSnackBar(context, 'Could not create the subscription.');
       }
     }
   }
@@ -78,7 +79,7 @@ class SubscriptionsScreen extends ConsumerWidget {
             );
       } catch (_) {
         if (context.mounted) {
-          _showError(context, 'Could not save the changes.');
+          showErrorSnackBar(context, 'Could not save the changes.');
         }
       }
       return;
@@ -127,7 +128,7 @@ class SubscriptionsScreen extends ConsumerWidget {
           .update(subscription.copyWith(status: SubscriptionStatus.cancelled));
     } catch (_) {
       if (context.mounted) {
-        _showError(context, 'Could not cancel the subscription.');
+        showErrorSnackBar(context, 'Could not cancel the subscription.');
       }
     }
   }
@@ -165,20 +166,21 @@ class SubscriptionsScreen extends ConsumerWidget {
           .softDelete(subscription.id);
     } catch (_) {
       if (context.mounted) {
-        _showError(context, 'Could not delete the subscription.');
+        showErrorSnackBar(context, 'Could not delete the subscription.');
       }
     }
-  }
-
-  void _showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(subscriptionListProvider);
+    listenForRefreshError(
+      ref,
+      context,
+      subscriptionListProvider.select(
+        (s) => s.status == SubscriptionListStatus.loaded ? s.error : null,
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -445,9 +447,7 @@ class _MessageList extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xxl,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
                 child: Text(
                   subtitle,
                   textAlign: TextAlign.center,

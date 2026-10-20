@@ -6,6 +6,7 @@
 /// feature so cold-start behaves consistently.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:life_os/features/auth/data/models/auth_state.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
@@ -61,13 +62,22 @@ class JobListNotifier extends StateNotifier<JobListState> {
     _userId = userId;
     if (state.jobs.isEmpty) {
       state = const JobListState(status: JobListStatus.loading);
+    } else {
+      // Clear a stale refresh error; copyWith resets it.
+      state = state.copyWith();
     }
     try {
       final jobs = await _repository.getAll(userId);
       state = JobListState(status: JobListStatus.loaded, jobs: jobs);
     } catch (e) {
+      debugPrint('Job applications load failed: $e');
       if (state.jobs.isNotEmpty) {
-        state = state.copyWith(status: JobListStatus.loaded);
+        // Keep the list on screen and tell the user the refresh failed.
+        state = state.copyWith(
+          status: JobListStatus.loaded,
+          error:
+              "Couldn't refresh your job applications. Check your connection and try again.",
+        );
       } else {
         state = const JobListState(
           status: JobListStatus.error,
@@ -86,32 +96,35 @@ class JobListNotifier extends StateNotifier<JobListState> {
 }
 
 /// Provides the [JobListNotifier] and its [JobListState].
-final jobListProvider =
-    StateNotifierProvider<JobListNotifier, JobListState>((ref) {
-      final repository = ref.watch(jobApplicationRepositoryProvider);
-      final notifier = JobListNotifier(repository);
+final jobListProvider = StateNotifierProvider<JobListNotifier, JobListState>((
+  ref,
+) {
+  final repository = ref.watch(jobApplicationRepositoryProvider);
+  final notifier = JobListNotifier(repository);
 
-      ref.listen<AuthState>(authProvider, (previous, next) {
-        if (next.isAuthenticated &&
-            next.userId != null &&
-            (previous == null ||
-                !previous.isAuthenticated ||
-                previous.userId != next.userId)) {
-          notifier.load(next.userId!);
-        }
-      });
+  ref.listen<AuthState>(authProvider, (previous, next) {
+    if (next.isAuthenticated &&
+        next.userId != null &&
+        (previous == null ||
+            !previous.isAuthenticated ||
+            previous.userId != next.userId)) {
+      notifier.load(next.userId!);
+    }
+  });
 
-      // Cold-start: if the session was already restored before this
-      // provider was created, `ref.listen` won't fire, so load eagerly.
-      final currentAuth = ref.read(authProvider);
-      if (currentAuth.isAuthenticated && currentAuth.userId != null) {
-        Future.microtask(() => notifier.load(currentAuth.userId!));
-      }
+  // Cold-start: if the session was already restored before this
+  // provider was created, `ref.listen` won't fire, so load eagerly.
+  final currentAuth = ref.read(authProvider);
+  if (currentAuth.isAuthenticated && currentAuth.userId != null) {
+    Future.microtask(() => notifier.load(currentAuth.userId!));
+  }
 
-      return notifier;
-    });
+  return notifier;
+});
 
 /// The number of tracked job applications (for dashboard badges).
+// Counts with .length, which is correct only because JobRepository.getAll has
+// no limit. If getAll ever gets a limit, switch this to a count: exact query.
 final jobApplicationCountProvider = Provider<int>((ref) {
   return ref.watch(jobListProvider).jobs.length;
 });

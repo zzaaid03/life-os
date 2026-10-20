@@ -67,13 +67,20 @@ class GoalListNotifier extends StateNotifier<GoalListState> {
     _userId = userId;
     if (state.goals.isEmpty) {
       state = const GoalListState(status: GoalListStatus.loading);
+    } else {
+      // copyWith resets error, so a repeat failure fires a new snackbar.
+      state = state.copyWith();
     }
     try {
       final goals = await _repository.getAll(userId);
       state = GoalListState(status: GoalListStatus.loaded, goals: goals);
     } catch (e) {
+      debugPrint('goal load failed for user $userId: $e');
       if (state.goals.isNotEmpty) {
-        state = state.copyWith(status: GoalListStatus.loaded);
+        state = state.copyWith(
+          status: GoalListStatus.loaded,
+          error: "Couldn't refresh your goals. Check your connection and try again.",
+        );
       } else {
         state = const GoalListState(
           status: GoalListStatus.error,

@@ -184,6 +184,9 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
 
     if (state.tasks.isEmpty) {
       state = const TaskListState(status: TaskListStatus.loading);
+    } else {
+      // copyWith resets error, so a repeat failure fires a new snackbar.
+      state = state.copyWith();
     }
 
     try {
@@ -193,7 +196,10 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
     } catch (e) {
       debugPrint('loadTasks failed for user $userId: $e');
       if (state.tasks.isNotEmpty) {
-        state = state.copyWith(status: TaskListStatus.loaded);
+        state = state.copyWith(
+          status: TaskListStatus.loaded,
+          error: "Couldn't refresh your tasks. Check your connection and try again.",
+        );
       } else {
         state = const TaskListState(
           status: TaskListStatus.error,

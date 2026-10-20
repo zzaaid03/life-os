@@ -43,12 +43,20 @@ class SavedRecipesNotifier extends StateNotifier<SavedRecipesState> {
   /// Loads for [userId].
   Future<void> load(String userId) async {
     _userId = userId;
+    if (state.recipes.isNotEmpty && state.error != null) {
+      state = SavedRecipesState(status: SavedRecipesStatus.loaded, recipes: state.recipes);
+    }
     try {
       final recipes = await _repository.getAll(userId);
       state = SavedRecipesState(status: SavedRecipesStatus.loaded, recipes: recipes);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Saved recipes load failed: $e');
       state = state.recipes.isNotEmpty
-          ? SavedRecipesState(status: SavedRecipesStatus.loaded, recipes: state.recipes)
+          ? SavedRecipesState(
+              status: SavedRecipesStatus.loaded,
+              recipes: state.recipes,
+              error: "Couldn't refresh your recipes. Check your connection and try again.",
+            )
           : const SavedRecipesState(
               status: SavedRecipesStatus.error,
               error: 'Failed to load your recipes.',

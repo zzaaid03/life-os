@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/widgets/error_snackbar.dart';
 import 'package:life_os/features/groceries/data/models/grocery_item.dart';
 import 'package:life_os/features/groceries/domain/providers/grocery_provider.dart';
 import 'package:life_os/features/groceries/presentation/widgets/grocery_add_row.dart';
@@ -50,19 +51,12 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen>
 
   GroceryListNotifier get _notifier => ref.read(groceryListProvider.notifier);
 
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
-  }
-
   Future<bool> _add(String name, String? quantity) async {
     try {
       await _notifier.add(name, quantity: quantity);
       return true;
     } catch (_) {
-      _showError('Could not add the item.');
+      if (mounted) showErrorSnackBar(context, 'Could not add the item.');
       return false;
     }
   }
@@ -72,7 +66,7 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen>
       await _notifier.setChecked(item, checked: checked);
     } catch (_) {
       // The notifier has already put the checkbox back.
-      _showError('Could not update the item.');
+      if (mounted) showErrorSnackBar(context, 'Could not update the item.');
     }
   }
 
@@ -88,7 +82,7 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen>
         ),
       );
     } catch (_) {
-      _showError('Could not save the changes.');
+      if (mounted) showErrorSnackBar(context, 'Could not save the changes.');
     }
   }
 
@@ -97,8 +91,10 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen>
     try {
       await _notifier.delete(item.id);
     } catch (_) {
-      if (mounted) setState(() => _removing.remove(item.id));
-      _showError('Could not delete the item.');
+      if (mounted) {
+        setState(() => _removing.remove(item.id));
+        showErrorSnackBar(context, 'Could not delete the item.');
+      }
     }
   }
 
@@ -128,13 +124,20 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen>
     try {
       await _notifier.clearChecked();
     } catch (_) {
-      _showError('Could not clear checked items.');
+      if (mounted) showErrorSnackBar(context, 'Could not clear checked items.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(groceryListProvider);
+    listenForRefreshError(
+      ref,
+      context,
+      groceryListProvider.select(
+        (s) => s.status == GroceryListStatus.loaded ? s.error : null,
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(

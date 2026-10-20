@@ -6,6 +6,7 @@
 /// existed and `ref.listen` therefore never fires.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:life_os/features/auth/data/models/auth_state.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
@@ -68,6 +69,9 @@ class SubscriptionListNotifier extends StateNotifier<SubscriptionListState> {
       state = const SubscriptionListState(
         status: SubscriptionListStatus.loading,
       );
+    } else {
+      // Clear a stale refresh error; copyWith resets it.
+      state = state.copyWith();
     }
     try {
       final subscriptions = await _repository.getAll(userId);
@@ -75,11 +79,16 @@ class SubscriptionListNotifier extends StateNotifier<SubscriptionListState> {
         status: SubscriptionListStatus.loaded,
         subscriptions: subscriptions,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Subscriptions load failed: $e');
       // Keep whatever is already on screen rather than blanking it: a failed
       // refresh should not erase a list the user is reading.
       if (state.subscriptions.isNotEmpty) {
-        state = state.copyWith(status: SubscriptionListStatus.loaded);
+        state = state.copyWith(
+          status: SubscriptionListStatus.loaded,
+          error:
+              "Couldn't refresh your subscriptions. Check your connection and try again.",
+        );
       } else {
         state = const SubscriptionListState(
           status: SubscriptionListStatus.error,
