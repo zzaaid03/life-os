@@ -8,8 +8,26 @@ library;
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// The remote calls the sync engine needs. Lets tests swap in a fake.
+abstract interface class TaskSyncRemote {
+  /// Upserts a task to the server.
+  Future<Task> upsert(Task task);
+
+  /// Fetches one page of tasks for [userId], ordered by `updated_at` then `id`.
+  ///
+  /// Without [cursor]: rows updated at or after [since]. With [cursor] (the
+  /// last row of the previous page): rows strictly after it in that order,
+  /// so a row updated mid-pull can't make a later page skip another row.
+  Future<List<Task>> getSince(
+    String userId,
+    DateTime since, {
+    ({DateTime updatedAt, String id})? cursor,
+    required int limit,
+  });
+}
+
 /// Remote data source for [Task] records backed by Supabase.
-class TaskRemoteDataSource {
+class TaskRemoteDataSource implements TaskSyncRemote {
   /// Creates a [TaskRemoteDataSource] with the given [SupabaseClient].
   const TaskRemoteDataSource(this._client);
 
@@ -17,6 +35,13 @@ class TaskRemoteDataSource {
 
   /// The Supabase table name for tasks.
   static const String _table = 'tasks';
+
+  /// The PostgREST `or` filter for rows strictly after ([updatedAt], [id]).
+  /// Values are double-quoted so `:` and `.` can't be read as syntax.
+  static String keysetFilter(DateTime updatedAt, String id) {
+    final ts = updatedAt.toUtc().toIso8601String();
+    return 'updated_at.gt."$ts",and(updated_at.eq."$ts",id.gt."$id")';
+  }
 
   /// Fetches a single task by [id], or `null` if not found.
   Future<Task?> getById(String id) async {
@@ -42,13 +67,20 @@ class TaskRemoteDataSource {
         .toList();
   }
 
-  /// Fetches tasks for [userId] updated after [lastSync].
-  Future<List<Task>> getSince(String userId, DateTime lastSync) async {
-    final response = await _client
-        .from(_table)
-        .select()
-        .eq('user_id', userId)
-        .gt('updated_at', lastSync.toIso8601String());
+  @override
+  Future<List<Task>> getSince(
+    String userId,
+    DateTime since, {
+    ({DateTime updatedAt, String id})? cursor,
+    required int limit,
+  }) async {
+    var query = _client.from(_table).select().eq('user_id', userId);
+    if (cursor == null) {
+      query = query.gte('updated_at', since.toUtc().toIso8601String());
+    } else {
+      query = query.or(keysetFilter(cursor.updatedAt, cursor.id));
+    }
+    final response = await query.order('updated_at').order('id').limit(limit);
     return (response as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(Task.fromJson)
@@ -59,6 +91,7 @@ class TaskRemoteDataSource {
   ///
   /// Returns the task as returned by the server, or the original
   /// [task] if no row is returned.
+  @override
   Future<Task> upsert(Task task) async {
     final response = await _client
         .from(_table)

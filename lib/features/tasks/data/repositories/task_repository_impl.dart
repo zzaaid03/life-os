@@ -119,12 +119,4 @@ class TaskRepositoryImpl implements TaskRepository {
     }
     await _remote.delete(id);
   }
-
-  /// Synchronizes local and remote task stores for [userId].
-  Future<void> sync(String userId) async {
-    final local = _local;
-    if (local == null) return;
-    final syncService = SyncService(localTasks: local, remoteTasks: _remote);
-    await syncService.syncTasks(userId);
-  }
 }

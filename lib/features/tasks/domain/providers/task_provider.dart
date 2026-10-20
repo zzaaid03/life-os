@@ -18,7 +18,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:life_os/core/services/app_database.dart';
 import 'package:life_os/core/services/supabase_service.dart';
+import 'package:life_os/core/sync/sync_lifecycle.dart';
 import 'package:life_os/core/sync/sync_service.dart';
+import 'package:life_os/core/sync/sync_state.dart';
 import 'package:life_os/features/auth/data/models/auth_state.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/tasks/data/datasources/task_local_data_source.dart';
@@ -55,13 +57,22 @@ final syncQueueProvider = Provider<SyncQueue>((ref) {
 /// Provides the [SyncService] (native only; no-op on web).
 final syncServiceProvider = Provider<SyncService>((ref) {
   final remote = ref.watch(taskRemoteDataSourceProvider);
+  final syncState = ref.watch(syncStateProvider.notifier);
 
   if (kIsWeb) {
-    return SyncService(localTasks: _NullLocalDataSource(), remoteTasks: remote);
+    return SyncService(
+      localTasks: _NullLocalDataSource(),
+      remoteTasks: remote,
+      syncState: syncState,
+    );
   }
 
   final local = ref.watch(taskLocalDataSourceProvider);
-  return SyncService(localTasks: local, remoteTasks: remote);
+  return SyncService(
+    localTasks: local,
+    remoteTasks: remote,
+    syncState: syncState,
+  );
 });
 
 /// Null local data source for web.
@@ -89,6 +100,15 @@ class _NullLocalDataSource implements TaskLocalDataSource {
 
   @override
   Future<List<Task>> getPendingSync(String userId) async => [];
+
+  @override
+  Future<void> markSyncedIfUnchanged(Task pushed, DateTime syncedAt) async {}
+
+  @override
+  Future<bool> applyRemote(Task remote) async => false;
+
+  @override
+  Future<int> countPending(String userId) async => 0;
 }
 
 /// Provides the [TaskRepository] (concrete [TaskRepositoryImpl], or a demo
@@ -171,6 +191,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       state = TaskListState(status: TaskListStatus.loaded, tasks: tasks);
       unawaited(_syncAndReload(userId));
     } catch (e) {
+      debugPrint('loadTasks failed for user $userId: $e');
       if (state.tasks.isNotEmpty) {
         state = state.copyWith(status: TaskListStatus.loaded);
       } else {
@@ -209,6 +230,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
           .create(toCreate)
           .then((_) => _syncAndReload(userId))
           .catchError((Object e) {
+            debugPrint('createTask failed for ${toCreate.id}: $e');
             state = state.copyWith(
               tasks: state.tasks.where((t) => t.id != toCreate.id).toList(),
             );
@@ -235,6 +257,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
           .update(task)
           .then((_) => _syncAndReload(_userId ?? task.userId))
           .catchError((Object e) {
+            debugPrint('updateTask failed for ${task.id}: $e');
             state = state.copyWith(
               tasks: state.tasks
                   .map((t) => t.id == task.id ? oldTask : t)
@@ -258,8 +281,16 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
     unawaited(
       _repository
           .delete(id)
-          .then((_) => _syncAndReload(_userId ?? ''))
+          .then((_) async {
+            final userId = _userId;
+            if (userId == null) {
+              debugPrint('deleteTask: no user id, skipping sync for $id');
+              return;
+            }
+            await _syncAndReload(userId);
+          })
           .catchError((Object e) {
+            debugPrint('deleteTask failed for $id: $e');
             state = state.copyWith(tasks: oldTasks);
           }),
     );
@@ -284,7 +315,11 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
 
     final next = isCompleted
         ? null
-        : nextRecurringTask(completed: task, newId: const Uuid().v4(), now: now);
+        : nextRecurringTask(
+            completed: task,
+            newId: const Uuid().v4(),
+            now: now,
+          );
 
     await updateTask(updated);
     if (next != null) {
@@ -314,9 +349,21 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
       // This picks up any tasks that were pulled from the remote.
       final tasks = await _repository.getAll(userId);
       state = TaskListState(status: TaskListStatus.loaded, tasks: tasks);
-    } catch (_) {
-      // Sync failures are silent: existing state remains valid.
+    } catch (e) {
+      // Existing state remains valid; the sync service records its own
+      // failures in the sync state.
+      debugPrint('Sync and reload failed for user $userId: $e');
     }
+  }
+
+  /// Syncs now for the current user (used when the app is resumed).
+  Future<void> syncNow() async {
+    final userId = _userId;
+    if (userId == null) {
+      debugPrint('syncNow: no user id, skipping sync');
+      return;
+    }
+    await _syncAndReload(userId);
   }
 }
 
@@ -326,6 +373,17 @@ final taskListProvider = StateNotifierProvider<TaskListNotifier, TaskListState>(
     final repository = ref.watch(taskRepositoryProvider);
     final syncService = ref.watch(syncServiceProvider);
     final notifier = TaskListNotifier(repository, syncService);
+
+    // Native only: catch up with the server when the app returns to the
+    // foreground. Only signed-in users have anything to sync.
+    final lifecycle = SyncLifecycle(
+      onResumed: () {
+        if (ref.read(authProvider).isAuthenticated) {
+          unawaited(notifier.syncNow());
+        }
+      },
+    );
+    ref.onDispose(lifecycle.dispose);
 
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.isAuthenticated &&

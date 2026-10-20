@@ -63,14 +63,67 @@ class TaskLocalDataSource {
   }
 
   /// Soft-deletes a task by setting `deleted_at` to now.
+  ///
+  /// Bumps `version` so a push already in flight cannot mark this
+  /// delete as synced (see [markSyncedIfUnchanged]).
   Future<void> softDelete(String id) async {
-    await (_db.update(_db.tasks)..where((t) => t.id.equals(id))).write(
-      TasksCompanion(
-        deletedAt: Value(DateTime.now()),
-        updatedAt: Value(DateTime.now()),
-        syncStatus: const Value('pendingPush'),
-      ),
+    final now = DateTime.now();
+    await _db.customUpdate(
+      'UPDATE tasks SET deleted_at = ?, updated_at = ?, '
+      "sync_status = 'pendingPush', version = version + 1 WHERE id = ?",
+      variables: [
+        Variable<DateTime>(now),
+        Variable<DateTime>(now),
+        Variable<String>(id),
+      ],
+      updates: {_db.tasks},
     );
+  }
+
+  /// Marks [pushed] as synced, but only if the row has not been edited
+  /// since it was read for the push (same `updated_at` and `version`).
+  ///
+  /// `updated_at` alone is not enough: Drift stores it in whole seconds,
+  /// so two edits in the same second look identical.
+  Future<void> markSyncedIfUnchanged(Task pushed, DateTime syncedAt) async {
+    await (_db.update(_db.tasks)..where(
+          (t) =>
+              t.id.equals(pushed.id) &
+              t.updatedAt.equals(pushed.updatedAt) &
+              t.version.equals(pushed.version),
+        ))
+        .write(
+          TasksCompanion(
+            syncStatus: Value(SyncStatus.synced.name),
+            syncedAt: Value(syncedAt),
+          ),
+        );
+  }
+
+  /// Writes a task pulled from the server as synced.
+  ///
+  /// Skips it (returns `false`) if the local row has unsynced edits,
+  /// because the pending local change wins. Runs in a transaction so an
+  /// edit cannot slip in between the check and the write.
+  Future<bool> applyRemote(Task remote) {
+    return _db.transaction(() async {
+      final local = await getById(remote.id);
+      if (local != null && local.syncStatus != SyncStatus.synced) {
+        return false;
+      }
+      await insert(remote.copyWith(syncStatus: SyncStatus.synced));
+      return true;
+    });
+  }
+
+  /// Counts tasks for [userId] that are not yet synced.
+  Future<int> countPending(String userId) async {
+    final count = _db.tasks.id.count();
+    final query = _db.selectOnly(_db.tasks)
+      ..addColumns([count])
+      ..where(_db.tasks.userId.equals(userId))
+      ..where(_db.tasks.syncStatus.isNotIn([SyncStatus.synced.name]));
+    return (await query.map((r) => r.read(count)).getSingle()) ?? 0;
   }
 
   /// Permanently removes a task row from the database.
