@@ -11,17 +11,11 @@
 // Secrets: AI_API_KEY, see _shared/ai.ts (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { handlePreflight, jsonResponse, requireUser } from "../_shared/http.ts";
 import { aiConfigured, chatJson } from "../_shared/ai.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
 
 const SYSTEM_PROMPT =
   `You infer durable facts about a person from their own app data. You will be shown their tasks, goals, job applications and file notes.
@@ -44,13 +38,6 @@ const VALID_CATEGORIES = new Set([
   "situation",
   "constraint",
 ]);
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
 
 function toFactKey(fact: string): string {
   return fact
@@ -93,21 +80,14 @@ interface QueryErrors {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
 
   try {
-    const jwt = (req.headers.get("Authorization") ?? "").replace(
-      /^Bearer\s+/i,
-      "",
-    );
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    const { data: userData, error: userErr } = await admin.auth.getUser(jwt);
-    if (userErr || !userData?.user) {
-      return jsonResponse({ error: "unauthorized" }, 401);
-    }
-    const userId = userData.user.id;
+    const user = await requireUser(req, admin);
+    if (user instanceof Response) return user;
+    const userId = user.id;
 
     const ninetyDaysAgo = new Date(
       Date.now() - 90 * 24 * 60 * 60 * 1000,
@@ -227,7 +207,7 @@ Deno.serve(async (req: Request) => {
       fileNotes.length;
 
     if (totalGathered < 5) {
-      return jsonResponse({
+      return jsonResponse(req, {
         written: 0,
         skipped: 0,
         reason: "not_enough_data",
@@ -269,7 +249,7 @@ Deno.serve(async (req: Request) => {
     const contextBlock = lines.join("\n");
 
     if (!aiConfigured) {
-      return jsonResponse({ error: "AI_API_KEY is not configured." }, 500);
+      return jsonResponse(req, { error: "AI_API_KEY is not configured." }, 500);
     }
 
     interface RawFact {
@@ -355,7 +335,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return jsonResponse({
+    return jsonResponse(req, {
       written,
       dropped,
       reason: "ok",
@@ -364,6 +344,6 @@ Deno.serve(async (req: Request) => {
       queryErrors,
     });
   } catch (e) {
-    return jsonResponse({ error: String(e) }, 500);
+    return jsonResponse(req, { error: String(e) }, 500);
   }
 });

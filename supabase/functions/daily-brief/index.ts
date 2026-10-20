@@ -15,23 +15,10 @@
 // Secrets: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { handlePreflight, jsonResponse, requireUser } from "../_shared/http.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
 
 // `priority` mirrors `TaskPriority` in lib/features/tasks/data/models/task.dart,
 // stored as the enum index (0=none, 1=low, 2=medium, 3=high) in
@@ -63,25 +50,18 @@ interface UserFact {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
 
   try {
     // Identify the caller from their JWT.
-    const jwt = (req.headers.get("Authorization") ?? "").replace(
-      /^Bearer\s+/i,
-      "",
-    );
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    const { data: userData, error: userErr } = await admin.auth.getUser(jwt);
-    if (userErr || !userData?.user) {
-      return jsonResponse({ error: "unauthorized" }, 401);
-    }
-    const userId = userData.user.id;
+    const user = await requireUser(req, admin);
+    if (user instanceof Response) return user;
+    const userId = user.id;
     const displayName =
-      (userData.user.user_metadata?.display_name as string | undefined) ??
-      (userData.user.user_metadata?.full_name as string | undefined) ??
+      (user.user_metadata?.display_name as string | undefined) ??
+      (user.user_metadata?.full_name as string | undefined) ??
       "";
     const firstName = displayName.split(" ")[0] ?? "";
 
@@ -275,7 +255,7 @@ Deno.serve(async (req: Request) => {
       const brief = firstName
         ? `${firstName}, nothing needs your attention today.`
         : "Nothing needs your attention today.";
-      return jsonResponse({ brief, noticed });
+      return jsonResponse(req, { brief, noticed });
     }
 
     if (completedThisWeek > 0) {
@@ -291,8 +271,8 @@ Deno.serve(async (req: Request) => {
       brief = `${firstName}, ${brief.charAt(0).toLowerCase()}${brief.slice(1)}`;
     }
 
-    return jsonResponse({ brief, noticed });
+    return jsonResponse(req, { brief, noticed });
   } catch (e) {
-    return jsonResponse({ error: String(e) }, 500);
+    return jsonResponse(req, { error: String(e) }, 500);
   }
 });

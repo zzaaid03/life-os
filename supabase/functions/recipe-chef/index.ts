@@ -15,24 +15,11 @@
 // the model's raw JSON to the app.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { handlePreflight, jsonResponse, requireUser } from "../_shared/http.ts";
 import { aiConfigured, chatJson } from "../_shared/ai.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Prompts
@@ -303,22 +290,18 @@ function parseJson(content: string): unknown {
 // ---------------------------------------------------------------------------
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
 
   try {
     if (!aiConfigured) {
-      return jsonResponse({ error: "AI_API_KEY is not configured." }, 500);
+      return jsonResponse(req, { error: "AI_API_KEY is not configured." }, 500);
     }
 
-    const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    const { data: userData, error: userErr } = await admin.auth.getUser(jwt);
-    if (userErr || !userData?.user) {
-      return jsonResponse({ error: "unauthorized" }, 401);
-    }
-    const userId = userData.user.id;
+    const user = await requireUser(req, admin);
+    if (user instanceof Response) return user;
+    const userId = user.id;
 
     const body = await req.json().catch(() => null) as Record<string, unknown> | null;
     const action = body?.action;
@@ -339,11 +322,12 @@ Deno.serve(async (req: Request) => {
       const pantry = str(body?.pantry, 500);
       const surprise = body?.surprise === true;
       const chips = (Array.isArray(body?.chips) ? body!.chips as unknown[] : [])
+        .slice(0, 20)
         .map((c) => CHIP_TEXT[String(c)])
         .filter(Boolean);
 
       if (!prompt && !pantry && !surprise && chips.length === 0) {
-        return jsonResponse({ error: "Tell the chef what you feel like." }, 400);
+        return jsonResponse(req, { error: "Tell the chef what you feel like." }, 400);
       }
 
       const lines: string[] = [];
@@ -376,48 +360,48 @@ Deno.serve(async (req: Request) => {
       const aiRes = await chatJson(userId, GENERATE_SYSTEM, lines.join("\n"), 4096, 0.9);
       if (!aiRes.ok) {
         if (aiRes.quotaExceeded) {
-          return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+          return jsonResponse(req, { error: "daily_ai_limit", detail: aiRes.detail }, 429);
         }
-        return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
+        return jsonResponse(req, { error: "AI provider error", detail: aiRes.detail }, 502);
       }
       const parsed = parseJson(aiRes.content);
-      if (isOffTopic(parsed)) return jsonResponse({ error: OFF_TOPIC }, 400);
+      if (isOffTopic(parsed)) return jsonResponse(req, { error: OFF_TOPIC }, 400);
       const recipe = sanitizeRecipe(parsed);
       if (!recipe) {
-        return jsonResponse({ error: "The chef returned an unusable recipe.", raw: aiRes.content }, 502);
+        return jsonResponse(req, { error: "The chef returned an unusable recipe.", raw: aiRes.content }, 502);
       }
-      return jsonResponse({ recipe, preferencesApplied: preferences.length > 0 });
+      return jsonResponse(req, { recipe, preferencesApplied: preferences.length > 0 });
     }
 
     if (action === "tweak") {
       const current = sanitizeRecipe(body?.recipe);
       const instruction = str(body?.instruction, 300);
-      if (!current) return jsonResponse({ error: "recipe is required" }, 400);
-      if (!instruction) return jsonResponse({ error: "instruction is required" }, 400);
+      if (!current) return jsonResponse(req, { error: "recipe is required" }, 400);
+      if (!instruction) return jsonResponse(req, { error: "instruction is required" }, 400);
 
       const user = `CURRENT RECIPE:\n${JSON.stringify(current)}\n\n` +
         `CHANGE REQUEST: "${instruction}"\n${prefsLine}`;
       const aiRes = await chatJson(userId, TWEAK_SYSTEM, user, 4096, 0.4);
       if (!aiRes.ok) {
         if (aiRes.quotaExceeded) {
-          return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+          return jsonResponse(req, { error: "daily_ai_limit", detail: aiRes.detail }, 429);
         }
-        return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
+        return jsonResponse(req, { error: "AI provider error", detail: aiRes.detail }, 502);
       }
       const parsed = parseJson(aiRes.content);
-      if (isOffTopic(parsed)) return jsonResponse({ error: OFF_TOPIC }, 400);
+      if (isOffTopic(parsed)) return jsonResponse(req, { error: OFF_TOPIC }, 400);
       const recipe = sanitizeRecipe(parsed);
       if (!recipe) {
-        return jsonResponse({ error: "The chef returned an unusable recipe.", raw: aiRes.content }, 502);
+        return jsonResponse(req, { error: "The chef returned an unusable recipe.", raw: aiRes.content }, 502);
       }
-      return jsonResponse({ recipe, preferencesApplied: preferences.length > 0 });
+      return jsonResponse(req, { recipe, preferencesApplied: preferences.length > 0 });
     }
 
     if (action === "ask") {
       const current = sanitizeRecipe(body?.recipe);
       const question = str(body?.question, 300);
-      if (!current) return jsonResponse({ error: "recipe is required" }, 400);
-      if (!question) return jsonResponse({ error: "question is required" }, 400);
+      if (!current) return jsonResponse(req, { error: "recipe is required" }, 400);
+      if (!question) return jsonResponse(req, { error: "question is required" }, 400);
 
       const stepIndex = typeof body?.stepIndex === "number" &&
           Number.isInteger(body.stepIndex) &&
@@ -433,20 +417,20 @@ Deno.serve(async (req: Request) => {
       const aiRes = await chatJson(userId, ASK_SYSTEM, user, 600, 0.3);
       if (!aiRes.ok) {
         if (aiRes.quotaExceeded) {
-          return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+          return jsonResponse(req, { error: "daily_ai_limit", detail: aiRes.detail }, 429);
         }
-        return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
+        return jsonResponse(req, { error: "AI provider error", detail: aiRes.detail }, 502);
       }
       const parsed = parseJson(aiRes.content) as { answer?: unknown } | null;
       const answer = str(parsed?.answer, 1200);
       if (!answer) {
-        return jsonResponse({ error: "The chef had no answer.", raw: aiRes.content }, 502);
+        return jsonResponse(req, { error: "The chef had no answer.", raw: aiRes.content }, 502);
       }
-      return jsonResponse({ answer });
+      return jsonResponse(req, { answer });
     }
 
-    return jsonResponse({ error: "Unknown action" }, 400);
+    return jsonResponse(req, { error: "Unknown action" }, 400);
   } catch (e) {
-    return jsonResponse({ error: String(e) }, 500);
+    return jsonResponse(req, { error: String(e) }, 500);
   }
 });

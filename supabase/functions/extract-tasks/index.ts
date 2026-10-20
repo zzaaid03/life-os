@@ -14,19 +14,13 @@
 //          (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { handlePreflight, jsonResponse, requireUser } from "../_shared/http.ts";
 import { aiConfigured, chatJson } from "../_shared/ai.ts";
 
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
 
 const SYSTEM_PROMPT =
   `You are an inbox assistant for a busy person who is also actively job-hunting.
@@ -194,13 +188,6 @@ Respond with ONLY a JSON object of this exact form:
 {"tasks":[{"title": string, "dueDate": string|null, "dueDateHint": string|null, "priority": string, "sourceEmailId": string}],
  "jobUpdates":[{"company": string, "role": string, "status": string, "summary": string, "sourceEmailId": string}],
  "subscriptions":[{"name": string, "amount": string|null, "currency": string|null, "cycle": string|null, "nextChargeDate": string|null, "sourceEmailId": string}]}`;
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
 
 // --- Google token: mint a fresh access token from a stored refresh token ---
 async function accessTokenFromRefresh(refreshToken: string): Promise<string> {
@@ -409,25 +396,22 @@ async function resolveAccessToken(
   req: Request,
 ): Promise<{ token: string; userId: string } | { error: Response }> {
   // Identify the user from their Supabase JWT, load stored refresh token.
-  const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-  const { data: userData, error: userErr } = await admin.auth.getUser(jwt);
-  if (userErr || !userData?.user) {
-    return { error: jsonResponse({ error: "unauthorized" }, 401) };
-  }
-  const userId = userData.user.id;
+  const user = await requireUser(req, admin);
+  if (user instanceof Response) return { error: user };
+  const userId = user.id;
   const { data: cred } = await admin
     .from("google_credentials")
     .select("refresh_token")
     .eq("user_id", userId)
     .maybeSingle();
   if (!cred?.refresh_token) {
-    return { error: jsonResponse({ error: "gmail_not_connected" }, 200) };
+    return { error: jsonResponse(req, { error: "gmail_not_connected" }, 200) };
   }
   try {
     return { token: await accessTokenFromRefresh(cred.refresh_token), userId };
   } catch (e) {
-    return { error: jsonResponse({ error: "token_refresh_failed", detail: String(e) }, 502) };
+    return { error: jsonResponse(req, { error: "token_refresh_failed", detail: String(e) }, 502) };
   }
 }
 
@@ -486,13 +470,12 @@ async function buildFactsBlock(
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
 
   try {
     if (!aiConfigured) {
-      return jsonResponse({ error: "AI_API_KEY is not configured." }, 500);
+      return jsonResponse(req, { error: "AI_API_KEY is not configured." }, 500);
     }
 
     const body = await req.json().catch(() => null);
@@ -532,14 +515,14 @@ Deno.serve(async (req: Request) => {
       capped = listing.capped;
       listingIds = listing.ids;
     } catch (e) {
-      return jsonResponse({ error: "Gmail fetch failed", detail: String(e) }, 502);
+      return jsonResponse(req, { error: "Gmail fetch failed", detail: String(e) }, 502);
     }
     // Shared by the scan and `count` paths, so both fail the same way.
     try {
       pendingIds = await filterPendingIds(userId, listingIds);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return jsonResponse(
+      return jsonResponse(req, 
         { error: "Lookup failed", detail: `processed_emails lookup failed: ${msg}` },
         502,
       );
@@ -548,7 +531,7 @@ Deno.serve(async (req: Request) => {
     // Count-only: must never fetch a body or call the model. Returns as soon
     // as the id set is known, before any per-message Gmail call is made.
     if (action === "count") {
-      return jsonResponse({
+      return jsonResponse(req, {
         pending: pendingIds.length,
         capped,
         horizonDays,
@@ -557,7 +540,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (pendingIds.length === 0) {
-      return jsonResponse({
+      return jsonResponse(req, {
         tasks: [],
         jobUpdates: [],
         subscriptions: [],
@@ -572,14 +555,14 @@ Deno.serve(async (req: Request) => {
     try {
       emails = await fetchEmailBodies(accessToken, batchIds, tzOffsetMinutes);
     } catch (e) {
-      return jsonResponse({ error: "Gmail fetch failed", detail: String(e) }, 502);
+      return jsonResponse(req, { error: "Gmail fetch failed", detail: String(e) }, 502);
     }
 
     // Every message in the batch was deleted since it was listed: nothing to
     // send. Mark them so they stop blocking the batch, and skip the model.
     if (emails.length === 0) {
       await markProcessed(userId, batchIds);
-      return jsonResponse({
+      return jsonResponse(req, {
         tasks: [],
         jobUpdates: [],
         subscriptions: [],
@@ -602,9 +585,9 @@ Deno.serve(async (req: Request) => {
 
     if (!aiRes.ok) {
       if (aiRes.quotaExceeded) {
-        return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+        return jsonResponse(req, { error: "daily_ai_limit", detail: aiRes.detail }, 429);
       }
-      return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
+      return jsonResponse(req, { error: "AI provider error", detail: aiRes.detail }, 502);
     }
 
     const content = aiRes.content;
@@ -617,7 +600,7 @@ Deno.serve(async (req: Request) => {
     try {
       parsed = JSON.parse(content);
     } catch {
-      return jsonResponse({ error: "Model returned invalid JSON", raw: content }, 502);
+      return jsonResponse(req, { error: "Model returned invalid JSON", raw: content }, 502);
     }
 
     // Only mark the batch analysed once the model has genuinely succeeded, never
@@ -626,7 +609,7 @@ Deno.serve(async (req: Request) => {
     const analyzedCount = batchIds.length;
     const remaining = Math.max(pendingIds.length - analyzedCount, 0);
 
-    return jsonResponse({
+    return jsonResponse(req, {
       tasks: parsed.tasks ?? [],
       jobUpdates: parsed.jobUpdates ?? [],
       subscriptions: parsed.subscriptions ?? [],
@@ -644,6 +627,6 @@ Deno.serve(async (req: Request) => {
         : {}),
     });
   } catch (e) {
-    return jsonResponse({ error: String(e) }, 500);
+    return jsonResponse(req, { error: String(e) }, 500);
   }
 });

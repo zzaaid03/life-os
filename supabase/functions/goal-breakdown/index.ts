@@ -12,17 +12,11 @@
 // JWT to confirm they're authenticated).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { handlePreflight, jsonResponse, requireUser } from "../_shared/http.ts";
 import { aiConfigured, chatJson } from "../_shared/ai.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
 
 const SYSTEM_PROMPT =
   `You are a planning assistant that breaks a goal down into concrete next
@@ -68,13 +62,6 @@ here: list only facts that genuinely changed what you wrote.
 Respond with ONLY a JSON object of this exact form:
 {"usedContext": string[], "tasks":[{"title": string, "description": string|null, "priority": string}]}`;
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
 interface RawTask {
   title?: string;
   description?: string | null;
@@ -99,6 +86,16 @@ function computeSuggestedDueDates(count: number, targetDate: string | null): str
     dates.push(new Date(startMs + span * fraction).toISOString());
   }
   return dates;
+}
+
+// A target date is only used if it parses and lands within 5 years of now,
+// otherwise it is treated as missing (the 30-day default applies).
+function parseTargetDate(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const ms = new Date(raw.trim().slice(0, 40)).getTime();
+  if (!Number.isFinite(ms)) return null;
+  const fiveYears = 5 * 365 * 24 * 60 * 60 * 1000;
+  return Math.abs(ms - Date.now()) <= fiveYears ? raw.trim().slice(0, 40) : null;
 }
 
 function truncate(s: string, max = 80): string {
@@ -188,32 +185,32 @@ function buildContextBlock(
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
 
   try {
     if (!aiConfigured) {
-      return jsonResponse({ error: "AI_API_KEY is not configured." }, 500);
+      return jsonResponse(req, { error: "AI_API_KEY is not configured." }, 500);
     }
 
-    const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    const { data: userData, error: userErr } = await admin.auth.getUser(jwt);
-    if (userErr || !userData?.user) {
-      return jsonResponse({ error: "unauthorized" }, 401);
-    }
+    const user = await requireUser(req, admin);
+    if (user instanceof Response) return user;
 
     const body = await req.json().catch(() => null);
-    const goalTitle = (body?.goalTitle as string | undefined)?.trim();
-    const goalDescription = (body?.goalDescription as string | undefined)?.trim() || null;
-    const targetDate = (body?.targetDate as string | undefined) || null;
+    const goalTitle = typeof body?.goalTitle === "string"
+      ? body.goalTitle.trim().slice(0, 200)
+      : "";
+    const goalDescription = typeof body?.goalDescription === "string"
+      ? body.goalDescription.trim().slice(0, 2000) || null
+      : null;
+    const targetDate = parseTargetDate(body?.targetDate);
 
     if (!goalTitle) {
-      return jsonResponse({ error: "goalTitle is required" }, 400);
+      return jsonResponse(req, { error: "goalTitle is required" }, 400);
     }
 
-    const userId = userData.user.id;
+    const userId = user.id;
     const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const [openTasksRes, completedTasksRes, jobAppsRes, otherGoalsRes, userFactsRes] = await Promise.all([
@@ -289,13 +286,13 @@ Deno.serve(async (req: Request) => {
       ? `${baseUserContent}\n\n${contextBlock}`
       : baseUserContent;
 
-    const aiRes = await chatJson(userData.user.id, SYSTEM_PROMPT, userContent);
+    const aiRes = await chatJson(user.id, SYSTEM_PROMPT, userContent);
 
     if (!aiRes.ok) {
       if (aiRes.quotaExceeded) {
-        return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+        return jsonResponse(req, { error: "daily_ai_limit", detail: aiRes.detail }, 429);
       }
-      return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
+      return jsonResponse(req, { error: "AI provider error", detail: aiRes.detail }, 502);
     }
 
     const content = aiRes.content;
@@ -304,7 +301,7 @@ Deno.serve(async (req: Request) => {
     try {
       parsed = JSON.parse(content);
     } catch {
-      return jsonResponse({ error: "Model returned invalid JSON", raw: content }, 502);
+      return jsonResponse(req, { error: "Model returned invalid JSON", raw: content }, 502);
     }
 
     const rawTasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
@@ -325,7 +322,7 @@ Deno.serve(async (req: Request) => {
     // exists because a failed context query degrades silently to an omitted
     // section — without it, "the model had no data" and "the queries returned
     // nothing" are indistinguishable from the UI.
-    return jsonResponse({
+    return jsonResponse(req, {
       tasks,
       context: {
         block: contextBlock,
@@ -350,6 +347,6 @@ Deno.serve(async (req: Request) => {
       },
     });
   } catch (e) {
-    return jsonResponse({ error: String(e) }, 500);
+    return jsonResponse(req, { error: String(e) }, 500);
   }
 });
