@@ -111,7 +111,7 @@ class HomeJobApplicationsCard extends ConsumerWidget {
 /// A dashboard section for subscriptions: a header plus a compact card.
 ///
 /// Renders nothing at all when the user has no subscriptions, active or
-/// cancelled — an empty-state card here would be noise on a dashboard that
+/// cancelled: an empty-state card here would be noise on a dashboard that
 /// already has an explicit place (the subscriptions screen's own empty
 /// state) to invite adding the first one.
 class HomeSubscriptionsSection extends ConsumerWidget {

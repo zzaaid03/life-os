@@ -4,7 +4,7 @@
 // tasks, tasks due today/soon, the single highest-priority open task, a
 // company-matched cross-reference between standout job applications and the
 // task list, and a completed-this-week count. Every sentence is assembled in
-// TypeScript directly from the caller's own rows — no model is involved, so
+// TypeScript directly from the caller's own rows, no model is involved, so
 // nothing is ever invented. The caller is identified from their Supabase
 // JWT; data is read server-side with the service role. Returns
 // { brief: string, noticed: string | null }. `noticed` is one AI-inferred
@@ -22,7 +22,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 // `priority` mirrors `TaskPriority` in lib/features/tasks/data/models/task.dart,
 // stored as the enum index (0=none, 1=low, 2=medium, 3=high) in
-// `tasks.priority` — a higher number is a higher priority, directly comparable.
+// `tasks.priority`: a higher number is a higher priority, directly comparable.
 interface OpenTask {
   id: string;
   title: string;
@@ -234,14 +234,14 @@ Deno.serve(async (req: Request) => {
       );
       if (openMatch) {
         sentences.push(
-          `${job.company} — ${job.status} stage. Next step: ${openMatch.title}.`,
+          `${job.company}: ${job.status} stage. Next step: ${openMatch.title}.`,
         );
       } else if (completedMatch) {
         sentences.push(
-          `${job.company} — ${job.status} stage. Your last step (${completedMatch.title}) is done — nothing open.`,
+          `${job.company}: ${job.status} stage. Your last step (${completedMatch.title}) is done, nothing open.`,
         );
       } else {
-        sentences.push(`${job.company} — ${job.status} stage. No task is tracking it.`);
+        sentences.push(`${job.company}: ${job.status} stage. No task is tracking it.`);
       }
     }
 

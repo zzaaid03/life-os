@@ -3,7 +3,7 @@
 -- Stores one row per job application, populated by the inbox-AI scan.
 -- Each scan UPSERTs on (user_id, company, role) so a new email advances the
 -- status (applied -> viewed -> rejected/interview/offer) instead of creating
--- a duplicate row. We store only derived data (company/role/status/summary) —
+-- a duplicate row. We store only derived data (company/role/status/summary),
 -- never the raw email content.
 --
 -- RLS ensures each user can only see and modify their own applications.

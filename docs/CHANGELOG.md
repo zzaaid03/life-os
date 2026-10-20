@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] — 2025-06-25
+## [1.0.0] - 2025-06-25
 
 ### Added
 
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.1.0] — 2025-06-27
+## [1.1.0] - 2025-06-27
 
 ### Added
 
@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Profile creation screen (single question: "What should Life call you?")
 - Profile data model and Supabase repository (profiles table with RLS)
 - Supabase migration 001: create profiles table with automatic trigger
-- Permission screens (notifications, calendar, files) — each with explanation and "Not now"
+- Permission screens (notifications, calendar, files), each with explanation and "Not now"
 - Home screen with personalized greeting and setup progress card
 - Floating bottom navigation bar with glass effect and animated labels
 - Beautiful empty states for Timeline, Life, Search, and Settings
@@ -72,4 +72,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-*Initial release — foundation established.*
+*Initial release: foundation established.*

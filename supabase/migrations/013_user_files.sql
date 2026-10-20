@@ -2,7 +2,7 @@
 --
 -- One row per uploaded file. The bytes live in the `user-files` Storage
 -- bucket at storage_path; this table is only the metadata. The bucket and
--- its own policies are migration 014 — securing this table does NOT secure
+-- its own policies are migration 014, so securing this table does NOT secure
 -- the bucket, they are two separate systems.
 --
 -- Files are network-only by design: there is no Drift mirror and no offline

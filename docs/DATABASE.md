@@ -4,8 +4,8 @@
 
 Life OS uses a **dual-database architecture**:
 
-1. **Supabase (PostgreSQL)** — Cloud database for sync and backup
-2. **Drift (SQLite)** — Local database for offline-first access
+1. **Supabase (PostgreSQL)**: Cloud database for sync and backup
+2. **Drift (SQLite)**: Local database for offline-first access
 
 ---
 
@@ -34,7 +34,7 @@ Life OS uses a **dual-database architecture**:
 **How to apply**:
 
 ```bash
-# Via Supabase SQL Editor — paste and run each migration
+# Via Supabase SQL Editor: paste and run each migration
 # Or via Supabase CLI:
 supabase db push
 ```
@@ -90,7 +90,7 @@ CREATE POLICY "Users can update own {table}"    ON {table} FOR UPDATE USING (aut
 CREATE POLICY "Users can delete own {table}"    ON {table} FOR DELETE USING (auth.uid() = user_id);
 ```
 
-This ensures **database-level** data isolation — users can never access another user's data, even if the client code has a bug.
+This ensures **database-level** data isolation, so users can never access another user's data, even if the client code has a bug.
 
 ---
 
@@ -98,8 +98,8 @@ This ensures **database-level** data isolation — users can never access anothe
 
 Every table includes:
 
-- `(user_id)` — For user-scoped queries
-- `(sync_status, updated_at)` — For efficient sync engine queries
+- `(user_id)`: For user-scoped queries
+- `(sync_status, updated_at)`: For efficient sync engine queries
 - Feature-specific indexes (e.g., `(status)` on tasks, `(entry_date)` on journal entries)
 
 ---
@@ -174,4 +174,4 @@ class Task extends Equatable implements Entity {
 
 ---
 
-*Last updated: June 2025 — Milestone 3 completion.*
+*Last updated: June 2025, Milestone 3 completion.*

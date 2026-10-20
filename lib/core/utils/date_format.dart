@@ -1,7 +1,7 @@
 /// Shared, unambiguous date formatting.
 ///
 /// Never render a date as `M/D/YYYY`. Zaid reads dates in Germany, where
-/// `1/9/2026` means 9 January to a US reader and 1 September to him — there
+/// `1/9/2026` means 9 January to a US reader and 1 September to him, so there
 /// is no way to tell from the string which one a screen meant. A named
 /// month cannot be read two ways, so every screen should format through
 /// [formatDay] or [formatDayTime] instead of rolling its own slash format.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Life OS follows **Feature-First Clean Architecture** — a layered architecture that organizes code by feature rather than by type, while maintaining clear separation of concerns.
+Life OS follows **Feature-First Clean Architecture**, a layered architecture that organizes code by feature rather than by type, while maintaining clear separation of concerns.
 
 ---
 
@@ -102,10 +102,10 @@ App Launch → Splash → Check Auth State
 
 Life OS uses **Riverpod** for state management:
 
-- **StateNotifierProvider** — For complex state with actions (e.g., `AuthNotifier`)
-- **Provider** — For services and repositories (e.g., `SupabaseClient`, `AppDatabase`)
-- **FutureProvider** — For async data that loads once
-- **StreamProvider** — For reactive data streams
+- **StateNotifierProvider**: For complex state with actions (e.g., `AuthNotifier`)
+- **Provider**: For services and repositories (e.g., `SupabaseClient`, `AppDatabase`)
+- **FutureProvider** - For async data that loads once
+- **StreamProvider**: For reactive data streams
 
 ### Provider Hierarchy
 
@@ -116,7 +116,7 @@ authRepositoryProvider (Provider<AuthRepository>)
     ↓
 authProvider (StateNotifierProvider<AuthNotifier, AuthState>)
     ↓
-createRouter(ref) — Uses authProvider for redirect guards
+createRouter(ref): Uses authProvider for redirect guards
 ```
 
 ---
@@ -125,10 +125,10 @@ createRouter(ref) — Uses authProvider for redirect guards
 
 GoRouter handles all navigation with:
 
-- **Declarative routes** — All routes defined in `app_router.dart`
-- **Authentication guard** — Redirect logic based on `authProvider`
-- **Deep linking** — Supported by GoRouter out of the box
-- **Error handling** — Custom 404 page for unknown routes
+- **Declarative routes**: All routes defined in `app_router.dart`
+- **Authentication guard** - Redirect logic based on `authProvider`
+- **Deep linking**: Supported by GoRouter out of the box
+- **Error handling**: Custom 404 page for unknown routes
 
 ---
 
@@ -139,7 +139,7 @@ Life OS is **offline-first**:
 1. **Writes** go to local Drift database first
 2. **Sync** pushes changes to Supabase when online
 3. **Reads** come from local database for instant access
-4. **Conflict resolution** — Last-write-wins with server timestamps
+4. **Conflict resolution** - Last-write-wins with server timestamps
 
 ```
 User Action → Local DB (Drift) → Background Sync → Supabase
@@ -155,7 +155,7 @@ Riverpod serves as the DI container. All dependencies are:
 
 - **Provided** through Riverpod providers
 - **Overridable** for testing via `ProviderScope.overrides`
-- **Lazy** — Created only when first accessed
+- **Lazy**: Created only when first accessed
 
 ---
 
@@ -172,15 +172,15 @@ Riverpod serves as the DI container. All dependencies are:
 
 ## Key Design Decisions
 
-1. **Feature-First over Layer-First** — Features are self-contained, making it easy to add, remove, or modify features without touching unrelated code.
+1. **Feature-First over Layer-First**: Features are self-contained, making it easy to add, remove, or modify features without touching unrelated code.
 
-2. **Repository Pattern** — Abstracts data sources behind interfaces, enabling easy swapping of implementations (e.g., Supabase → Firebase).
+2. **Repository Pattern** - Abstracts data sources behind interfaces, enabling easy swapping of implementations (e.g., Supabase → Firebase).
 
-3. **Riverpod over BLoC** — Riverpod provides compile-time safety, better testability, and simpler syntax for this project's needs.
+3. **Riverpod over BLoC**: Riverpod provides compile-time safety, better testability, and simpler syntax for this project's needs.
 
-4. **Drift over Hive** — Drift provides type-safe SQL, migrations, and complex queries. Hive is simpler but less powerful for relational data.
+4. **Drift over Hive**: Drift provides type-safe SQL, migrations, and complex queries. Hive is simpler but less powerful for relational data.
 
-5. **GoRouter over Navigator 2.0** — GoRouter provides declarative routing with built-in auth guards and deep linking support.
+5. **GoRouter over Navigator 2.0** - GoRouter provides declarative routing with built-in auth guards and deep linking support.
 
 ---
 

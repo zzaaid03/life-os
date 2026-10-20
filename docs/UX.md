@@ -40,9 +40,9 @@ Splash Screen (2.2s, auto-advance)
 ### 1. Purposeful Animation
 
 Every animation in Life OS serves a purpose:
-- **Fade** — Welcoming entrance, calming presence
-- **Scale** — Drawing attention to important elements
-- **Slide** — Natural progression through content
+- **Fade**: Welcoming entrance, calming presence
+- **Scale**: Drawing attention to important elements
+- **Slide** - Natural progression through content
 
 ### 2. Duration Philosophy
 
@@ -55,9 +55,9 @@ Every animation in Life OS serves a purpose:
 
 ### 3. Easing Philosophy
 
-- **easeOut** — Elements coming to rest (default for entrances)
-- **easeInOut** — Screen transitions
-- **easeIn** — Elements leaving
+- **easeOut**: Elements coming to rest (default for entrances)
+- **easeInOut**: Screen transitions
+- **easeIn** - Elements leaving
 
 No bouncy, playful animations during the onboarding flow. The tone is calm and premium.
 
@@ -82,9 +82,9 @@ Each permission has its own dedicated screen with:
 
 ### Permission Order
 
-1. **Notifications** — Gentle reminders for habits and goals
-2. **Calendar** — Integrate events into the timeline
-3. **Files** — Attach photos to journal entries
+1. **Notifications**: Gentle reminders for habits and goals
+2. **Calendar**: Integrate events into the timeline
+3. **Files** - Attach photos to journal entries
 
 Permissions are asked one at a time. Progress is shown via a three-dot indicator at the top of each screen.
 
@@ -180,4 +180,4 @@ Animations use `flutter_animate` with custom `AnimationController` for the splas
 
 ---
 
-*Last updated: June 2025 — Milestone 2 completion.*
+*Last updated: June 2025, Milestone 2 completion.*

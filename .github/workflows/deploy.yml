@@ -23,7 +23,7 @@ permissions:
 # a CONSTANT, not keyed on github.ref: the server-side restriction is one
 # rrsync instance per account, so a stable-and-staging pair pushed together
 # raced and one run died with "Another instance of rrsync is running"
-# (exit 12) — twice. Serialising per-branch was not enough.
+# (exit 12), twice. Serialising per-branch was not enough.
 # cancel-in-progress stays false: queue, never cancel. Interrupting an
 # in-flight --delete rsync is how you get a half-deleted live bundle.
 concurrency:
@@ -58,7 +58,7 @@ jobs:
           channel: stable
 
       # Fail fast on a missing secret. Without this, .env is written with an
-      # empty value, the build succeeds, and a broken bundle deploys — the
+      # empty value, the build succeeds, and a broken bundle deploys: the
       # site then white-screens in the browser with no CI failure to explain it.
       - name: Verify required secrets are present
         env:
@@ -89,6 +89,14 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run edge function tests
+        run: deno test --allow-env --allow-read=supabase/functions/_shared supabase/functions/_shared/
+
       - name: Build web bundle
         run: bash scripts/build-web.sh ${{ steps.env.outputs.name }}
 
@@ -101,13 +109,13 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          echo "167.233.39.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHZ39wen3sSx21pbiG4osJW9NiF2oafXo1dNd37cGWZW" >> ~/.ssh/known_hosts
+          echo "${{ secrets.VPS_HOST }} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHZ39wen3sSx21pbiG4osJW9NiF2oafXo1dNd37cGWZW" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy via rsync
         # The deploy key is restricted server-side with
         # command="rrsync /home/ibrahim/lifeos", which chroots to that
         # directory and resolves every requested path relative to it. So the
-        # destination is just the env name — sending ~/lifeos/<env>/ makes
+        # destination is just the env name. Sending ~/lifeos/<env>/ makes
         # rrsync build /home/ibrahim/lifeos/~/lifeos/<env> and fail.
-        run: rsync -av --delete build/web/ ibrahim@167.233.39.1:${{ steps.env.outputs.name }}/
+        run: rsync -av --delete build/web/ ibrahim@${{ secrets.VPS_HOST }}:${{ steps.env.outputs.name }}/

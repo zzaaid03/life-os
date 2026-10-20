@@ -55,7 +55,7 @@ DATES. dueDate is an ISO yyyy-mm-dd string and is the anti-hallucination gate:
 
 === JOB UPDATES ===
 Produce a job update ONLY when the email clearly concerns the RECIPIENT'S OWN
-application to a specific employer — their personal application lifecycle.
+application to a specific employer, their personal application lifecycle.
 Qualifying emails: an application confirmation/received, notice that their
 application was viewed by the employer, an interview invite or scheduling request,
 an online assessment/test tied to their application, a rejection, or an offer/
@@ -68,12 +68,12 @@ NEVER create a job update from (these are NOT applications the recipient made):
 - "We're hiring" / careers marketing / newsletters
 - Postings about to expire or generic "apply now" nudges
 If an email is job-related but you cannot tell it reflects the recipient's OWN
-application to a specific company, DO NOT emit a job update — skip it. Never guess a
+application to a specific company, DO NOT emit a job update, skip it. Never guess a
 company or invent an application. When in doubt, emit nothing.
 
 Only create a TASK from a job email if there is a concrete action with a deadline
 (e.g. "confirm interview time", "reply by Friday").
-Emails may be in English or German — read the BODY, not just the subject, to decide
+Emails may be in English or German: read the BODY, not just the subject, to decide
 status. Subjects like "Your update from X" are neutral; the real outcome is in the body.
 Each job update: {company, role, status, summary, sourceEmailId}.
 - status MUST be exactly one of: applied | viewed | interview | rejected | accepted.
@@ -84,7 +84,7 @@ Each job update: {company, role, status, summary, sourceEmailId}.
   - accepted: a job offer or an acceptance (any "offer" counts as accepted)
   - viewed: the application was viewed/noticed by the hiring team (no decision yet)
   - applied: a genuine application confirmation/received with no decision yet
-  Use applied ONLY for a real application confirmation — NEVER as a catch-all for
+  Use applied ONLY for a real application confirmation, NEVER as a catch-all for
   ambiguous or merely job-related emails (skip those entirely).
   NEVER emit any other status word.
 - summary: one concise, human sentence reflecting the ACTUAL outcome

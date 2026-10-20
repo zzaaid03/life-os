@@ -21,7 +21,7 @@ The foundation, authentication, data layer, and app shell are complete. Tasks ar
 
 ---
 
-## Milestone 2: Identity — UX, Authentication & First Experience ✅
+## Milestone 2: Identity: UX, Authentication & First Experience ✅
 
 - [x] Premium splash screen with custom animations
 - [x] Minimal welcome screen

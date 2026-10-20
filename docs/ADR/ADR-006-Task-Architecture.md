@@ -49,7 +49,7 @@ TaskLocalDataSource (Drift)  ←→  TaskRepositoryImpl  ←→  TaskRemoteDataS
 
 1. **Push**: Get all tasks with `syncStatus != synced`, upsert to Supabase, mark as `synced`
 2. **Pull**: Get all tasks from Supabase where `updated_at > lastSyncTimestamp`, upsert to local
-3. **Conflict**: If both local and remote changed, compare `updatedAt` — last-write-wins
+3. **Conflict**: If both local and remote changed, compare `updatedAt`, last-write-wins
 4. **Version tracking**: Each mutation increments `version`, used for optimistic concurrency
 
 ### State Management
@@ -76,7 +76,7 @@ The home dashboard's "Focus for Today" card watches `todayTasksProvider` and sho
 
 ### Timeline Integration
 
-Completed tasks automatically appear in the Timeline screen by watching `completedTasksProvider`. No manual duplication — the same data source feeds both screens.
+Completed tasks automatically appear in the Timeline screen by watching `completedTasksProvider`. No manual duplication: the same data source feeds both screens.
 
 ## Alternatives Considered
 

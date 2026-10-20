@@ -4,7 +4,7 @@
 // asks the AI model for durable facts that are traceable to real rows, validates
 // every returned fact, and upserts survivors into public.user_facts keyed
 // on (user_id, fact_key). Never touches suppressed_at or first_seen_at on
-// conflict — those are how a user's rejection of a wrong fact stays
+// conflict: those are how a user's rejection of a wrong fact stays
 // permanent. Below a sparse-data floor, writes nothing and calls no model.
 //
 // Deploy:  npx supabase functions deploy infer-facts --workdir . --project-ref ganbmkphtzdvxxnmprku

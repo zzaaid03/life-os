@@ -2,13 +2,13 @@
 //
 // Given a goal (title, optional description, optional target date), asks
 // the AI model for an ordered list of 4-8 concrete, actionable,
-// sequential tasks toward that goal. The AI is NOT asked for dates — this
+// sequential tasks toward that goal. The AI is NOT asked for dates, this
 // function computes each task's suggestedDueDate itself by spreading tasks
 // evenly between today and the target date (or a 30-day horizon if no
 // target date was given).
 //
 // Secrets: AI_API_KEY, see _shared/ai.ts (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are
-// auto-injected, but unused here — this function only needs the caller's
+// auto-injected, but unused here: this function only needs the caller's
 // JWT to confirm they're authenticated).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -22,12 +22,12 @@ const SYSTEM_PROMPT =
   `You are a planning assistant that breaks a goal down into concrete next
 steps. Given a goal's title and (optionally) a description, produce an
 ORDERED list of 4 to 8 concrete, actionable, sequential tasks that move the
-person toward that goal. Each task should be a single, specific action —
+person toward that goal. Each task should be a single, specific action,
 not vague ("make progress") and not a restatement of the goal itself. Order
 them the way the person should actually do them, earliest/most foundational
 first.
 
-Do NOT include any dates or due-date hints — dates are computed separately.
+Do NOT include any dates or due-date hints. Dates are computed separately.
 
 You may be given an "About this person" context block describing their real
 job applications, open tasks, recently completed tasks, and other goals.
@@ -320,7 +320,7 @@ Deno.serve(async (req: Request) => {
     // Diagnostic echo. The context block is assembled from the caller's own
     // rows and is returned only to that same caller, so nothing leaks. This
     // exists because a failed context query degrades silently to an omitted
-    // section — without it, "the model had no data" and "the queries returned
+    // section. Without it, "the model had no data" and "the queries returned
     // nothing" are indistinguishable from the UI.
     return jsonResponse(req, {
       tasks,

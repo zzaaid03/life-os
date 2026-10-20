@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
         }
       }
     } catch {
-      // Labelling is an enhancement to search, never presented as a failure —
+      // Labelling is an enhancement to search, never presented as a failure.
       // the file is already uploaded and still findable by its note and name.
       labels = [];
     }
@@ -109,7 +109,7 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse(req, { aiLabel });
   } catch (_e) {
-    // Any unexpected failure is still reported as a 200 with a null label —
+    // Any unexpected failure is still reported as a 200 with a null label,
     // labelling must never surface as an error to the caller.
     return jsonResponse(req, { aiLabel: null });
   }

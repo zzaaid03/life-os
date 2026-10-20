@@ -19,10 +19,10 @@ Life OS needs a permanent application shell that wraps all main app screens (Hom
 
 Previously, each screen individually embedded its own `FloatingNavBar` as a `bottomNavigationBar`. This caused:
 
-1. **Navigation bar rebuilt on every screen transition** — losing animation continuity
-2. **No shared FAB** — each screen would need its own
-3. **Inconsistent state** — the nav bar's active state was manually passed as a string per screen
-4. **No responsive centering** — content stretched edge-to-edge on tablets/desktops
+1. **Navigation bar rebuilt on every screen transition**: losing animation continuity
+2. **No shared FAB**: each screen would need its own
+3. **Inconsistent state** - the nav bar's active state was manually passed as a string per screen
+4. **No responsive centering**: content stretched edge-to-edge on tablets/desktops
 
 ## Decision
 
@@ -30,10 +30,10 @@ Previously, each screen individually embedded its own `FloatingNavBar` as a `bot
 
 The main app routes (Home, Timeline, Life, Search, Settings) are nested inside a `ShellRoute` whose builder wraps the child in an `AppShell` widget. The `AppShell` provides:
 
-- `FloatingNavBar` — reads the current location from `GoRouterState` for active state
-- `FloatingActionButton.large` — centered FAB for quick create
-- `ConstrainedBox(maxWidth: 600)` — centers content on larger screens
-- `SafeArea` — proper insets on all platforms
+- `FloatingNavBar`: reads the current location from `GoRouterState` for active state
+- `FloatingActionButton.large`: centered FAB for quick create
+- `ConstrainedBox(maxWidth: 600)`: centers content on larger screens
+- `SafeArea`: proper insets on all platforms
 
 ## Alternatives Considered
 
@@ -89,9 +89,9 @@ AppShell
 
 Every empty state in Life OS follows three rules:
 
-1. **Never say "No Data"** — use warm, encouraging language
-2. **Always include an icon** — visual anchor for the section
-3. **Always include a subtitle** — a gentle call to action
+1. **Never say "No Data"**: use warm, encouraging language
+2. **Always include an icon** - visual anchor for the section
+3. **Always include a subtitle**: a gentle call to action
 
 The `EmptyStateWidget` supports both `compact` (inline in cards) and full (centered in screen) variants.
 
@@ -99,7 +99,7 @@ The `EmptyStateWidget` supports both `compact` (inline in cards) and full (cente
 
 ### Positive
 
-- Single navigation instance — smooth transitions, no rebuilds
+- Single navigation instance, smooth transitions, no rebuilds
 - Shared FAB across all main screens
 - Automatic responsive centering on tablet/desktop/web
 - Consistent empty states across the entire app
@@ -112,7 +112,7 @@ The `EmptyStateWidget` supports both `compact` (inline in cards) and full (cente
 
 ### Neutral
 
-- Auth and onboarding screens are outside the shell (no nav bar) — this is intentional
+- Auth and onboarding screens are outside the shell (no nav bar), and this is intentional
 
 ## References
 

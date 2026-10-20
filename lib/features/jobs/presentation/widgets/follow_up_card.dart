@@ -106,8 +106,8 @@ class _FollowUpRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     // The reference date falls back to `updatedAt` when the application has
-    // no recorded `appliedAt`, so this cannot claim "applied N days ago" —
-    // that would state something the row does not actually say.
+    // no recorded `appliedAt`, so this cannot claim "applied N days ago",
+    // because that would state something the row does not actually say.
     final reference = application.appliedAt ?? application.updatedAt;
     final days = now.difference(reference).inDays;
 

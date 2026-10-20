@@ -5,15 +5,15 @@
 -- version tracking, and full RLS policies.
 --
 -- Tables created:
---   tasks          — Actionable items with due dates and priorities
---   notes          — Free-form notes with rich content support
---   goals          — Long-term objectives with progress tracking
---   habits         — Recurring behaviors with frequency configuration
---   habit_entries  — Daily habit completion records
---   journal_entries — Timestamped personal journal entries
---   tags           — Categorization labels (many-to-many)
---   entity_tags    — Junction table for entity-tag relationships
---   attachments    — Files linked to any entity (polymorphic)
+--   tasks          - Actionable items with due dates and priorities
+--   notes          - Free-form notes with rich content support
+--   goals          - Long-term objectives with progress tracking
+--   habits         - Recurring behaviors with frequency configuration
+--   habit_entries  - Daily habit completion records
+--   journal_entries - Timestamped personal journal entries
+--   tags           - Categorization labels (many-to-many)
+--   entity_tags    - Junction table for entity-tag relationships
+--   attachments    - Files linked to any entity (polymorphic)
 
 -- ============================================================
 -- TASKS

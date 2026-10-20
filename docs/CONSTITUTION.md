@@ -11,7 +11,7 @@ This document defines the **non-negotiable principles** that govern all developm
 - Code must be readable, maintainable, and well-documented
 - No hacks, no shortcuts, no "fix it later" mentality
 - Every file should be understandable by a new contributor within 10 minutes
-- Strict linting is enforced — no warnings allowed in production code
+- Strict linting is enforced, so no warnings allowed in production code
 
 ---
 
@@ -38,15 +38,15 @@ This document defines the **non-negotiable principles** that govern all developm
 - No third-party analytics without explicit opt-in
 - No data leaves the device without user knowledge
 - Sensitive data is encrypted at rest
-- Users own their data — export must always be possible
+- Users own their data: export must always be possible
 
 ---
 
 ## 5. Dependency Discipline
 
-- Dependencies must be justified — no "nice to have" packages
+- Dependencies must be justified: no "nice to have" packages
 - Prefer well-maintained packages with active communities
-- Pin versions — no caret (`^`) without consideration
+- Pin versions, no caret (`^`) without consideration
 - Review dependency licenses for compatibility
 
 ---
@@ -56,7 +56,7 @@ This document defines the **non-negotiable principles** that govern all developm
 - Business logic must be unit tested
 - Repositories must have integration tests
 - Critical user flows must have widget tests
-- Tests are not optional — they are part of the definition of done
+- Tests are not optional, they are part of the definition of done
 
 ---
 
@@ -65,7 +65,7 @@ This document defines the **non-negotiable principles** that govern all developm
 - Every public API must be documented with `///` comments
 - Architecture decisions must be recorded in `ARCHITECTURE.md`
 - README must always reflect the current state of the project
-- No placeholder documentation — write meaningful content or don't write it
+- No placeholder documentation: write meaningful content or don't write it
 
 ---
 
@@ -74,7 +74,7 @@ This document defines the **non-negotiable principles** that govern all developm
 - Conventional Commits only (`feat:`, `fix:`, `docs:`, etc.)
 - One logical change per commit
 - Commit messages explain "why", not just "what"
-- No giant commits — break work into logical chunks
+- No giant commits, break work into logical chunks
 
 ---
 
@@ -107,4 +107,4 @@ This constitution can be amended through:
 
 ---
 
-*Last amended: June 2025 — Original ratification.*
+*Last amended: June 2025, Original ratification.*

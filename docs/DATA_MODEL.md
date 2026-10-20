@@ -2,7 +2,7 @@
 
 ## Overview
 
-Life OS uses a **universal entity pattern** — every entity in the system shares a common set of base properties. This ensures consistent sync behavior, audit tracking, and soft-delete support across all feature domains.
+Life OS uses a **universal entity pattern**: every entity in the system shares a common set of base properties. This ensures consistent sync behavior, audit tracking, and soft-delete support across all feature domains.
 
 ---
 
@@ -265,8 +265,8 @@ All queries should filter out soft-deleted records (`WHERE deleted_at IS NULL`) 
 
 ### 5. Feature-First Organization
 
-Each entity lives in its own feature directory with its own model, repository, and use cases. Entities do not import from other feature directories — cross-entity relationships are handled through repositories at the domain layer.
+Each entity lives in its own feature directory with its own model, repository, and use cases. Entities do not import from other feature directories. Cross-entity relationships are handled through repositories at the domain layer.
 
 ---
 
-*Last updated: June 2025 — Milestone 3 completion.*
+*Last updated: June 2025, Milestone 3 completion.*

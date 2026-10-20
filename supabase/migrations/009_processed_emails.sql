@@ -3,7 +3,7 @@
     -- Records which Gmail message ids have already been surfaced as task
     -- suggestions, so re-scanning the same inbox never re-suggests a task the
     -- user has already added or dismissed. Only the opaque Gmail message id is
-    -- stored — never any email content.
+    -- stored, never any email content.
 
     CREATE TABLE IF NOT EXISTS public.processed_emails (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,

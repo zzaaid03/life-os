@@ -2,16 +2,16 @@
 
 ## Overview
 
-Life OS follows a design system inspired by **Apple's Human Interface Guidelines** — minimal, premium, with soft aesthetics and calm interactions.
+Life OS follows a design system inspired by **Apple's Human Interface Guidelines**: minimal, premium, with soft aesthetics and calm interactions.
 
 ---
 
 ## Design Principles
 
-1. **Clarity** — Every element should be immediately understandable
-2. **Deference** — The UI defers to the content, not itself
-3. **Depth** — Subtle layering creates visual hierarchy without clutter
-4. **Calm** — Nothing should feel urgent or overwhelming
+1. **Clarity**: Every element should be immediately understandable
+2. **Deference**: The UI defers to the content, not itself
+3. **Depth** - Subtle layering creates visual hierarchy without clutter
+4. **Calm**: Nothing should feel urgent or overwhelming
 
 ---
 
@@ -49,7 +49,7 @@ Life OS follows a design system inspired by **Apple's Human Interface Guidelines
 
 ### Typeface
 
-**Inter** — A clean, modern sans-serif optimized for screens.
+**Inter**: A clean, modern sans-serif optimized for screens.
 
 ### Scale
 
@@ -116,9 +116,9 @@ Life OS uses an **8-point grid system**:
 
 Life OS uses **subtle, soft shadows**:
 
-- Light mode: `rgba(0, 0, 0, 0.04)` — barely visible
-- Dark mode: `rgba(0, 0, 0, 0.2)` — deeper for contrast
-- No hard shadows — everything feels soft and layered
+- Light mode: `rgba(0, 0, 0, 0.04)`, barely visible
+- Dark mode: `rgba(0, 0, 0, 0.2)`, deeper for contrast
+- No hard shadows, everything feels soft and layered
 
 ---
 
@@ -189,9 +189,9 @@ Pages slide up slightly with a fade for a natural, iOS-inspired feel.
 
 Life OS supports three theme modes:
 
-1. **Light** — Clean, bright, minimal
-2. **Dark** — Deep, calm, premium
-3. **System** — Follows device preference
+1. **Light**: Clean, bright, minimal
+2. **Dark** - Deep, calm, premium
+3. **System**: Follows device preference
 
 Theme switching will be implemented in the Settings feature.
 

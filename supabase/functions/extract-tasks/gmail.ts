@@ -74,7 +74,7 @@ function gmailFetch(accessToken: string, path: string): Promise<Response> {
 }
 
 // Lists inbox message ids inside a rolling horizon, newest first (Gmail's own
-// order), without fetching any body. One page only (500 ids) — if Gmail says
+// order), without fetching any body. One page only (500 ids), if Gmail says
 // there's more, `capped` is set so the caller can report it, but we never
 // page further in a single request.
 export async function listInboxIds(

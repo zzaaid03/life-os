@@ -7,7 +7,7 @@
 // Google refresh token and mint a fresh access token server-side. Survives
 // reloads; no re-auth. There is no way to pass a Gmail token in the request.
 //
-// Email bodies never touch the client and are never stored — only derived
+// Email bodies never touch the client and are never stored, only derived
 // tasks/summaries are returned.
 //
 // Secrets: AI_API_KEY (see _shared/ai.ts), GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
@@ -52,7 +52,7 @@ async function filterPendingIds(
 }
 
 // Marks a batch as analysed after a SUCCESSFUL model response only. A write
-// failure here is logged and swallowed — the user getting their tasks matters
+// failure here is logged and swallowed, the user getting their tasks matters
 // more than the mark, and the cost of a missed mark is just re-analysis.
 async function markProcessed(userId: string, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
@@ -100,7 +100,7 @@ function truncate(s: string, max = 80): string {
 }
 
 /// Assembles a short "About this user" block from user_facts, for the model's
-/// background only. Returns "" on a query error or zero facts —
+/// background only. Returns "" on a query error or zero facts,
 /// a facts problem must never change what's sent to the model beyond this block.
 async function buildFactsBlock(
   userId: string,
@@ -129,7 +129,7 @@ async function buildFactsBlock(
     // diagnostic that over-reports is worse than no diagnostic: it makes
     // "the facts were cut" look like "the model ignored them".
     const header =
-      "About this user (background only — these are NOT tasks and must never be extracted as tasks):";
+      "About this user (background only, these are NOT tasks and must never be extracted as tasks):";
     const kept: string[] = [];
     let length = header.length;
     for (const line of lines) {

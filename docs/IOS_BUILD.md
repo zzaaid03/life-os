@@ -1,4 +1,4 @@
-# iOS build runbook — free provisioning on a borrowed Mac
+# iOS build runbook: free provisioning on a borrowed Mac
 
 Goal: get Life OS running on Zaid's **physical iPhone**, at **zero cost**, using a Mac that
 does **not** have a paid Apple Developer account.
@@ -15,7 +15,7 @@ build and install onto a physically connected device.
 
 **TestFlight is NOT available on this route.** TestFlight requires a paid Apple Developer
 Program membership ($99/year). There is no free tier for it. Do not spend time looking for a
-workaround — there isn't one.
+workaround (there isn't one).
 
 Free provisioning limits, all of which are expected and none of which are bugs:
 
@@ -26,21 +26,21 @@ Free provisioning limits, all of which are expected and none of which are bugs:
   so this does not affect us.
 
 Our Google sign-in uses a plain custom URL scheme (`com.lifeos.app://login-callback`), which
-needs no entitlement — so **sign-in works normally on free provisioning**.
+needs no entitlement, so **sign-in works normally on free provisioning**.
 
 ---
 
-## Prerequisites — install these BEFORE the session
+## Prerequisites: install these BEFORE the session
 
 Xcode is a very large download and is the most common way to lose an afternoon. Install it in
 advance, not on the day.
 
-1. **Xcode** — from the Mac App Store. Launch it once after installing and let it finish
+1. **Xcode**: from the Mac App Store. Launch it once after installing and let it finish
    "installing components", then accept the licence:
    ```bash
    sudo xcodebuild -license accept
    ```
-2. **Flutter SDK** — must be **3.44.4 or newer**. Do not use 3.44.0: it ships Dart 3.12.0 and
+2. **Flutter SDK**: must be **3.44.4 or newer**. Do not use 3.44.0: it ships Dart 3.12.0 and
    this project's `pubspec.yaml` requires `^3.12.2`, so it fails to build.
    ```bash
    flutter --version   # confirm >= 3.44.4
@@ -56,11 +56,11 @@ Then confirm the toolchain:
 flutter doctor
 ```
 The **Xcode** line must be `[√]`. A missing Android toolchain or Chrome on this machine is fine
-and irrelevant — we only care about Xcode here.
+and irrelevant. We only care about Xcode here.
 
 ---
 
-## Step 1 — get the code
+## Step 1: get the code
 
 ```bash
 git clone https://github.com/<owner>/life-os.git
@@ -72,7 +72,7 @@ Use the `staging` branch. The mobile fixes (deep link, iOS URL scheme, app name)
 
 ---
 
-## Step 2 — create `.env` (THE MOST COMMON FAILURE)
+## Step 2: create `.env` (THE MOST COMMON FAILURE)
 
 **`.env` is gitignored, so cloning does NOT bring it, and the build fails without it.**
 You must recreate it by hand at the repo root.
@@ -87,7 +87,7 @@ GOOGLE_CLIENT_ID=...
 
 Copy the values from Zaid's Windows machine at `C:\Users\Zaid\Desktop\life-os\.env`.
 
-These three are **browser-public** values — they already ship inside the public web bundle and
+These three are **browser-public** values. They already ship inside the public web bundle and
 are downloadable by anyone at `/assets/.env`. Typing them on a borrowed Mac leaks nothing.
 
 **Never put any other key in this file.** Server secrets (the AI provider API key, Supabase service_role)
@@ -98,7 +98,7 @@ fourth value, stop and ask Zaid.
 
 ---
 
-## Step 3 — dependencies
+## Step 3: dependencies
 
 ```bash
 flutter pub get
@@ -112,7 +112,7 @@ cd ios && pod install && cd ..
 
 ---
 
-## Step 4 — signing (the only genuinely fiddly part)
+## Step 4: signing (the only genuinely fiddly part)
 
 Open the **workspace**, not the project:
 
@@ -120,7 +120,7 @@ Open the **workspace**, not the project:
 open ios/Runner.xcworkspace
 ```
 
-> Opening `Runner.xcodeproj` instead is a classic mistake — it builds without the CocoaPods
+> Opening `Runner.xcodeproj` instead is a classic mistake: it builds without the CocoaPods
 > dependencies and fails confusingly.
 
 In Xcode:
@@ -128,7 +128,7 @@ In Xcode:
 1. Select the **Runner** project in the left sidebar, then the **Runner** target.
 2. Go to **Signing & Capabilities**.
 3. Tick **Automatically manage signing**.
-4. **Team** → **Add an Account…** → sign in with **Zaid's own Apple ID** (not the Mac owner's —
+4. **Team** → **Add an Account…** → sign in with **Zaid's own Apple ID** (not the Mac owner's, since
    the device registration and certificates should belong to Zaid). Then select the resulting
    **"(Personal Team)"** entry.
 
@@ -147,7 +147,7 @@ This bundle-ID change is a local, throwaway edit for this machine. **Do not comm
 
 ---
 
-## Step 5 — build and run on the device
+## Step 5: build and run on the device
 
 1. Connect the iPhone by USB. On the phone, tap **Trust This Computer** and enter the passcode.
 2. In Xcode's device dropdown (top bar), select the iPhone.
@@ -158,7 +158,7 @@ This bundle-ID change is a local, throwaway edit for this machine. **Do not comm
    ```
    `--debug` also works; `--release` is noticeably faster to use on the phone.
 
-### "Untrusted Developer" — the app installs but will not launch
+### "Untrusted Developer": the app installs but will not launch
 
 Expected on free provisioning. On the **iPhone**:
 
@@ -168,13 +168,13 @@ Then launch the app again.
 
 ---
 
-## Step 6 — verify it actually works
+## Step 6: verify it actually works
 
-In this order — the first item is the real unknown:
+In this order (the first item is the real unknown):
 
 1. **Google sign-in.** Tap sign in. It should open a browser, let you choose the Google account,
    and then **return into the app**. If it strands you on the Life OS website and never comes
-   back, the deep link is not working — see Troubleshooting.
+   back, the deep link is not working, see Troubleshooting.
 2. **App name** on the home screen reads **Life OS**.
 3. **Create a task with a due date** and confirm the date is correct (this verifies the
    store-UTC / display-local fix on a real device).
@@ -182,7 +182,7 @@ In this order — the first item is the real unknown:
 Two expected behaviours that are **not** bugs:
 
 - **Goals are network-only.** With no signal the goals list is empty and creating a goal fails.
-  This is a deliberate v1 scope decision — only tasks work offline.
+  This is a deliberate v1 scope decision: only tasks work offline.
 - Pre-existing tasks may render **one day off exactly once** on first load, then stay correct.
 
 ---
@@ -198,7 +198,7 @@ Also confirm `ios/Runner/Info.plist` still has the `CFBundleURLTypes` entry with
 
 **"Only test users can sign in"**
 Correct and expected. The Google OAuth app is still in **Testing** mode, so only the two
-approved test accounts can sign in — on any platform, phone or web. Not an iOS problem.
+approved test accounts can sign in, on any platform, phone or web. Not an iOS problem.
 
 **The app stopped working after about a week**
 The 7-day provisioning profile expired. Reconnect to the Mac and re-run. There is no way around
@@ -212,11 +212,11 @@ You probably opened `.xcodeproj` instead of `.xcworkspace`. Close it and open th
 ## Rules for agents assisting with this
 
 - **Never run `npx supabase db push` or `npx supabase functions deploy`.** The CLI is linked to
-  a **shared production project** — those commands go live instantly for all users. There is no
+  a **shared production project**, so those commands go live instantly for all users. There is no
   staging equivalent and no undo.
 - **Do not create `supabase/config.toml`.** A later `supabase config push` could overwrite the
   hosted auth configuration, including the OAuth redirect URL sign-in depends on.
-- **Do not commit anything from the borrowed Mac** — especially the bundle-identifier change
+- **Do not commit anything from the borrowed Mac**, especially the bundle-identifier change
   from Step 4, which is machine-local.
 - **Do not create a signing certificate, keystore, or paid-account resource.** Free provisioning
   only.

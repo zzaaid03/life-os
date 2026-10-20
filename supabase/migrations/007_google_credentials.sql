@@ -1,7 +1,7 @@
 -- Migration 007: Google credentials (refresh tokens)
 --
 -- Stores each user's Google OAuth refresh token so the backend can mint a
--- fresh Gmail access token on demand — no more relying on the short-lived,
+-- fresh Gmail access token on demand, no more relying on the short-lived,
 -- reload-losing session provider token. One row per user.
 --
 -- RLS: a user can only read/write their own row. The extract-tasks Edge

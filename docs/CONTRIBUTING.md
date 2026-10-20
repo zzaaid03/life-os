@@ -65,11 +65,11 @@ Thank you for your interest in contributing to Life OS. This document outlines t
 
 ### Branch Naming
 
-- `feat/short-description` — New features
-- `fix/short-description` — Bug fixes
-- `docs/short-description` — Documentation
-- `refactor/short-description` — Code refactoring
-- `chore/short-description` — Maintenance tasks
+- `feat/short-description`: New features
+- `fix/short-description`: Bug fixes
+- `docs/short-description`: Documentation
+- `refactor/short-description`: Code refactoring
+- `chore/short-description`: Maintenance tasks
 
 ### Commit Messages
 
@@ -128,7 +128,7 @@ flutter test
 - Use Riverpod for state management
 - Use GoRouter for navigation
 - Repository pattern for data access
-- Never hardcode values — use design tokens
+- Never hardcode values, use design tokens
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for full details.
 

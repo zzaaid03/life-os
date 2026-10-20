@@ -72,7 +72,7 @@ authRepositoryProvider (Provider<AuthRepository>)
     ↓
 authProvider (StateNotifierProvider<AuthNotifier, AuthState>)
     ↓
-createRouter(ref) — Uses authProvider for redirect guards
+createRouter(ref): Uses authProvider for redirect guards
 ```
 
 ### Testing Pattern

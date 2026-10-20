@@ -2,7 +2,7 @@
 
 ## What is Life OS?
 
-Life OS is a personal operating system for your life. It's not just another productivity app — it's a unified platform that brings together every aspect of personal management into one calm, beautiful, and intelligent experience.
+Life OS is a personal operating system for your life. It's not just another productivity app. It's a unified platform that brings together every aspect of personal management into one calm, beautiful, and intelligent experience.
 
 ---
 
@@ -51,7 +51,7 @@ Transparency builds trust. The entire codebase is open for audit, contribution, 
 
 ### 5. Long-Term Thinking
 
-This is not a startup chasing an exit. Life OS is built to last decades — like a good notebook, but digital.
+This is not a startup chasing an exit. Life OS is built to last decades, like a good notebook, but digital.
 
 ---
 
@@ -81,10 +81,10 @@ In 10 years, Life OS should be:
 
 ## What Life OS is NOT
 
-- **Not a social network** — Your data stays private
-- **Not a project management tool** — This is personal, not professional
-- **Not a note-taking app** — Though journaling is a feature
-- **Not a clone** — We're building something original, not copying existing apps
+- **Not a social network**: Your data stays private
+- **Not a project management tool**: This is personal, not professional
+- **Not a note-taking app** - Though journaling is a feature
+- **Not a clone**: We're building something original, not copying existing apps
 
 ---
 

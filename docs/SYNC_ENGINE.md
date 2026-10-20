@@ -1,8 +1,8 @@
-# Life OS Sync Engine — Design Document
+# Life OS Sync Engine: Design Document
 
 This document describes the design of the Life OS sync engine. It covers the
 pull, push, conflict detection, retry strategy, queue, and offline support
-mechanisms. **This is a design document only — no implementation yet.**
+mechanisms. **This is a design document only, with no implementation yet.**
 
 ---
 
@@ -74,7 +74,7 @@ stateDiagram-v2
 
 - App launch / foreground.
 - Manual pull-to-refresh.
-- Periodic background fetch (every 5–15 minutes, platform-dependent).
+- Periodic background fetch (every 5 to 15 minutes, platform-dependent).
 - Real-time Supabase subscription (WebSocket) for instant updates.
 
 ---
@@ -112,7 +112,7 @@ For each record in the queue:
 
 ### Push Triggers
 
-- After any local mutation (debounced by 2–5 seconds).
+- After any local mutation (debounced by 2 to 5 seconds).
 - On app background (best-effort, platform-limited).
 - Manual "Sync Now" button.
 
