@@ -280,7 +280,7 @@ Deno.serve(async (req: Request) => {
 
     let rawFacts: RawFact[] = [];
     try {
-      const aiRes = await chatJson(SYSTEM_PROMPT, contextBlock);
+      const aiRes = await chatJson(userId, SYSTEM_PROMPT, contextBlock);
 
       if (aiRes.ok) {
         const content = aiRes.content;

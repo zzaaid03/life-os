@@ -373,8 +373,11 @@ Deno.serve(async (req: Request) => {
       }
       lines.push(prefsLine);
 
-      const aiRes = await chatJson(GENERATE_SYSTEM, lines.join("\n"), 4096, 0.9);
+      const aiRes = await chatJson(userId, GENERATE_SYSTEM, lines.join("\n"), 4096, 0.9);
       if (!aiRes.ok) {
+        if (aiRes.quotaExceeded) {
+          return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+        }
         return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
       }
       const parsed = parseJson(aiRes.content);
@@ -394,8 +397,11 @@ Deno.serve(async (req: Request) => {
 
       const user = `CURRENT RECIPE:\n${JSON.stringify(current)}\n\n` +
         `CHANGE REQUEST: "${instruction}"\n${prefsLine}`;
-      const aiRes = await chatJson(TWEAK_SYSTEM, user, 4096, 0.4);
+      const aiRes = await chatJson(userId, TWEAK_SYSTEM, user, 4096, 0.4);
       if (!aiRes.ok) {
+        if (aiRes.quotaExceeded) {
+          return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+        }
         return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
       }
       const parsed = parseJson(aiRes.content);
@@ -424,8 +430,11 @@ Deno.serve(async (req: Request) => {
           ? "They have not started the steps yet.\n"
           : `They are on step ${stepIndex + 1}: "${current.steps[stepIndex].text}"\n`) +
         `${prefsLine}\nQUESTION: "${question}"`;
-      const aiRes = await chatJson(ASK_SYSTEM, user, 600, 0.3);
+      const aiRes = await chatJson(userId, ASK_SYSTEM, user, 600, 0.3);
       if (!aiRes.ok) {
+        if (aiRes.quotaExceeded) {
+          return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+        }
         return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
       }
       const parsed = parseJson(aiRes.content) as { answer?: unknown } | null;

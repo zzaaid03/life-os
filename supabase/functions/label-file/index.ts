@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
 
     let labels: string[] = [];
     try {
-      const aiRes = await chatJson(SYSTEM_PROMPT, userContent, 256);
+      const aiRes = await chatJson(userId, SYSTEM_PROMPT, userContent, 256);
 
       if (aiRes.ok) {
         const content = aiRes.content;

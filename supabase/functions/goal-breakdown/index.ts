@@ -289,9 +289,12 @@ Deno.serve(async (req: Request) => {
       ? `${baseUserContent}\n\n${contextBlock}`
       : baseUserContent;
 
-    const aiRes = await chatJson(SYSTEM_PROMPT, userContent);
+    const aiRes = await chatJson(userData.user.id, SYSTEM_PROMPT, userContent);
 
     if (!aiRes.ok) {
+      if (aiRes.quotaExceeded) {
+        return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+      }
       return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
     }
 

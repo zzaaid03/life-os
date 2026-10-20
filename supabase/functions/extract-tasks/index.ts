@@ -3,12 +3,9 @@
 // Reads the user's recent Gmail SERVER-SIDE and classifies each email into
 // actionable TASKS and JOB-APPLICATION updates using the AI model (see _shared/ai.ts).
 //
-// Two ways to get a Gmail access token:
-//   1. App path (production): the caller is an authenticated Supabase user and
-//      does NOT pass a token. We look up their stored Google refresh token and
-//      mint a fresh access token server-side. Survives reloads; no re-auth.
-//   2. Test path: caller passes { accessToken } directly (used by our terminal
-//      test scripts). Bypasses the stored-credential lookup.
+// The caller must be an authenticated Supabase user. We look up their stored
+// Google refresh token and mint a fresh access token server-side. Survives
+// reloads; no re-auth. There is no way to pass a Gmail token in the request.
 //
 // Email bodies never touch the client and are never stored — only derived
 // tasks/summaries are returned.
@@ -331,13 +328,12 @@ async function fetchEmailBodies(
 
 // Subtracts ids already analysed (present in processed_emails) from a listed
 // id set. A query failure degrades to "nothing filtered" — re-analysing a few
-// emails is wasteful, failing the scan over it is not. No user id (test path)
-// means no processed-set to check, so nothing is filtered either.
+// emails is wasteful, failing the scan over it is not.
 async function filterPendingIds(
-  userId: string | undefined,
+  userId: string,
   ids: string[],
 ): Promise<string[]> {
-  if (!userId || ids.length === 0) return ids;
+  if (ids.length === 0) return ids;
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const { data, error } = await admin
@@ -355,8 +351,8 @@ async function filterPendingIds(
 // Marks a batch as analysed after a SUCCESSFUL model response only. A write
 // failure here is logged and swallowed — the user getting their tasks matters
 // more than the mark, and the cost of a missed mark is just re-analysis.
-async function markProcessed(userId: string | undefined, ids: string[]): Promise<void> {
-  if (!userId || ids.length === 0) return;
+async function markProcessed(userId: string, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const rows = ids.map((id) => ({ user_id: userId, email_id: id }));
@@ -371,15 +367,11 @@ async function markProcessed(userId: string | undefined, ids: string[]): Promise
   }
 }
 
-// Resolve a Gmail access token for this request (test path OR stored-refresh path).
+// Resolve a Gmail access token for this request from the stored refresh token.
 async function resolveAccessToken(
   req: Request,
-  bodyToken: string | undefined,
-): Promise<{ token?: string; userId?: string; error?: Response }> {
-  // Test path: token passed directly. No JWT, so no user id is available.
-  if (bodyToken) return { token: bodyToken };
-
-  // App path: identify the user from their Supabase JWT, load stored refresh token.
+): Promise<{ token: string; userId: string } | { error: Response }> {
+  // Identify the user from their Supabase JWT, load stored refresh token.
   const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const { data: userData, error: userErr } = await admin.auth.getUser(jwt);
@@ -408,13 +400,12 @@ function truncate(s: string, max = 80): string {
 }
 
 /// Assembles a short "About this user" block from user_facts, for the model's
-/// background only. Returns "" on no user id, a query error, or zero facts —
+/// background only. Returns "" on a query error or zero facts —
 /// a facts problem must never change what's sent to the model beyond this block.
 async function buildFactsBlock(
-  userId: string | undefined,
+  userId: string,
 ): Promise<{ block: string; factsCount: number }> {
   const EMPTY = { block: "", factsCount: 0 };
-  if (!userId) return EMPTY;
 
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -490,17 +481,15 @@ Deno.serve(async (req: Request) => {
       ? Math.min(Math.max(Math.floor(rawHorizon), 1), 90)
       : 30;
 
-    const { token: accessToken, userId, error: tokenError } = await resolveAccessToken(
-      req,
-      body?.accessToken,
-    );
-    if (tokenError) return tokenError;
+    const resolved = await resolveAccessToken(req);
+    if ("error" in resolved) return resolved.error;
+    const { token: accessToken, userId } = resolved;
 
     let account = "";
     let pendingIds: string[] = [];
     let capped = false;
     try {
-      const listing = await listInboxIds(accessToken!, horizonDays);
+      const listing = await listInboxIds(accessToken, horizonDays);
       account = listing.account;
       capped = listing.capped;
       pendingIds = await filterPendingIds(userId, listing.ids);
@@ -533,7 +522,7 @@ Deno.serve(async (req: Request) => {
 
     let emails;
     try {
-      emails = await fetchEmailBodies(accessToken!, batchIds, tzOffsetMinutes);
+      emails = await fetchEmailBodies(accessToken, batchIds, tzOffsetMinutes);
     } catch (e) {
       return jsonResponse({ error: "Gmail fetch failed", detail: String(e) }, 502);
     }
@@ -547,9 +536,12 @@ Deno.serve(async (req: Request) => {
     // A batch can return tasks, job updates and subscriptions for up to 50
     // emails. A reply cut off by the cap is invalid JSON, the batch is never
     // marked analysed and every later scan would retry it, so leave headroom.
-    const aiRes = await chatJson(SYSTEM_PROMPT, userContent, 16384);
+    const aiRes = await chatJson(userId, SYSTEM_PROMPT, userContent, 16384);
 
     if (!aiRes.ok) {
+      if (aiRes.quotaExceeded) {
+        return jsonResponse({ error: "daily_ai_limit", detail: aiRes.detail }, 429);
+      }
       return jsonResponse({ error: "AI provider error", detail: aiRes.detail }, 502);
     }
 

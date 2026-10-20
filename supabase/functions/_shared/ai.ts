@@ -12,6 +12,9 @@
 //                        drops temperature, which OpenAI rejects while
 //                        reasoning is on. Set it to an empty string for a
 //                        provider that does not know the field.
+//   AI_DAILY_CALL_LIMIT  model calls allowed per user per UTC day, default 80.
+
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const AI_API_KEY = Deno.env.get("AI_API_KEY");
 const AI_BASE_URL = (Deno.env.get("AI_BASE_URL") ?? "https://api.openai.com/v1")
@@ -24,11 +27,18 @@ const AI_REASONING_EFFORT = Deno.env.get("AI_REASONING_EFFORT") ?? "none";
 const MAX_RETRIES = 3;
 const MAX_WAIT_MS = 10_000;
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const dailyLimitEnv = Number(Deno.env.get("AI_DAILY_CALL_LIMIT"));
+const DAILY_CALL_LIMIT = Number.isFinite(dailyLimitEnv) && dailyLimitEnv > 0
+  ? Math.floor(dailyLimitEnv)
+  : 80;
+
 export const aiConfigured = Boolean(AI_API_KEY);
 
 export type AiResult =
   | { ok: true; content: string }
-  | { ok: false; status: number; detail: string };
+  | { ok: false; status: number; detail: string; quotaExceeded?: true };
 
 /// Sends one system + user message pair in JSON mode and returns the reply
 /// text. Transport errors throw, exactly like a bare fetch would.
@@ -40,11 +50,34 @@ export type AiResult =
 /// otherwise). 0 suits extraction; creative callers such as recipe-chef pass
 /// more, or "surprise me" would return the identical dish every time.
 export async function chatJson(
+  userId: string,
   system: string,
   user: string,
   maxTokens = 2048,
   temperature = 0,
 ): Promise<AiResult> {
+  // Counted once per call, not per retry. Fails closed: if the quota cannot
+  // be checked, the provider is not called.
+  try {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { data, error } = await admin.rpc("consume_ai_call", {
+      p_user_id: userId,
+      p_limit: DAILY_CALL_LIMIT,
+    });
+    if (error) throw new Error(error.message);
+    if (data !== true) {
+      return {
+        ok: false,
+        status: 429,
+        quotaExceeded: true,
+        detail: "You've used today's AI allowance. It resets at midnight UTC.",
+      };
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, status: 503, detail: `ai_quota_check_failed: ${msg}` };
+  }
+
   const body: Record<string, unknown> = {
     model: AI_MODEL,
     max_completion_tokens: maxTokens,
