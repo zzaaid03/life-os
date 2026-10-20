@@ -147,8 +147,9 @@ class InboxScanController extends StateNotifier<InboxScanState> {
       // the tidier wording.
       state = state.copyWith(
         phase: InboxScanPhase.error,
-        errorMessage:
-            'We couldn\'t scan your inbox right now. Please try again.\n\n$e',
+        errorMessage: e is InboxScanException && e.isAiLimit
+            ? e.message
+            : 'We couldn\'t scan your inbox right now. Please try again.\n\n$e',
       );
     }
   }

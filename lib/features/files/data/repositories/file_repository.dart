@@ -17,9 +17,6 @@ import 'package:riverpod/riverpod.dart';
 /// Storage bucket and the metadata row in `public.user_files`. They must
 /// never leave one without the other.
 abstract class FileRepository {
-  /// Fetches every non-deleted file for [userId], newest first.
-  Future<List<StoredFile>> getAll(String userId);
-
   /// Finds this user's live files matching [query].
   ///
   /// Matches case-insensitively against the user's note, the file name and

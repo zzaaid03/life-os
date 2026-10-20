@@ -55,16 +55,30 @@ class TaskRemoteDataSource implements TaskSyncRemote {
   }
 
   /// Fetches all non-deleted tasks for the given [userId].
+  ///
+  /// Pages through the table 1000 rows at a time, because PostgREST silently
+  /// cuts a single response off at 1000. The order is by id so pages never
+  /// overlap or skip a row.
   Future<List<Task>> getAll(String userId) async {
-    final response = await _client
-        .from(_table)
-        .select()
-        .eq('user_id', userId)
-        .isFilter('deleted_at', null);
-    return (response as List<dynamic>)
-        .cast<Map<String, dynamic>>()
-        .map(Task.fromJson)
-        .toList();
+    const pageSize = 1000;
+    final tasks = <Task>[];
+    var from = 0;
+    while (true) {
+      final response = await _client
+          .from(_table)
+          .select()
+          .eq('user_id', userId)
+          .isFilter('deleted_at', null)
+          .order('id')
+          .range(from, from + pageSize - 1);
+      final page = (response as List<dynamic>)
+          .cast<Map<String, dynamic>>()
+          .map(Task.fromJson)
+          .toList();
+      tasks.addAll(page);
+      if (page.length < pageSize) return tasks;
+      from += pageSize;
+    }
   }
 
   @override

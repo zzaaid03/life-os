@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
+import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
@@ -323,6 +324,16 @@ class _JobCard extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 height: 1.4,
+              ),
+            ),
+          ],
+          if (job.statusFromEmailAt != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Updated from email · '
+              '${formatDay(job.statusFromEmailAt!.toLocal())}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
               ),
             ),
           ],

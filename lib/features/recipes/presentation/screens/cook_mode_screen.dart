@@ -196,8 +196,9 @@ class _CookModeViewState extends ConsumerState<_CookModeView> {
     try {
       final updated = await ref.read(savedRecipesProvider.notifier).markCooked(saved);
       if (mounted) setState(() => _timesCooked = updated.timesCooked);
-    } catch (_) {
-      _snack("Couldn't record this cook.");
+    } catch (e) {
+      debugPrint('markCooked failed: $e');
+      _snack("Couldn't save that you cooked this.");
     }
   }
 
@@ -213,8 +214,12 @@ class _CookModeViewState extends ConsumerState<_CookModeView> {
       try {
         final updated = await notifier.markCooked(saved);
         if (mounted) setState(() => _timesCooked = updated.timesCooked);
-      } catch (_) {}
-    } catch (_) {
+      } catch (e) {
+        debugPrint('markCooked failed: $e');
+        _snack("Couldn't save that you cooked this.");
+      }
+    } catch (e) {
+      debugPrint('Recipe save failed: $e');
       if (!mounted) return;
       setState(() => _saveState = CookSaveState.idle);
       _snack("Couldn't save the recipe. Try again.");

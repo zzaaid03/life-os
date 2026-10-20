@@ -66,24 +66,32 @@ class _FoodPreferencesDialogState extends ConsumerState<FoodPreferencesDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final loadFailed = ref.watch(foodPreferencesProvider).loadFailed;
     return AlertDialog(
       title: const Text('Food preferences'),
       content: SizedBox(
         width: 400,
-        child: TextField(
-          controller: _controller,
-          autofocus: true,
-          minLines: 3,
-          maxLines: 5,
-          maxLength: 300,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(
-            hintText: 'e.g. vegetarian, no mushrooms, allergic to peanuts',
-            helperText: 'Diet, allergies, dislikes. The chef always follows these.',
-            helperMaxLines: 2,
-            border: OutlineInputBorder(),
-          ),
-        ),
+        child: loadFailed
+            ? const Text(
+                "Couldn't load your food preferences, so they can't be edited "
+                'right now. Close this and try again later.',
+              )
+            : TextField(
+                controller: _controller,
+                autofocus: true,
+                minLines: 3,
+                maxLines: 5,
+                maxLength: 300,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  hintText:
+                      'e.g. vegetarian, no mushrooms, allergic to peanuts',
+                  helperText:
+                      'Diet, allergies, dislikes. The chef always follows these.',
+                  helperMaxLines: 2,
+                  border: OutlineInputBorder(),
+                ),
+              ),
       ),
       actions: [
         TextButton(
@@ -91,7 +99,7 @@ class _FoodPreferencesDialogState extends ConsumerState<FoodPreferencesDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _saving ? null : _save,
+          onPressed: (_saving || loadFailed) ? null : _save,
           child: _saving
               ? const SizedBox(
                   width: 18,

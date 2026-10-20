@@ -45,7 +45,17 @@ class FactRefreshService {
     }
 
     final client = _ref.read(supabaseClientProvider);
-    await client.functions.invoke('infer-facts');
+    final response = await client.functions.invoke('infer-facts');
+
+    // Only a run that actually finished counts as done. An AI failure comes
+    // back as HTTP 200 with another reason, and stamping it would hide the
+    // facts for a full day.
+    final data = response.data;
+    final reason = data is Map ? data['reason'] : null;
+    if (reason != 'ok' && reason != 'not_enough_data') {
+      debugPrint('[learning] fact refresh not stamped, reason: $reason');
+      return;
+    }
 
     await prefs.setString(_keyFor(userId), DateTime.now().toUtc().toIso8601String());
     await _ref.read(factListProvider.notifier).refresh();

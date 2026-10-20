@@ -5,6 +5,7 @@
 /// answers and stay zero-network (same pattern as `GoalBreakdownService`).
 library;
 
+import 'package:life_os/core/services/function_errors.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/features/recipes/data/models/recipe.dart';
 import 'package:riverpod/riverpod.dart';
@@ -102,7 +103,11 @@ class RecipeChefService {
     try {
       response = await client.functions.invoke('recipe-chef', body: body);
     } on FunctionException catch (e) {
-      throw RecipeChefException(_describe(e.details) ?? 'The chef is unavailable (${e.status}).');
+      throw RecipeChefException(
+        aiLimitMessage(e) ??
+            _describe(e.details) ??
+            'The chef is unavailable (${e.status}).',
+      );
     } catch (e) {
       throw RecipeChefException('Could not reach the chef. ($e)');
     }

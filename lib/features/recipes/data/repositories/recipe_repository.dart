@@ -47,6 +47,8 @@ class SupabaseRecipeRepository implements RecipeRepository {
 
   @override
   Future<List<SavedRecipe>> getAll(String userId) async {
+    // No limit on purpose: the screen shows every recipe and one user has far
+    // fewer than the 1000-row response cap.
     final rows = await _client
         .from(_table)
         .select()

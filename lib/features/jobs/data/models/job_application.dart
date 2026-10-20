@@ -18,6 +18,7 @@ class JobApplication extends Equatable {
     this.summary,
     this.sourceEmailId,
     this.appliedAt,
+    this.statusFromEmailAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -34,6 +35,9 @@ class JobApplication extends Equatable {
       sourceEmailId: json['source_email_id'] as String?,
       appliedAt: json['applied_at'] != null
           ? DateTime.parse(json['applied_at'] as String)
+          : null,
+      statusFromEmailAt: json['status_from_email_at'] != null
+          ? DateTime.parse(json['status_from_email_at'] as String).toUtc()
           : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -63,6 +67,10 @@ class JobApplication extends Equatable {
 
   /// When the application was submitted, if known.
   final DateTime? appliedAt;
+
+  /// When an email last changed the status, or null if it was never changed
+  /// by email (or a manual edit cleared it).
+  final DateTime? statusFromEmailAt;
 
   /// When the row was created.
   final DateTime createdAt;
@@ -97,6 +105,7 @@ class JobApplication extends Equatable {
     summary,
     sourceEmailId,
     appliedAt,
+    statusFromEmailAt,
     createdAt,
     updatedAt,
   ];

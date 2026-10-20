@@ -5,6 +5,7 @@
 /// goal and computes each task's suggested due date server-side.
 library;
 
+import 'package:life_os/core/services/function_errors.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -84,6 +85,8 @@ class GoalBreakdownService {
         },
       );
     } catch (e) {
+      final limit = aiLimitMessage(e);
+      if (limit != null) throw GoalBreakdownException(limit);
       throw GoalBreakdownException(
         'Could not reach the goal assistant. ($e)',
       );

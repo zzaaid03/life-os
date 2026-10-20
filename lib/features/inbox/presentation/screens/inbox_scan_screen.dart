@@ -162,9 +162,21 @@ class InboxScanScreen extends ConsumerWidget {
     final userId = ref.read(authProvider).userId;
     if (userId == null) return;
 
-    await ref
-        .read(jobApplicationRepositoryProvider)
-        .upsertFromScan([update], userId);
+    try {
+      await ref
+          .read(jobApplicationRepositoryProvider)
+          .upsertFromScan([update], userId);
+    } catch (e) {
+      debugPrint('Add job from scan failed: $e');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't add this job. Try again."),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     await ref.read(jobListProvider.notifier).refresh();
     ref.read(inboxScanProvider.notifier).removeJobUpdate(update);
 

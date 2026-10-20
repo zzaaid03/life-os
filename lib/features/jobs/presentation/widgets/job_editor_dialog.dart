@@ -9,15 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
-
-/// The five valid job-application statuses.
-const List<String> kJobStatuses = [
-  'applied',
-  'viewed',
-  'interview',
-  'rejected',
-  'accepted',
-];
+import 'package:life_os/features/jobs/domain/job_status.dart';
 
 /// The values collected by [JobEditorDialog].
 class JobEditorResult {

@@ -17,6 +17,8 @@ class SupabaseGroceryRepository implements GroceryRepository {
 
   @override
   Future<List<GroceryItem>> getAll(String userId) async {
+    // No limit on purpose: the screen shows every item and one user has far
+    // fewer than the 1000-row response cap.
     final response = await _client.from(table).select().eq('user_id', userId);
     return (response as List<dynamic>)
         .cast<Map<String, dynamic>>()

@@ -32,6 +32,8 @@ class SupabaseGoalRepository implements GoalRepository {
 
   @override
   Future<List<Goal>> getAll(String userId) async {
+    // No limit on purpose: the screen shows every goal and one user has far
+    // fewer than the 1000-row response cap.
     final response = await _client
         .from(_table)
         .select()

@@ -9,6 +9,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/features/files/data/models/stored_file.dart';
 import 'package:life_os/features/files/data/repositories/file_repository.dart';
@@ -57,13 +58,20 @@ final matchingGoalsProvider = Provider<List<Goal>>((ref) {
 /// State for the debounced file search.
 class FileSearchState {
   /// Creates a [FileSearchState].
-  const FileSearchState({this.results = const [], this.isLoading = false});
+  const FileSearchState({
+    this.results = const [],
+    this.isLoading = false,
+    this.error,
+  });
 
   /// The current result set for the latest completed query.
   final List<StoredFile> results;
 
   /// True while a debounced query is in flight.
   final bool isLoading;
+
+  /// Set when the latest query failed, so "failed" never looks like "no matches".
+  final Object? error;
 }
 
 /// Debounces and serialises the network-backed file search.
@@ -99,9 +107,10 @@ class FileSearchNotifier extends StateNotifier<FileSearchState> {
         final results = await _repository.search(userId, trimmed);
         if (requestId != _requestId || !mounted) return;
         state = FileSearchState(results: results);
-      } catch (_) {
+      } catch (e) {
+        debugPrint('File search failed: $e');
         if (requestId != _requestId || !mounted) return;
-        state = const FileSearchState();
+        state = FileSearchState(error: e);
       }
     });
   }

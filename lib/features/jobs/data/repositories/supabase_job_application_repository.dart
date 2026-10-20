@@ -8,6 +8,7 @@ library;
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
+import 'package:life_os/features/jobs/domain/job_status.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Repository for [JobApplication] records backed by Supabase.
@@ -35,28 +36,52 @@ class SupabaseJobApplicationRepository implements JobApplicationRepository {
   @override
   Future<void> upsertFromScan(List<JobUpdate> updates, String userId) async {
     for (final update in updates) {
-      final values = {
-        'status': update.status,
-        'summary': update.summary,
-        'source_email_id': update.sourceEmailId,
-      };
-      final existingId = await _findExistingId(update, userId);
-      if (existingId != null) {
-        await _client.from(_table).update(values).eq('id', existingId);
+      final existing = await _findExisting(update, userId);
+      if (existing != null) {
+        await _client
+            .from(_table)
+            .update(_emailValues(update, existing.status))
+            .eq('id', existing.id);
       } else {
         await _client.from(_table).insert({
           'user_id': userId,
           'company': update.company.trim(),
           'role': update.role,
-          ...values,
+          'status': update.status,
+          'summary': update.summary,
+          'source_email_id': update.sourceEmailId,
+          'status_from_email_at': DateTime.now().toUtc().toIso8601String(),
         });
       }
     }
   }
 
-  /// Returns the id of the existing row [update] refers to, using the same
-  /// identity rules as [upsertFromScan], or `null` if there is no match.
-  Future<String?> _findExistingId(JobUpdate update, String userId) async {
+  /// Columns to write when an email touches an existing row. The status (and
+  /// the "updated from email" stamp) only change if the email moves it
+  /// forward; summary and source email always update.
+  Map<String, dynamic> _emailValues(JobUpdate update, String currentStatus) {
+    return {
+      if (emailMayChangeStatus(currentStatus, update.status)) ...{
+        'status': update.status,
+        'status_from_email_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      'summary': update.summary,
+      'source_email_id': update.sourceEmailId,
+    };
+  }
+
+  /// Returns the id and status of the existing row [update] refers to, using
+  /// the same identity rules as [upsertFromScan], or `null` if no match.
+  Future<({String id, String status})?> _findExisting(
+    JobUpdate update,
+    String userId,
+  ) async {
+    ({String id, String status})? pick(Map<String, dynamic> row) {
+      final id = row['id'] as String?;
+      if (id == null) return null;
+      return (id: id, status: row['status'] as String? ?? 'applied');
+    }
+
     final company = update.company.trim();
     if (company.isNotEmpty) {
       // Match on company (case-insensitive), NOT role: the AI extracts
@@ -64,19 +89,19 @@ class SupabaseJobApplicationRepository implements JobApplicationRepository {
       // which caused a duplicate instead of a status update.
       final rows = await _client
           .from(_table)
-          .select('id, role')
+          .select('id, role, status')
           .eq('user_id', userId)
           .ilike('company', company);
       final list = (rows as List).cast<Map<String, dynamic>>();
       if (list.isEmpty) return null;
-      if (list.length == 1) return list.first['id'] as String?;
+      if (list.length == 1) return pick(list.first);
       // Multiple applications at the same company: disambiguate by role.
       // If none matches, don't guess: return null so it's surfaced as a
       // new card for the user to confirm, never merged into the wrong row.
       final role = update.role.trim().toLowerCase();
       for (final row in list) {
         if ((row['role'] as String? ?? '').trim().toLowerCase() == role) {
-          return row['id'] as String?;
+          return pick(row);
         }
       }
       return null;
@@ -86,12 +111,12 @@ class SupabaseJobApplicationRepository implements JobApplicationRepository {
     if (emailId != null && emailId.isNotEmpty) {
       final existing = await _client
           .from(_table)
-          .select('id')
+          .select('id, status')
           .eq('user_id', userId)
           .eq('company', '')
           .eq('source_email_id', emailId)
           .maybeSingle();
-      return existing?['id'] as String?;
+      return existing == null ? null : pick(existing);
     }
 
     return null;
@@ -108,17 +133,13 @@ class SupabaseJobApplicationRepository implements JobApplicationRepository {
     final newOnes = <JobUpdate>[];
 
     for (final update in updates) {
-      final id = await _findExistingId(update, userId);
+      final existing = await _findExisting(update, userId);
 
-      if (id != null) {
+      if (existing != null) {
         await _client
             .from(_table)
-            .update({
-              'status': update.status,
-              'summary': update.summary,
-              'source_email_id': update.sourceEmailId,
-            })
-            .eq('id', id);
+            .update(_emailValues(update, existing.status))
+            .eq('id', existing.id);
       } else {
         newOnes.add(update);
       }
@@ -170,6 +191,8 @@ class SupabaseJobApplicationRepository implements JobApplicationRepository {
           'status': status,
           'summary': summary,
           'location': location,
+          // A manual edit removes the "updated from email" label.
+          'status_from_email_at': null,
         })
         .eq('id', id);
   }
@@ -180,6 +203,8 @@ class SupabaseJobApplicationRepository implements JobApplicationRepository {
     await _client.from(_table).delete().eq('id', id);
   }
 
+  // Deliberately unbounded: the screen shows every job and the dashboard
+  // count depends on it.
   /// Fetches all job applications for [userId], most recently updated first.
   @override
   Future<List<JobApplication>> getAll(String userId) async {

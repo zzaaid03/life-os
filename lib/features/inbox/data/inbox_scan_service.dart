@@ -8,6 +8,8 @@
 /// client.
 library;
 
+import 'package:flutter/foundation.dart';
+import 'package:life_os/core/services/function_errors.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
@@ -35,10 +37,14 @@ class GmailNotConnectedException implements Exception {
 /// missing token (network error, function error, malformed response).
 class InboxScanException implements Exception {
   /// Creates an [InboxScanException].
-  const InboxScanException(this.message);
+  const InboxScanException(this.message, {this.isAiLimit = false});
 
   /// A human-readable explanation.
   final String message;
+
+  /// True when the user hit the daily AI limit, so [message] is a complete
+  /// sentence to show on its own.
+  final bool isAiLimit;
 
   @override
   String toString() => 'InboxScanException: $message';
@@ -359,6 +365,8 @@ class InboxScanService {
         },
       );
     } catch (e) {
+      final limit = aiLimitMessage(e);
+      if (limit != null) throw InboxScanException(limit, isAiLimit: true);
       throw InboxScanException('Could not reach the inbox assistant. ($e)');
     }
 
@@ -399,14 +407,17 @@ class InboxScanService {
       );
       final data = response.data;
       if (data is! Map) {
+        debugPrint('[inbox] countPending: response was not a map');
         return const InboxScanPending(pending: 0, capped: false);
       }
       final map = Map<String, dynamic>.from(data);
       if (map['error'] != null) {
+        debugPrint('[inbox] countPending: server error ${map['error']}');
         return const InboxScanPending(pending: 0, capped: false);
       }
       return InboxScanPending.fromJson(map);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[inbox] countPending failed: $e');
       return const InboxScanPending(pending: 0, capped: false);
     }
   }

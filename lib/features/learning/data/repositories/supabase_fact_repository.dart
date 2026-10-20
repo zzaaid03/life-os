@@ -27,6 +27,8 @@ class SupabaseFactRepository implements FactRepository {
   /// already-installed app.
   @override
   Future<List<UserFact>> getAll(String userId) async {
+    // No limit on purpose: the screen shows every fact and one user has far
+    // fewer than the 1000-row response cap.
     final response = await _client
         .from(_table)
         .select()

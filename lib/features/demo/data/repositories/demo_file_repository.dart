@@ -17,14 +17,6 @@ class DemoFileRepository implements FileRepository {
 
   final List<StoredFile> _files;
 
-  @override
-  Future<List<StoredFile>> getAll(String userId) async {
-    return List.unmodifiable(
-      _files.where((f) => f.deletedAt == null).toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
-    );
-  }
-
   /// Searches the in-memory seed. Stays entirely local: the demo makes no
   /// network calls of any kind, which is a guarantee, not an optimisation.
   @override

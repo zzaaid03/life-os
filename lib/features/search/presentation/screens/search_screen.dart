@@ -162,6 +162,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 subtitle: 'Find tasks, goals and files.',
               ),
             ).animate().fadeIn(duration: 400.ms, delay: 300.ms)
+          else if (!hasResults && fileState.error != null)
+            const Center(
+              child: EmptyStateWidget(
+                icon: Icons.error_outline_rounded,
+                title: "Couldn't search your files",
+                subtitle: 'Try again.',
+              ),
+            ).animate().fadeIn(duration: 300.ms)
           else if (!hasResults)
             const Center(
               child: EmptyStateWidget(
@@ -171,6 +179,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             ).animate().fadeIn(duration: 300.ms)
           else ...[
+            if (fileState.error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+                child: Text(
+                  "Couldn't search your files. Try again.",
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ),
             if (fileState.results.isNotEmpty)
               _ResultSection(
                 title: 'Files',

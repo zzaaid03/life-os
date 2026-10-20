@@ -3,6 +3,7 @@
 /// Same load/auto-load pattern as `grocery_provider.dart`.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:life_os/features/auth/data/models/auth_state.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/recipes/data/models/recipe.dart';
@@ -129,10 +130,17 @@ final savedRecipeByIdProvider = Provider.family<SavedRecipe?, String>((ref, id) 
 /// State of the food-preferences line.
 class FoodPreferencesState {
   /// Creates a [FoodPreferencesState].
-  const FoodPreferencesState({this.loaded = false, this.value});
+  const FoodPreferencesState({
+    this.loaded = false,
+    this.value,
+    this.loadFailed = false,
+  });
 
   /// Whether the first load finished (successfully or not).
   final bool loaded;
+
+  /// True when the load failed, so a null [value] means "unknown", not "unset".
+  final bool loadFailed;
 
   /// The line, or null when unset.
   final String? value;
@@ -146,15 +154,20 @@ class FoodPreferencesNotifier extends StateNotifier<FoodPreferencesState> {
   final FoodPreferencesRepository _repository;
   String? _userId;
 
-  /// Loads for [userId]. A failure leaves the value null but marks loaded,
-  /// so the settings field is usable rather than stuck.
+  /// Loads for [userId]. A failure marks loaded with [FoodPreferencesState.loadFailed]
+  /// set, so the dialog can refuse to save over preferences it never saw.
   Future<void> load(String userId) async {
     _userId = userId;
     try {
       final value = await _repository.get(userId);
       state = FoodPreferencesState(loaded: true, value: value);
-    } catch (_) {
-      state = FoodPreferencesState(loaded: true, value: state.value);
+    } catch (e) {
+      debugPrint('Food preferences load failed: $e');
+      state = FoodPreferencesState(
+        loaded: true,
+        value: state.value,
+        loadFailed: true,
+      );
     }
   }
 
@@ -163,6 +176,7 @@ class FoodPreferencesNotifier extends StateNotifier<FoodPreferencesState> {
   Future<void> save(String? value) async {
     final userId = _userId;
     if (userId == null) throw StateError('No user loaded');
+    if (state.loadFailed) throw StateError('Preferences never loaded');
     await _repository.set(userId, value);
     final trimmed = value?.trim();
     state = FoodPreferencesState(

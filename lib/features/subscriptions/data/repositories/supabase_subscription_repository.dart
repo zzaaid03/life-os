@@ -20,6 +20,8 @@ class SupabaseSubscriptionRepository implements SubscriptionRepository {
 
   @override
   Future<List<Subscription>> getAll(String userId) async {
+    // No limit on purpose: the screen shows every subscription and one user
+    // has far fewer than the 1000-row response cap.
     final response = await _client
         .from(table)
         .select()

@@ -5,6 +5,7 @@ import 'package:life_os/features/demo/data/demo_seed.dart';
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/jobs/data/models/job_application.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
+import 'package:life_os/features/jobs/domain/job_status.dart';
 
 /// Stateful in-memory [JobApplicationRepository] backing the sandbox demo
 /// mode.
@@ -34,6 +35,28 @@ class DemoJobApplicationRepository implements JobApplicationRepository {
     return -1;
   }
 
+  /// Applies an email update to the row at [index]. The status only moves
+  /// forward (see [emailMayChangeStatus]); summary and source email always
+  /// update.
+  void _applyEmail(int index, JobUpdate update) {
+    final job = _jobs[index];
+    final now = DateTime.now();
+    final moves = emailMayChangeStatus(job.status, update.status);
+    _jobs[index] = JobApplication(
+      id: job.id,
+      company: job.company,
+      role: job.role,
+      location: job.location,
+      status: moves ? update.status : job.status,
+      summary: update.summary,
+      sourceEmailId: update.sourceEmailId,
+      appliedAt: job.appliedAt,
+      statusFromEmailAt: moves ? now.toUtc() : job.statusFromEmailAt,
+      createdAt: job.createdAt,
+      updatedAt: now,
+    );
+  }
+
   @override
   Future<void> upsertFromScan(List<JobUpdate> updates, String userId) async {
     for (final update in updates) {
@@ -41,18 +64,7 @@ class DemoJobApplicationRepository implements JobApplicationRepository {
       final now = DateTime.now();
 
       if (index != -1) {
-        _jobs[index] = JobApplication(
-          id: _jobs[index].id,
-          company: _jobs[index].company,
-          role: _jobs[index].role,
-          location: _jobs[index].location,
-          status: update.status,
-          summary: update.summary,
-          sourceEmailId: update.sourceEmailId,
-          appliedAt: _jobs[index].appliedAt,
-          createdAt: _jobs[index].createdAt,
-          updatedAt: now,
-        );
+        _applyEmail(index, update);
       } else {
         _jobs.add(
           JobApplication(
@@ -62,6 +74,7 @@ class DemoJobApplicationRepository implements JobApplicationRepository {
             status: update.status,
             summary: update.summary,
             sourceEmailId: update.sourceEmailId,
+            statusFromEmailAt: now.toUtc(),
             createdAt: now,
             updatedAt: now,
           ),
@@ -81,18 +94,7 @@ class DemoJobApplicationRepository implements JobApplicationRepository {
       final index = _findExistingIndex(update);
 
       if (index != -1) {
-        _jobs[index] = JobApplication(
-          id: _jobs[index].id,
-          company: _jobs[index].company,
-          role: _jobs[index].role,
-          location: _jobs[index].location,
-          status: update.status,
-          summary: update.summary,
-          sourceEmailId: update.sourceEmailId,
-          appliedAt: _jobs[index].appliedAt,
-          createdAt: _jobs[index].createdAt,
-          updatedAt: DateTime.now(),
-        );
+        _applyEmail(index, update);
       } else {
         newOnes.add(update);
       }

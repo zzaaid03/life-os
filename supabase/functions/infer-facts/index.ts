@@ -259,6 +259,7 @@ Deno.serve(async (req: Request) => {
     }
 
     let rawFacts: RawFact[] = [];
+    let aiFailed = false;
     try {
       const aiRes = await chatJson(userId, SYSTEM_PROMPT, contextBlock);
 
@@ -268,9 +269,23 @@ Deno.serve(async (req: Request) => {
         if (Array.isArray(parsed.facts)) {
           rawFacts = parsed.facts;
         }
+      } else {
+        aiFailed = true;
       }
-    } catch {
-      rawFacts = [];
+    } catch (e) {
+      console.error("infer-facts: model call failed", e);
+      aiFailed = true;
+    }
+
+    // Still HTTP 200 (installed apps depend on it), but the app must not
+    // record this run as done, so say it failed and write nothing.
+    if (aiFailed) {
+      return jsonResponse(req, {
+        written: 0,
+        dropped: 0,
+        reason: "ai_failed",
+        evidenceCounts,
+      });
     }
 
     let dropped = 0;

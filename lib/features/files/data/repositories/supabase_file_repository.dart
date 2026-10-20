@@ -30,21 +30,6 @@ class SupabaseFileRepository implements FileRepository {
   /// EGRESS DISCIPLINE: a widget rebuild must never mint a fresh signed URL.
   final Map<String, ({String url, DateTime expiresAt})> _signedUrlCache = {};
 
-  /// Fetches every non-deleted file for [userId], newest first.
-  @override
-  Future<List<StoredFile>> getAll(String userId) async {
-    final response = await _client
-        .from(_table)
-        .select()
-        .eq('user_id', userId)
-        .isFilter('deleted_at', null)
-        .order('created_at', ascending: false);
-    return (response as List<dynamic>)
-        .cast<Map<String, dynamic>>()
-        .map(StoredFile.fromJson)
-        .toList();
-  }
-
   /// Finds this user's live files whose note, name or AI label contains
   /// [query], newest first.
   @override
@@ -62,7 +47,8 @@ class SupabaseFileRepository implements FileRepository {
           'file_name.ilike.%$term%,'
           'ai_label.ilike.%$term%',
         )
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false)
+        .limit(50);
     return (response as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(StoredFile.fromJson)
