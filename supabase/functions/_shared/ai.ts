@@ -26,6 +26,7 @@ const AI_REASONING_EFFORT = Deno.env.get("AI_REASONING_EFFORT") ?? "none";
 // covers ~7s of backoff.
 const MAX_RETRIES = 3;
 const MAX_WAIT_MS = 10_000;
+const AI_TIMEOUT_MS = 120_000;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -91,14 +92,23 @@ export async function chatJson(
   if (!AI_REASONING_EFFORT || AI_REASONING_EFFORT === "none") body.temperature = temperature;
 
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(`${AI_BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${AI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${AI_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${AI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+      });
+    } catch (e) {
+      if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+        return { ok: false, status: 504, detail: `${AI_MODEL}: no reply within 120s` };
+      }
+      throw e;
+    }
 
     if (res.status === 429 && attempt < MAX_RETRIES) {
       await res.body?.cancel();

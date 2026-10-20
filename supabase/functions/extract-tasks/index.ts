@@ -216,6 +216,7 @@ async function accessTokenFromRefresh(refreshToken: string): Promise<string> {
       refresh_token: refreshToken,
       grant_type: "refresh_token",
     }),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
     throw new Error(`Google token refresh ${res.status}: ${await res.text()}`);
@@ -269,6 +270,7 @@ function localDate(epochMs: number, tzOffsetMinutes: number): string {
 function gmailFetch(accessToken: string, path: string): Promise<Response> {
   return fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(15_000),
   });
 }
 
@@ -293,23 +295,53 @@ async function listInboxIds(
     `messages?maxResults=500&labelIds=INBOX&q=${encodeURIComponent(`after:${afterEpochSeconds}`)}`,
   );
   if (!listRes.ok) {
-    throw new Error(`Gmail list ${listRes.status}: ${await listRes.text()}`);
+    throw new Error(`Gmail list ${listRes.status}: ${(await listRes.text()).slice(0, 200)}`);
   }
   const { messages = [], nextPageToken } = await listRes.json();
   const ids = messages.map((m: { id: string }) => m.id as string);
   return { account, ids, capped: Boolean(nextPageToken) };
 }
 
-// Fetches full bodies for exactly the given ids (a selected batch, not "recent N").
+// Gets one message, retrying 429/5xx twice. Returns null for a 404 (message
+// deleted since it was listed). Any other failure throws, so the caller never
+// sees a blank email that was not really read.
+async function fetchMessage(accessToken: string, id: string) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await gmailFetch(accessToken, `messages/${id}?format=full`);
+    if (r.ok) return await r.json();
+    if (r.status === 404) {
+      await r.body?.cancel();
+      return null;
+    }
+    const retryable = r.status === 429 || r.status >= 500;
+    if (retryable && attempt < 2) {
+      await r.body?.cancel();
+      const retryAfter = Number(r.headers.get("retry-after"));
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+        ? Math.min(retryAfter, 5) * 1000
+        : 1000 * (attempt + 1);
+      await new Promise((res) => setTimeout(res, waitMs));
+      continue;
+    }
+    const text = (await r.text()).slice(0, 200);
+    throw new Error(`Gmail message ${id} ${r.status}: ${text}`);
+  }
+}
+
+// Fetches full bodies for exactly the given ids (a selected batch, not "recent N"),
+// at most 10 at a time. Deleted messages (404) are left out of the result.
 async function fetchEmailBodies(
   accessToken: string,
   ids: string[],
   tzOffsetMinutes: number,
 ) {
-  return await Promise.all(
-    ids.map(async (id: string) => {
-      const r = await gmailFetch(accessToken, `messages/${id}?format=full`);
-      const m = await r.json();
+  const out = [];
+  for (let i = 0; i < ids.length; i += 10) {
+    const group = ids.slice(i, i + 10);
+    const emails = await Promise.all(
+      group.map(async (id: string) => {
+      const m = await fetchMessage(accessToken, id);
+      if (m === null) return null;
       const headers = m.payload?.headers ?? [];
       const h = (n: string) =>
         headers.find((x: { name: string }) => x.name.toLowerCase() === n.toLowerCase())
@@ -322,30 +354,35 @@ async function fetchEmailBodies(
         ? localDate(epoch, tzOffsetMinutes)
         : null;
       return { id, from: h("From"), subject: h("Subject"), sentDate, body };
-    }),
-  );
+      }),
+    );
+    for (const e of emails) if (e) out.push(e);
+  }
+  return out;
 }
 
 // Subtracts ids already analysed (present in processed_emails) from a listed
-// id set. A query failure degrades to "nothing filtered" — re-analysing a few
-// emails is wasteful, failing the scan over it is not.
+// id set. Only the listed ids are queried, in chunks, so the API's 1000-row
+// cap can never hide a processed row. A query failure THROWS: treating
+// everything as pending would silently re-bill the model for old mail.
 async function filterPendingIds(
   userId: string,
   ids: string[],
 ): Promise<string[]> {
   if (ids.length === 0) return ids;
-  try {
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const processed = new Set<string>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
     const { data, error } = await admin
       .from("processed_emails")
       .select("email_id")
-      .eq("user_id", userId);
-    if (error || !data) return ids;
-    const processed = new Set(data.map((r: { email_id: string }) => r.email_id as string));
-    return ids.filter((id) => !processed.has(id));
-  } catch (_) {
-    return ids;
+      .eq("user_id", userId)
+      .in("email_id", chunk);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) processed.add((r as { email_id: string }).email_id);
   }
+  return ids.filter((id) => !processed.has(id));
 }
 
 // Marks a batch as analysed after a SUCCESSFUL model response only. A write
@@ -488,13 +525,24 @@ Deno.serve(async (req: Request) => {
     let account = "";
     let pendingIds: string[] = [];
     let capped = false;
+    let listingIds: string[] = [];
     try {
       const listing = await listInboxIds(accessToken, horizonDays);
       account = listing.account;
       capped = listing.capped;
-      pendingIds = await filterPendingIds(userId, listing.ids);
+      listingIds = listing.ids;
     } catch (e) {
       return jsonResponse({ error: "Gmail fetch failed", detail: String(e) }, 502);
+    }
+    // Shared by the scan and `count` paths, so both fail the same way.
+    try {
+      pendingIds = await filterPendingIds(userId, listingIds);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return jsonResponse(
+        { error: "Lookup failed", detail: `processed_emails lookup failed: ${msg}` },
+        502,
+      );
     }
 
     // Count-only: must never fetch a body or call the model. Returns as soon
@@ -525,6 +573,20 @@ Deno.serve(async (req: Request) => {
       emails = await fetchEmailBodies(accessToken, batchIds, tzOffsetMinutes);
     } catch (e) {
       return jsonResponse({ error: "Gmail fetch failed", detail: String(e) }, 502);
+    }
+
+    // Every message in the batch was deleted since it was listed: nothing to
+    // send. Mark them so they stop blocking the batch, and skip the model.
+    if (emails.length === 0) {
+      await markProcessed(userId, batchIds);
+      return jsonResponse({
+        tasks: [],
+        jobUpdates: [],
+        subscriptions: [],
+        scannedAccount: account,
+        analyzedCount: batchIds.length,
+        remaining: Math.max(pendingIds.length - batchIds.length, 0),
+      });
     }
 
     const { block: factsBlock, factsCount } = await buildFactsBlock(userId);
