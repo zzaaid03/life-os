@@ -1,1 +1,6 @@
+# Store and check out text as LF everywhere. Flutter and Deno write LF, and core.autocrlf
+# on Windows kept flagging generated files (windows/flutter/*) as modified.
+* text=auto eol=lf
 *.sql text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
