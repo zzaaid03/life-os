@@ -3,7 +3,9 @@
 -- since Notes, Habits and Journal were removed.
 --
 -- Safety: refuses to run if any of them still holds a row, so this can never
--- delete real data. No CASCADE, so it also fails loudly if something new has
+-- delete real data. The one exception is a single leftover test note in notes,
+-- checked by hand on 2026-10-20. A second note still stops it.
+-- No CASCADE, so it also fails loudly if something new has
 -- started depending on one of them. Policies, triggers and indexes go with the
 -- tables. Safe to re-run (IF EXISTS).
 
@@ -16,7 +18,7 @@ BEGIN
                            'tags', 'entity_tags', 'attachments', 'sync_queue'] LOOP
     IF to_regclass('public.' || t) IS NOT NULL THEN
       EXECUTE format('SELECT count(*) FROM public.%I', t) INTO n;
-      IF n > 0 THEN
+      IF n > CASE WHEN t = 'notes' THEN 1 ELSE 0 END THEN
         RAISE EXCEPTION 'public.% has % rows, not dropping anything', t, n;
       END IF;
     END IF;
