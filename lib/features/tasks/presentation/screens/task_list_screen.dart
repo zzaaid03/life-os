@@ -13,6 +13,7 @@ import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
 import 'package:life_os/features/tasks/domain/providers/task_provider.dart';
+import 'package:life_os/features/tasks/presentation/widgets/sync_status_banner.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_card.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_editor_sheet.dart';
 import 'package:life_os/features/tasks/presentation/widgets/task_empty_state.dart';
@@ -134,6 +135,7 @@ class TaskListScreen extends ConsumerWidget {
         vertical: AppSpacing.sm,
       ),
       children: [
+        const SyncStatusBanner(),
         TaskSection(title: 'Today', count: today.length),
         if (today.isEmpty)
           const TaskEmptyState(type: TaskEmptyType.today)

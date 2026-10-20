@@ -5,8 +5,12 @@
 /// and swipe-to-complete/delete actions.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:life_os/core/data/entity.dart';
+import 'package:life_os/core/sync/sync_state.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/tasks/data/models/task.dart';
@@ -15,7 +19,7 @@ import 'package:life_os/features/tasks/presentation/widgets/task_due_date_badge.
 import 'package:life_os/features/tasks/presentation/widgets/task_priority_chip.dart';
 
 /// A premium task list item with swipe actions.
-class TaskCard extends StatelessWidget {
+class TaskCard extends ConsumerWidget {
   /// Creates a [TaskCard].
   const TaskCard({
     super.key,
@@ -38,9 +42,14 @@ class TaskCard extends StatelessWidget {
   final VoidCallback? onDelete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isCompleted = task.status == TaskStatus.completed;
+    final syncFailed = ref.watch(
+      syncStateProvider.select((s) => s.lastError != null),
+    );
+    final showNotSynced =
+        !kIsWeb && syncFailed && task.syncStatus != SyncStatus.synced;
 
     return Dismissible(
       key: ValueKey(task.id),
@@ -147,6 +156,23 @@ class TaskCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (showNotSynced)
+                  Padding(
+                    padding: const EdgeInsets.only(left: AppSpacing.sm, top: 2),
+                    child: Tooltip(
+                      message: 'Not synced yet',
+                      child: Semantics(
+                        label: 'Not synced yet',
+                        child: Icon(
+                          Icons.cloud_off_outlined,
+                          size: 16,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.45,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
