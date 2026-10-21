@@ -18,7 +18,7 @@ BEGIN
                            'tags', 'entity_tags', 'attachments', 'sync_queue'] LOOP
     IF to_regclass('public.' || t) IS NOT NULL THEN
       EXECUTE format('SELECT count(*) FROM public.%I', t) INTO n;
-      IF n > CASE WHEN t = 'notes' THEN 1 ELSE 0 END THEN
+      IF n > 0 AND NOT (t = 'notes' AND n = 1) THEN
         RAISE EXCEPTION 'public.% has % rows, not dropping anything', t, n;
       END IF;
     END IF;
