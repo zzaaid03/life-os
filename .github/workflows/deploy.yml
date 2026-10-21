@@ -95,7 +95,7 @@ jobs:
           deno-version: v2.x
 
       - name: Run edge function tests
-        run: deno test --allow-env --allow-read=supabase/functions/_shared supabase/functions/_shared/
+        run: deno test --allow-env --allow-read=supabase/functions/_shared supabase/functions/_shared/ supabase/functions/recipe-chef/nutrition_test.ts
 
       - name: Build web bundle
         run: bash scripts/build-web.sh ${{ steps.env.outputs.name }}

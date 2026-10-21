@@ -20,6 +20,7 @@ import 'package:life_os/features/recipes/presentation/sheets/tweak_recipe_sheet.
 import 'package:life_os/features/recipes/presentation/widgets/detail/add_to_list_sheet.dart';
 import 'package:life_os/features/recipes/presentation/widgets/detail/ingredient_row.dart';
 import 'package:life_os/features/recipes/presentation/widgets/detail/method_preview.dart';
+import 'package:life_os/features/recipes/presentation/widgets/detail/nutrition_row.dart';
 import 'package:life_os/features/recipes/presentation/widgets/detail/recipe_detail_header.dart';
 import 'package:life_os/features/recipes/presentation/widgets/detail/recipe_pills.dart';
 import 'package:life_os/features/recipes/presentation/widgets/detail/servings_stepper.dart';
@@ -346,6 +347,11 @@ class _RecipeDetailViewState extends ConsumerState<_RecipeDetailView> {
           ],
         ),
       ),
+      if (recipe.nutrition != null)
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.md),
+          child: NutritionRow(nutrition: recipe.nutrition!),
+        ),
       Padding(
         padding: const EdgeInsets.only(top: AppSpacing.xl),
         child: Row(

@@ -145,6 +145,55 @@ class RecipeStep {
   };
 }
 
+/// An estimated nutrition block, per serving at the recipe's base servings.
+class RecipeNutrition {
+  /// Creates a [RecipeNutrition].
+  const RecipeNutrition({
+    required this.kcal,
+    required this.protein,
+    required this.carbs,
+    required this.fat,
+  });
+
+  /// Parses a nutrition block. Returns null unless [json] is a map with all
+  /// four values numeric and in range, so a bad block never breaks a recipe.
+  static RecipeNutrition? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final kcal = json['kcal'];
+    final protein = json['protein'];
+    final carbs = json['carbs'];
+    final fat = json['fat'];
+    if (kcal is! num || protein is! num || carbs is! num || fat is! num) return null;
+    final k = kcal.round();
+    final p = protein.round();
+    final c = carbs.round();
+    final f = fat.round();
+    if (k < 1 || k > 5000) return null;
+    if (p < 0 || p > 1000 || c < 0 || c > 1000 || f < 0 || f > 1000) return null;
+    return RecipeNutrition(kcal: k, protein: p, carbs: c, fat: f);
+  }
+
+  /// Energy per serving.
+  final int kcal;
+
+  /// Protein per serving, in grams.
+  final int protein;
+
+  /// Carbohydrates per serving, in grams.
+  final int carbs;
+
+  /// Fat per serving, in grams.
+  final int fat;
+
+  /// Serialises back to the wire shape.
+  Map<String, dynamic> toJson() => {
+    'kcal': kcal,
+    'protein': protein,
+    'carbs': carbs,
+    'fat': fat,
+  };
+}
+
 /// A complete recipe, saved or not.
 class Recipe {
   /// Creates a [Recipe].
@@ -160,6 +209,7 @@ class Recipe {
     required this.ingredients,
     required this.steps,
     this.tips = const [],
+    this.nutrition,
   });
 
   /// Parses a recipe. Never throws on a malformed field; see the library doc.
@@ -185,6 +235,7 @@ class Recipe {
       tips: json['tips'] is List
           ? (json['tips'] as List).whereType<String>().toList()
           : const [],
+      nutrition: RecipeNutrition.fromJson(json['nutrition']),
     );
   }
 
@@ -222,6 +273,9 @@ class Recipe {
   /// Zero to three short tips.
   final List<String> tips;
 
+  /// Estimated nutrition per serving at base [servings]. Null on older recipes.
+  final RecipeNutrition? nutrition;
+
   /// Total minutes, prep plus cook.
   int get totalMinutes => prepMinutes + cookMinutes;
 
@@ -239,6 +293,7 @@ class Recipe {
     'ingredients': ingredients.map((i) => i.toJson()).toList(),
     'steps': steps.map((s) => s.toJson()).toList(),
     'tips': tips,
+    if (nutrition != null) 'nutrition': nutrition!.toJson(),
   };
 }
 

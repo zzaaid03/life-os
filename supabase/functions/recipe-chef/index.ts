@@ -13,10 +13,15 @@
 // reaches the client. The Dart Recipe model and cook mode rely on that shape
 // (ingredient indices in range, timers positive, servings sane); do not hand
 // the model's raw JSON to the app.
+//
+// The recipe also carries `nutrition` (kcal, protein, carbs, fat per serving),
+// or null. It is an estimate computed in code (nutrition.ts) from the grams and
+// per-100g numbers the model gives for each ingredient; the model never sums.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse, requireUser } from "../_shared/http.ts";
 import { aiConfigured, chatJson } from "../_shared/ai.ts";
+import { type Nutrition, nutritionPerServing } from "./nutrition.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -42,7 +47,9 @@ const RECIPE_FORMAT = `Reply with ONE JSON object in exactly this shape:
       "name": string,          // the ingredient itself, lowercase
       "prep": string | null,   // how to prepare it before cooking: "finely diced"
       "staple": boolean,       // true for salt, pepper, cooking oil, water
-      "have": boolean          // true ONLY if it is in the user's "I have" list
+      "have": boolean,         // true ONLY if it is in the user's "I have" list
+      "grams": number | null,  // your estimate of this amount's weight in grams: 3 eggs -> 150, 1 tsp oil -> 5; null ONLY for "to taste" items
+      "per100g": {"kcal": number, "protein": number, "carbs": number, "fat": number} | null // typical values per 100 g of this ingredient as listed, raw unless the name says cooked; null ONLY for "to taste" items
     }
   ],
   "steps": [
@@ -83,12 +90,15 @@ const RECIPE_RULES = `Rules:
    tip looks like "Rest the chicken for 5 minutes before slicing so it stays
    juicy." with no president, name or politics anywhere in the reply.
    If the request contains NO food or cooking part at all ("what is the
-   capital of France"), reply with exactly {"offTopic": true} and nothing else.`;
+   capital of France"), reply with exactly {"offTopic": true} and nothing else.
+8. "grams" and "per100g" are estimates used for nutrition. Give them for every
+   ingredient that has an amount. Do not compute totals or per-serving
+   numbers yourself, the app does that.`;
 
 const WORKED_EXAMPLE = `Example.
 Request: "something quick with eggs". FOOD PREFERENCES: none. I have: eggs, spinach.
 Correct reply:
-{"title":"Spinach and Feta Omelette","emoji":"🍳","description":"A fluffy omelette folded around wilted spinach and salty feta, ready in ten minutes.","gradient":["#F9D976","#7FB069"],"servings":1,"prepMinutes":3,"cookMinutes":6,"difficulty":"easy","ingredients":[{"amount":3,"unit":null,"name":"eggs","prep":"beaten with a pinch of salt","staple":false,"have":true},{"amount":40,"unit":"g","name":"baby spinach","prep":null,"staple":false,"have":true},{"amount":30,"unit":"g","name":"feta","prep":"crumbled","staple":false,"have":false},{"amount":1,"unit":"tsp","name":"olive oil","prep":null,"staple":true,"have":false},{"amount":null,"unit":null,"name":"salt and black pepper","prep":null,"staple":true,"have":false}],"steps":[{"text":"Heat the olive oil in a non-stick pan over medium heat, add the spinach and stir until just wilted.","timerSeconds":60,"timerLabel":"Wilt spinach","ingredients":[1,3]},{"text":"Pour in the eggs and let them set without stirring, tilting the pan so the runny egg reaches the edges.","timerSeconds":120,"timerLabel":"Set eggs","ingredients":[0]},{"text":"Scatter the feta over one half, fold the omelette over it and season to taste.","timerSeconds":null,"timerLabel":null,"ingredients":[2,4]}],"tips":["Take it off the heat while the top is still slightly glossy; it keeps cooking."]}`;
+{"title":"Spinach and Feta Omelette","emoji":"🍳","description":"A fluffy omelette folded around wilted spinach and salty feta, ready in ten minutes.","gradient":["#F9D976","#7FB069"],"servings":1,"prepMinutes":3,"cookMinutes":6,"difficulty":"easy","ingredients":[{"amount":3,"unit":null,"name":"eggs","prep":"beaten with a pinch of salt","staple":false,"have":true,"grams":150,"per100g":{"kcal":143,"protein":12.6,"carbs":0.7,"fat":9.5}},{"amount":40,"unit":"g","name":"baby spinach","prep":null,"staple":false,"have":true,"grams":40,"per100g":{"kcal":23,"protein":2.9,"carbs":3.6,"fat":0.4}},{"amount":30,"unit":"g","name":"feta","prep":"crumbled","staple":false,"have":false,"grams":30,"per100g":{"kcal":264,"protein":14,"carbs":4,"fat":21}},{"amount":1,"unit":"tsp","name":"olive oil","prep":null,"staple":true,"have":false,"grams":5,"per100g":{"kcal":884,"protein":0,"carbs":0,"fat":100}},{"amount":null,"unit":null,"name":"salt and black pepper","prep":null,"staple":true,"have":false,"grams":null,"per100g":null}],"steps":[{"text":"Heat the olive oil in a non-stick pan over medium heat, add the spinach and stir until just wilted.","timerSeconds":60,"timerLabel":"Wilt spinach","ingredients":[1,3]},{"text":"Pour in the eggs and let them set without stirring, tilting the pan so the runny egg reaches the edges.","timerSeconds":120,"timerLabel":"Set eggs","ingredients":[0]},{"text":"Scatter the feta over one half, fold the omelette over it and season to taste.","timerSeconds":null,"timerLabel":null,"ingredients":[2,4]}],"tips":["Take it off the heat while the top is still slightly glossy; it keeps cooking."]}`;
 
 const GENERATE_SYSTEM = `You are a warm, expert home chef who writes recipes
 for a cooking app. The app shows your recipe as a card and walks the user
@@ -191,6 +201,7 @@ type Recipe = {
   ingredients: Ingredient[];
   steps: Step[];
   tips: string[];
+  nutrition: Nutrition | null;
 };
 
 function str(v: unknown, max: number): string {
@@ -259,12 +270,14 @@ export function sanitizeRecipe(raw: unknown): Recipe | null {
     ? r.difficulty
     : "easy";
 
+  const servings = int(r.servings, 1, 12, 2);
+
   return {
     title,
     emoji: str(r.emoji, 16) || "🍽️",
     description: str(r.description, 300),
     gradient,
-    servings: int(r.servings, 1, 12, 2),
+    servings,
     prepMinutes: int(r.prepMinutes, 0, 1440, 0),
     cookMinutes: int(r.cookMinutes, 0, 1440, 0),
     difficulty,
@@ -274,6 +287,7 @@ export function sanitizeRecipe(raw: unknown): Recipe | null {
       .map((t) => str(t, 200))
       .filter((t) => t.length > 0)
       .slice(0, 3),
+    nutrition: nutritionPerServing(r.ingredients, servings),
   };
 }
 
