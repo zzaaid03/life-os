@@ -23,6 +23,7 @@ import 'package:life_os/features/inbox/presentation/screens/inbox_scan_screen.da
 import 'package:life_os/features/jobs/presentation/screens/job_applications_screen.dart';
 import 'package:life_os/features/learning/presentation/screens/known_facts_screen.dart';
 import 'package:life_os/features/life/presentation/screens/life_screen.dart';
+import 'package:life_os/features/nutrition/presentation/calorie_target_screen.dart';
 import 'package:life_os/features/onboarding/domain/onboarding_provider.dart';
 import 'package:life_os/features/permissions/presentation/screens/calendar_permission_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/files_permission_screen.dart';
@@ -67,6 +68,7 @@ abstract final class AppRoutes {
   static const String settings = '/settings';
   static const String knownFacts = '/known-facts';
   static const String privacy = '/privacy';
+  static const String calorieTarget = '/daily-calories';
   static const String tasks = '/tasks';
   static const String taskDetail = '/tasks/:id';
 
@@ -355,6 +357,11 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.knownFacts,
         name: 'knownFacts',
         builder: (context, state) => const KnownFactsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.calorieTarget,
+        name: 'calorieTarget',
+        builder: (context, state) => const CalorieTargetScreen(),
       ),
     ],
 

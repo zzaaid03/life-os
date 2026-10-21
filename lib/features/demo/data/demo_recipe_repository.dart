@@ -10,6 +10,8 @@ library;
 
 import 'package:life_os/features/demo/data/demo_recipes.dart';
 import 'package:life_os/features/demo/data/demo_seed.dart';
+import 'package:life_os/features/nutrition/data/calorie_profile_repository.dart';
+import 'package:life_os/features/nutrition/domain/calorie_target.dart';
 import 'package:life_os/features/recipes/data/models/recipe.dart';
 import 'package:life_os/features/recipes/data/repositories/recipe_repository.dart';
 
@@ -93,6 +95,19 @@ class DemoFoodPreferencesRepository implements FoodPreferencesRepository {
   Future<void> set(String userId, String? value) async {
     final trimmed = value?.trim();
     _value = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+  }
+}
+
+/// Calorie profile backed by a single in-memory value, starting empty.
+class DemoCalorieProfileRepository implements CalorieProfileRepository {
+  CalorieProfile _profile = const CalorieProfile();
+
+  @override
+  Future<CalorieProfile> load() async => _profile;
+
+  @override
+  Future<void> save(CalorieProfile p) async {
+    _profile = p;
   }
 }
 

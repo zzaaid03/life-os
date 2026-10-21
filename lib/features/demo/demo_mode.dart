@@ -35,6 +35,7 @@ import 'package:life_os/features/jobs/data/repositories/job_application_reposito
 import 'package:life_os/features/learning/data/repositories/fact_repository.dart';
 import 'package:life_os/features/notifications/data/noop_notification_service.dart';
 import 'package:life_os/features/notifications/domain/providers/notification_service_provider.dart';
+import 'package:life_os/features/nutrition/data/calorie_profile_repository.dart';
 import 'package:life_os/features/profile/data/repositories/supabase_profile_repository.dart';
 import 'package:life_os/features/recipes/data/recipe_chef_service.dart';
 import 'package:life_os/features/recipes/data/repositories/recipe_repository.dart';
@@ -85,6 +86,9 @@ List<Override> buildDemoOverrides() {
     recipeRepositoryProvider.overrideWithValue(DemoRecipeRepository()),
     foodPreferencesRepositoryProvider.overrideWithValue(
       DemoFoodPreferencesRepository(),
+    ),
+    calorieProfileRepositoryProvider.overrideWithValue(
+      DemoCalorieProfileRepository(),
     ),
     // Demo mode must never touch the OS: no permission prompt, no alarms
     // left scheduled on a stranger's phone after they close the sandbox.

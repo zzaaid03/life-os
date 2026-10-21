@@ -122,7 +122,7 @@ class SavedRecipesNotifier extends StateNotifier<SavedRecipesState> {
 final savedRecipesProvider =
     StateNotifierProvider<SavedRecipesNotifier, SavedRecipesState>((ref) {
       final notifier = SavedRecipesNotifier(ref.watch(recipeRepositoryProvider));
-      _autoLoad(ref, notifier.load);
+      autoLoadOnSignIn(ref, notifier.load);
       return notifier;
     });
 
@@ -198,13 +198,13 @@ class FoodPreferencesNotifier extends StateNotifier<FoodPreferencesState> {
 final foodPreferencesProvider =
     StateNotifierProvider<FoodPreferencesNotifier, FoodPreferencesState>((ref) {
       final notifier = FoodPreferencesNotifier(ref.watch(foodPreferencesRepositoryProvider));
-      _autoLoad(ref, notifier.load);
+      autoLoadOnSignIn(ref, notifier.load);
       return notifier;
     });
 
 /// Loads on a real sign-in change, plus eagerly when a session was restored
 /// before the provider existed (where `ref.listen` never fires).
-void _autoLoad(Ref ref, Future<void> Function(String userId) load) {
+void autoLoadOnSignIn(Ref ref, Future<void> Function(String userId) load) {
   ref.listen<AuthState>(authProvider, (previous, next) {
     if (next.isAuthenticated &&
         next.userId != null &&
