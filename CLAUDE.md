@@ -130,6 +130,9 @@ These turn Zaid's four goals into rules. A diff that breaks one is not done.
 - Fix the bug class, not the instance: grep every copy before calling it fixed.
 - Before blaming your change for a failing test, check whether it failed on clean `HEAD`.
 - With parallel workers in the tree, stage explicit paths, never `git add -A`.
+- An edit reported as "rejected" may still have applied. Re-read the file before redoing it.
+- `.update()`/`.delete()` that matches 0 rows (RLS, missing row) returns no error. Chain
+  `.select('id')` and throw on an empty result.
 - Search for multi-byte characters with ripgrep `\x{2014}` escapes, not bash bracket expressions.
 
 ## For WORKER agents (Zed CC): read this before every task
