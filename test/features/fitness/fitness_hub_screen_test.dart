@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life_os/features/fitness/data/workout_checkin_repository.dart';
 import 'package:life_os/features/fitness/data/workout_plan_repository.dart';
+import 'package:life_os/features/fitness/data/workout_session_repository.dart';
 import 'package:life_os/features/fitness/domain/plan_inputs.dart';
 import 'package:life_os/features/fitness/domain/workout_checkin_providers.dart';
 import 'package:life_os/features/fitness/domain/workout_plan.dart';
 import 'package:life_os/features/fitness/domain/workout_plan_providers.dart';
+import 'package:life_os/features/fitness/domain/workout_session.dart';
+import 'package:life_os/features/fitness/domain/workout_session_providers.dart';
 import 'package:life_os/features/fitness/presentation/screens/fitness_hub_screen.dart';
 import 'package:life_os/features/fitness/presentation/widgets/coach_card.dart';
 import 'package:life_os/features/nutrition/data/calorie_profile_repository.dart';
@@ -56,6 +59,22 @@ class _FakePlanNotifier extends WorkoutPlanNotifier {
   }
 }
 
+class _SessionsRepo extends Fake implements WorkoutSessionRepository {}
+
+class _FakeSessionsNotifier extends WorkoutSessionsNotifier {
+  _FakeSessionsNotifier(WorkoutSessionsState initial)
+    : super(_SessionsRepo(), 'p') {
+    state = initial;
+  }
+
+  int loads = 0;
+
+  @override
+  Future<void> load([String? userId]) async {
+    loads++;
+  }
+}
+
 PlanExercise _ex(int i) => PlanExercise(
   id: 'e$i',
   position: i,
@@ -86,6 +105,8 @@ Widget _app(
   WorkoutPlanState planState, {
   CalorieProfile profile = const CalorieProfile(),
   _FakePlanNotifier? planNotifier,
+  WorkoutSessionsState sessions = const WorkoutSessionsState(loaded: true),
+  _FakeSessionsNotifier? sessionsNotifier,
 }) {
   return ProviderScope(
     overrides: [
@@ -95,6 +116,9 @@ Widget _app(
       ),
       workoutCheckinProvider.overrideWith(
         (ref) => WorkoutCheckinNotifier(_NoCheckinRepo()),
+      ),
+      workoutSessionsProvider.overrideWith(
+        (ref) => sessionsNotifier ?? _FakeSessionsNotifier(sessions),
       ),
       workoutPlanProvider.overrideWith(
         (ref) => planNotifier ?? _FakePlanNotifier(planState),
@@ -185,5 +209,62 @@ void main() {
     );
     expect(find.textContaining('kcal/day'), findsOneWidget);
     expect(find.text('Maintain'), findsOneWidget);
+  });
+
+  testWidgets('next up follows the last session and Start is offered', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        WorkoutPlanState(loaded: true, plan: _plan),
+        sessions: WorkoutSessionsState(
+          loaded: true,
+          lastSession: WorkoutSession(
+            id: 's',
+            dayTitle: 'Push',
+            dayPosition: 0,
+            startedAt: DateTime(2026, 10, 21),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('NEXT UP · DAY B OF 3'), findsOneWidget);
+    expect(find.text('Pull'), findsWidgets);
+    expect(find.text('Start workout'), findsOneWidget);
+  });
+
+  testWidgets('an open session today shows Resume workout', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        WorkoutPlanState(loaded: true, plan: _plan),
+        sessions: WorkoutSessionsState(
+          loaded: true,
+          openToday: WorkoutSession(
+            id: 's',
+            dayTitle: 'Push',
+            dayPosition: 0,
+            startedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Resume workout'), findsOneWidget);
+    expect(find.text('Start workout'), findsNothing);
+  });
+
+  testWidgets('a failed sessions load shows Retry, not Day A', (tester) async {
+    final notifier = _FakeSessionsNotifier(
+      const WorkoutSessionsState(loaded: true, loadFailed: true),
+    );
+    await tester.pumpWidget(
+      _app(
+        WorkoutPlanState(loaded: true, plan: _plan),
+        sessionsNotifier: notifier,
+      ),
+    );
+    expect(find.text("Couldn't load your workouts."), findsOneWidget);
+    expect(find.text('NEXT UP · DAY A OF 3'), findsNothing);
+    await tester.tap(find.text('Retry'));
+    expect(notifier.loads, 1);
   });
 }

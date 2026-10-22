@@ -54,7 +54,9 @@ void main() {
 
     test('never uses an en dash', () {
       expect(
-        formatPrescription(_ex(repsMin: 6, repsMax: 8)).contains(String.fromCharCode(0x2013)),
+        formatPrescription(
+          _ex(repsMin: 6, repsMax: 8),
+        ).contains(String.fromCharCode(0x2013)),
         isFalse,
       );
     });
@@ -99,6 +101,6 @@ void main() {
     expect(plan.days.map((d) => d.title), ['Push', 'Pull']);
     expect(plan.days.first.exercises.map((e) => e.name), ['A', 'B']);
     expect(plan.days.last.exercises, isEmpty);
-    expect(nextUpDay(plan), 0);
+    expect(nextUpDay(plan, null), 0);
   });
 }

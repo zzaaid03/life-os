@@ -5,7 +5,9 @@ import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/fitness/domain/workout_plan.dart';
 import 'package:life_os/features/fitness/domain/workout_plan_providers.dart';
+import 'package:life_os/features/fitness/domain/workout_session_providers.dart';
 import 'package:life_os/features/fitness/presentation/widgets/rotation_strip.dart';
+import 'package:life_os/features/fitness/presentation/widgets/start_workout_button.dart';
 import 'package:life_os/shared/widgets/dashboard_card.dart';
 
 const int _maxRows = 5;
@@ -28,6 +30,7 @@ class _CoachCardState extends ConsumerState<CoachCard> {
   Widget build(BuildContext context) {
     final state = ref.watch(workoutPlanProvider);
     final plan = state.plan;
+    final sessions = ref.watch(workoutSessionsProvider);
     final Widget child;
     if (!state.loaded) {
       child = const _CardMessage(
@@ -53,8 +56,38 @@ class _CoachCardState extends ConsumerState<CoachCard> {
       );
     } else if (plan == null || plan.days.isEmpty) {
       child = const _EmptyPlan();
+    } else if (!sessions.loaded) {
+      child = const _CardMessage(
+        child: SizedBox(
+          height: 28,
+          width: 28,
+          child: CircularProgressIndicator(strokeWidth: 3),
+        ),
+      );
+    } else if (sessions.loadFailed && sessions.lastSession == null) {
+      // Without the last session "next up" would silently fall back to Day A.
+      child = _CardMessage(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Couldn't load your workouts.",
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FilledButton(
+              onPressed: () =>
+                  ref.read(workoutSessionsProvider.notifier).load(),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
     } else {
-      final next = nextUpDay(plan).clamp(0, plan.days.length - 1);
+      final next = nextUpDay(
+        plan,
+        sessions.lastSession,
+      ).clamp(0, plan.days.length - 1);
       final shown = (_picked ?? next).clamp(0, plan.days.length - 1);
       child = _PlanBody(
         plan: plan,
@@ -168,6 +201,7 @@ class _PlanBody extends StatelessWidget {
             ),
           ),
         const SizedBox(height: AppSpacing.sm),
+        StartWorkoutButton(plan: plan, day: day),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton(

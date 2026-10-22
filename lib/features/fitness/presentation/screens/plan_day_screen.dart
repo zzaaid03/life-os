@@ -9,6 +9,7 @@ import 'package:life_os/features/fitness/domain/workout_plan.dart';
 import 'package:life_os/features/fitness/domain/workout_plan_providers.dart';
 import 'package:life_os/features/fitness/presentation/widgets/coach_card.dart';
 import 'package:life_os/features/fitness/presentation/widgets/exercise_editor_sheet.dart';
+import 'package:life_os/features/fitness/presentation/widgets/start_workout_button.dart';
 
 /// Shows the day with id [dayId]. Swipe a row to delete it (with Undo), tap
 /// Edit to reorder, tap a row to change it.
@@ -119,11 +120,27 @@ class _PlanDayScreenState extends ConsumerState<PlanDayScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Add exercise'),
       ),
-      body: shown.exercises.isEmpty
-          ? const _EmptyDay()
-          : _editing
-          ? _reorderList(shown)
-          : _swipeList(shown),
+      body: Column(
+        children: [
+          if (plan != null && !_editing)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenHorizontal,
+                AppSpacing.sm,
+                AppSpacing.screenHorizontal,
+                0,
+              ),
+              child: StartWorkoutButton(plan: plan, day: shown),
+            ),
+          Expanded(
+            child: shown.exercises.isEmpty
+                ? const _EmptyDay()
+                : _editing
+                ? _reorderList(shown)
+                : _swipeList(shown),
+          ),
+        ],
+      ),
     );
   }
 

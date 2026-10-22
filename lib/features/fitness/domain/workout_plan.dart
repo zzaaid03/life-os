@@ -1,6 +1,8 @@
 /// Saved workout plan models and the pure helpers that format them.
 library;
 
+import 'package:life_os/features/fitness/domain/workout_session.dart';
+
 /// One exercise in a plan day.
 class PlanExercise {
   /// Creates a [PlanExercise].
@@ -104,9 +106,17 @@ class WorkoutPlan {
   final List<PlanDay> days;
 }
 
-/// The day to show as "next up": always the first day for now. Workout
-/// sessions will drive this later.
-int nextUpDay(WorkoutPlan plan) => 0;
+/// The index in [WorkoutPlan.days] to show as "next up": the day after the
+/// last session that logged at least one set ([lastSession]), wrapping to the
+/// first day. No such session means the first day. Skipping days does not move
+/// it, only a session with logged sets does.
+int nextUpDay(WorkoutPlan plan, WorkoutSession? lastSession) {
+  if (lastSession == null) return 0;
+  for (var i = 0; i < plan.days.length; i++) {
+    if (plan.days[i].position > lastSession.dayPosition) return i;
+  }
+  return 0;
+}
 
 /// "A", "B", ... for a day position.
 String dayLetter(int position) =>
