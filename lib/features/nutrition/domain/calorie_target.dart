@@ -246,6 +246,12 @@ double? _rawMaintenance(CalorieProfile p, DateTime now) {
   return bmr * p.activity!.factor;
 }
 
+/// Share of the daily target that [kcal] covers, rounded, at least 1 when [kcal] > 0.
+int percentOfDailyTarget(int kcal, int targetKcal) {
+  if (kcal <= 0 || targetKcal <= 0) return 0;
+  return max(1, (kcal * 100 / targetKcal).round());
+}
+
 const double _kgPerLb = 0.45359237;
 const double _cmPerInch = 2.54;
 

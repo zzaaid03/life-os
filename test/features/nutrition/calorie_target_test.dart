@@ -141,4 +141,30 @@ void main() {
       expect(cmToFeetInches(182.88), (feet: 6, inches: 0.0));
     });
   });
+
+  group('percentOfDailyTarget', () {
+    test('rounds down below .5', () {
+      expect(percentOfDailyTarget(620, 2259), 27);
+    });
+
+    test('rounds up from .5', () {
+      expect(percentOfDailyTarget(620, 2200), 28);
+    });
+
+    test('is at least 1 for a small positive amount', () {
+      expect(percentOfDailyTarget(5, 2259), 1);
+    });
+
+    test('is 0 for no kcal', () {
+      expect(percentOfDailyTarget(0, 2259), 0);
+    });
+
+    test('is 0 for no target', () {
+      expect(percentOfDailyTarget(620, 0), 0);
+    });
+
+    test('is 100 when it is the whole target', () {
+      expect(percentOfDailyTarget(2259, 2259), 100);
+    });
+  });
 }

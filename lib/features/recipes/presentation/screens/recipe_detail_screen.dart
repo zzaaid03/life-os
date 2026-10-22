@@ -12,6 +12,7 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/groceries/data/models/grocery_item.dart';
 import 'package:life_os/features/groceries/domain/providers/grocery_provider.dart';
+import 'package:life_os/features/nutrition/domain/calorie_providers.dart';
 import 'package:life_os/features/recipes/data/models/recipe.dart';
 import 'package:life_os/features/recipes/domain/providers/recipe_providers.dart';
 import 'package:life_os/features/recipes/domain/scaling.dart';
@@ -350,7 +351,10 @@ class _RecipeDetailViewState extends ConsumerState<_RecipeDetailView> {
       if (recipe.nutrition != null)
         Padding(
           padding: const EdgeInsets.only(top: AppSpacing.md),
-          child: NutritionRow(nutrition: recipe.nutrition!),
+          child: NutritionRow(
+            nutrition: recipe.nutrition!,
+            dailyTargetKcal: ref.watch(dailyTargetProvider),
+          ),
         ),
       Padding(
         padding: const EdgeInsets.only(top: AppSpacing.xl),
