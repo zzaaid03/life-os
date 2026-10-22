@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:life_os/features/fitness/data/workout_checkin_repository.dart';
 import 'package:life_os/features/fitness/data/workout_plan_repository.dart';
 import 'package:life_os/features/fitness/domain/plan_inputs.dart';
+import 'package:life_os/features/fitness/domain/workout_checkin_providers.dart';
 import 'package:life_os/features/fitness/domain/workout_plan.dart';
 import 'package:life_os/features/fitness/domain/workout_plan_providers.dart';
 import 'package:life_os/features/fitness/presentation/screens/fitness_hub_screen.dart';
+import 'package:life_os/features/fitness/presentation/widgets/coach_card.dart';
 import 'package:life_os/features/nutrition/data/calorie_profile_repository.dart';
 import 'package:life_os/features/nutrition/domain/calorie_providers.dart';
 import 'package:life_os/features/nutrition/domain/calorie_target.dart';
@@ -33,6 +36,11 @@ class _PlanRepo extends Fake implements WorkoutPlanRepository {
 
   @override
   Future<String> generate(PlanInputs inputs) async => 'x';
+}
+
+class _NoCheckinRepo extends Fake implements WorkoutCheckinRepository {
+  @override
+  Future<bool?> fetch(String localDate) async => null;
 }
 
 class _FakePlanNotifier extends WorkoutPlanNotifier {
@@ -85,6 +93,9 @@ Widget _app(
         (ref) =>
             _FakeNotifier(CalorieProfileState(loaded: true, profile: profile)),
       ),
+      workoutCheckinProvider.overrideWith(
+        (ref) => WorkoutCheckinNotifier(_NoCheckinRepo()),
+      ),
       workoutPlanProvider.overrideWith(
         (ref) => planNotifier ?? _FakePlanNotifier(planState),
       ),
@@ -96,7 +107,13 @@ Widget _app(
 void main() {
   testWidgets('loading keeps the card and shows a spinner', (tester) async {
     await tester.pumpWidget(_app(const WorkoutPlanState()));
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(CoachCard),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Build your plan'), findsNothing);
   });
 

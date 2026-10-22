@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/utils/number_format.dart';
+import 'package:life_os/features/fitness/domain/workout_checkin_providers.dart';
 import 'package:life_os/features/nutrition/domain/calorie_providers.dart';
 import 'package:life_os/shared/widgets/dashboard_card.dart';
 import 'package:life_os/shared/widgets/section_header.dart';
@@ -34,8 +35,11 @@ class HomeFitnessCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(calorieProfileProvider);
     final target = ref.watch(dailyTargetProvider);
+    final trained = trainedToday(ref.watch(workoutCheckinProvider));
     final String subtitle;
-    if (!state.loaded) {
+    if (trained) {
+      subtitle = 'Trained today ✓';
+    } else if (!state.loaded) {
       subtitle = 'Loading…';
     } else if (state.loadFailed) {
       subtitle = 'Tap to open';

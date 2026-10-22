@@ -32,3 +32,13 @@ String formatDayTime(DateTime dt) {
   final minute = dt.minute.toString().padLeft(2, '0');
   return '${formatDay(dt)} at ${dt.hour}:$minute';
 }
+
+/// Formats the local calendar date of [dt] as "YYYY-MM-DD", for date columns.
+///
+/// Uses the date parts as they are, so pass a local [DateTime] (not UTC) to
+/// get the user's own day.
+String localDateString(DateTime dt) {
+  final month = dt.month.toString().padLeft(2, '0');
+  final day = dt.day.toString().padLeft(2, '0');
+  return '${dt.year.toString().padLeft(4, '0')}-$month-$day';
+}

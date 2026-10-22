@@ -20,6 +20,20 @@ void main() {
     });
   });
 
+  group('localDateString', () {
+    test('zero-pads month and day', () {
+      expect(localDateString(DateTime(2026, 1, 9, 14)), '2026-01-09');
+    });
+
+    test('a time just after local midnight stays on the new day', () {
+      expect(localDateString(DateTime(2026, 10, 23, 0, 1)), '2026-10-23');
+    });
+
+    test('a time just before local midnight stays on the old day', () {
+      expect(localDateString(DateTime(2026, 10, 22, 23, 59)), '2026-10-22');
+    });
+  });
+
   group('formatDayTime', () {
     test('zero-pads a minute below 10', () {
       expect(formatDayTime(DateTime(2026, 8, 18, 14, 5)), '18 Aug at 14:05');

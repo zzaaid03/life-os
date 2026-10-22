@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/fitness/presentation/widgets/body_row.dart';
+import 'package:life_os/features/fitness/presentation/widgets/checkin_card.dart';
 import 'package:life_os/features/fitness/presentation/widgets/coach_card.dart';
 import 'package:life_os/features/fitness/presentation/widgets/plan_menu_button.dart';
 
@@ -23,6 +24,8 @@ class FitnessHubScreen extends StatelessWidget {
       body: ListView(
         padding: AppSpacing.screenPadding,
         children: const [
+          CheckinCard(),
+          SizedBox(height: AppSpacing.sectionSpacing),
           CoachCard(),
           SizedBox(height: AppSpacing.sectionSpacing),
           BodyRow(),
