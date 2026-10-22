@@ -1,6 +1,7 @@
 /// State of the track-mode screen: exercises, their set rows, and what is logged.
 library;
 
+import 'package:life_os/features/fitness/domain/personal_best.dart';
 import 'package:life_os/features/fitness/domain/set_input.dart';
 import 'package:life_os/features/fitness/domain/workout_session.dart';
 
@@ -55,6 +56,9 @@ class TrackExercise {
     required this.rows,
     this.extra = false,
     this.skipped = false,
+    this.lastSets = const [],
+    this.best,
+    this.bestFailed = false,
   });
 
   final String key;
@@ -66,7 +70,32 @@ class TrackExercise {
   final bool extra;
   final bool skipped;
 
+  /// The sets of the last session that included this exercise, by set number.
+  final List<LoggedSet> lastSets;
+
+  /// The best set from before this session, null for a first-time exercise.
+  final LoggedSet? best;
+
+  /// True when [best] could not be loaded.
+  final bool bestFailed;
+
   int get loggedCount => rows.where((r) => r.logged != null).length;
+
+  /// The row whose saved set is this session's top one, when it strictly beats
+  /// [best]. Null for a first-time exercise, a failed best load or no beat.
+  TrackRow? get newBestRow {
+    final before = best;
+    if (before == null || bestFailed) return null;
+    final top = bestSet([
+      for (final r in rows)
+        if (r.logged != null) r.logged!,
+    ]);
+    if (top == null || !isBetterSet(top, before)) return null;
+    for (final r in rows) {
+      if (identical(r.logged, top)) return r;
+    }
+    return null;
+  }
 
   TrackExercise copyWith({List<TrackRow>? rows, bool? skipped}) {
     return TrackExercise(
@@ -76,6 +105,9 @@ class TrackExercise {
       rows: rows ?? this.rows,
       extra: extra,
       skipped: skipped ?? this.skipped,
+      lastSets: lastSets,
+      best: best,
+      bestFailed: bestFailed,
     );
   }
 }

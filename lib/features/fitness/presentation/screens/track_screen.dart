@@ -10,6 +10,7 @@ import 'package:life_os/features/fitness/domain/set_input.dart';
 import 'package:life_os/features/fitness/domain/track_notifier.dart';
 import 'package:life_os/features/fitness/domain/track_state.dart';
 import 'package:life_os/features/fitness/presentation/widgets/add_track_exercise_sheet.dart';
+import 'package:life_os/features/fitness/presentation/widgets/exercise_history_line.dart';
 import 'package:life_os/features/fitness/presentation/widgets/set_row_tile.dart';
 import 'package:life_os/features/nutrition/domain/calorie_providers.dart';
 import 'package:life_os/features/nutrition/domain/calorie_target.dart';
@@ -209,6 +210,11 @@ class _TrackScreenState extends ConsumerState<TrackScreen> {
                         color: theme.colorScheme.error,
                       ),
                     ),
+                  ExerciseHistoryLine(
+                    exercise: current,
+                    units: units,
+                    historyFailed: state.historyFailed,
+                  ),
                 ],
               ),
             ),
@@ -293,6 +299,7 @@ class _ExercisePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bestRow = exercise.newBestRow;
     return ListView(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.screenHorizontal,
@@ -304,6 +311,7 @@ class _ExercisePage extends StatelessWidget {
             row: exercise.rows[r],
             kind: exercise.kind,
             units: units,
+            newBest: identical(exercise.rows[r], bestRow),
             onLog: (v) => notifier.logRow(index, r, v),
             onUpdate: (v) => notifier.updateRow(index, r, v),
             onRemove: () => notifier.removeLog(index, r),

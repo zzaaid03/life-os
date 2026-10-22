@@ -1,4 +1,4 @@
-/// Read-only history queries for the weekly review.
+/// Read-only history queries for the weekly review and track mode.
 library;
 
 import 'package:life_os/core/services/supabase_service.dart';
@@ -30,6 +30,14 @@ class WorkoutWindow {
 abstract class WorkoutHistoryRepository {
   /// Sets logged in `[startUtc, endUtc)` plus each exercise's prior best.
   Future<WorkoutWindow> fetchWindow(DateTime startUtc, DateTime endUtc);
+
+  /// The best set ever logged for each exercise, keyed by [setGroupKey]. An
+  /// exercise with no set (or past the cap) is absent. Sets of
+  /// [excludeSessionId] are left out.
+  Future<Map<String, LoggedSet>> fetchBests(
+    List<({String name, String kind})> exercises, {
+    String? excludeSessionId,
+  });
 }
 
 /// Supabase-backed [WorkoutHistoryRepository].
@@ -60,7 +68,8 @@ class SupabaseWorkoutHistoryRepository implements WorkoutHistoryRepository {
     }
     final picked = groups.values.take(_maxExercises).toList();
     final priors = await Future.wait([
-      for (final s in picked) _priorBest(userId, s, startUtc),
+      for (final s in picked)
+        _bestOf(userId, s.exerciseName, s.kind, beforeUtc: startUtc),
     ]);
     final priorBests = <String, LoggedSet>{};
     for (var i = 0; i < picked.length; i++) {
@@ -72,19 +81,48 @@ class SupabaseWorkoutHistoryRepository implements WorkoutHistoryRepository {
     return WorkoutWindow(sets: sets, priorBests: priorBests);
   }
 
-  Future<LoggedSet?> _priorBest(
+  @override
+  Future<Map<String, LoggedSet>> fetchBests(
+    List<({String name, String kind})> exercises, {
+    String? excludeSessionId,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Not signed in');
+    final picked = exercises.take(_maxExercises).toList();
+    final found = await Future.wait([
+      for (final e in picked)
+        _bestOf(userId, e.name, e.kind, excludeSessionId: excludeSessionId),
+    ]);
+    final out = <String, LoggedSet>{};
+    for (var i = 0; i < picked.length; i++) {
+      final best = found[i];
+      if (best != null) out[setGroupKey(picked[i].name, picked[i].kind)] = best;
+    }
+    return out;
+  }
+
+  // The best set of one exercise, optionally only before a time and without
+  // one session.
+  Future<LoggedSet?> _bestOf(
     String userId,
-    LoggedSet like,
-    DateTime beforeUtc,
-  ) async {
-    final query = _client
+    String name,
+    String kind, {
+    DateTime? beforeUtc,
+    String? excludeSessionId,
+  }) async {
+    var query = _client
         .from('workout_sets')
         .select()
         .eq('user_id', userId)
-        .eq('exercise_name', like.exerciseName)
-        .eq('kind', like.kind)
-        .lt('logged_at', beforeUtc.toUtc().toIso8601String());
-    final ordered = like.kind == 'time'
+        .eq('exercise_name', name)
+        .eq('kind', kind);
+    if (beforeUtc != null) {
+      query = query.lt('logged_at', beforeUtc.toUtc().toIso8601String());
+    }
+    if (excludeSessionId != null) {
+      query = query.neq('session_id', excludeSessionId);
+    }
+    final ordered = kind == 'time'
         ? query.order('hold_seconds', ascending: false, nullsFirst: false)
         : query
               .order('weight_kg', ascending: false, nullsFirst: false)

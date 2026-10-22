@@ -20,6 +20,7 @@ class SetRowTile extends StatefulWidget {
     required this.onLog,
     required this.onUpdate,
     required this.onRemove,
+    this.newBest = false,
   });
 
   final TrackRow row;
@@ -30,6 +31,9 @@ class SetRowTile extends StatefulWidget {
   final Future<void> Function(SetValues values) onLog;
   final Future<void> Function(SetValues values) onUpdate;
   final Future<void> Function() onRemove;
+
+  /// True when this logged set is the session's new best for the exercise.
+  final bool newBest;
 
   @override
   State<SetRowTile> createState() => _SetRowTileState();
@@ -128,7 +132,8 @@ class _SetRowTileState extends State<SetRowTile> {
     if (_logged && !_editing) {
       return Semantics(
         button: true,
-        label: 'Set $n logged, ${_summary()}. Tap to change.',
+        label:
+            'Set $n logged, ${_summary()}.${widget.newBest ? ' New best.' : ''} Tap to change.',
         excludeSemantics: true,
         child: InkWell(
           onTap: () {
@@ -165,6 +170,18 @@ class _SetRowTileState extends State<SetRowTile> {
                     ),
                   ),
                 ),
+                if (widget.newBest) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  Icon(Icons.emoji_events_outlined, color: accent, size: 20),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    'New best',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

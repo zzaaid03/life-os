@@ -5,7 +5,9 @@
 /// bodyweight exercise falls back to most reps). Time sets: longest hold.
 library;
 
+import 'package:life_os/features/fitness/domain/set_input.dart';
 import 'package:life_os/features/fitness/domain/workout_session.dart';
+import 'package:life_os/features/nutrition/domain/calorie_target.dart';
 
 /// Key that groups sets of the same exercise: exact name plus kind.
 String setGroupKey(String exerciseName, String kind) => '$kind|$exerciseName';
@@ -29,4 +31,13 @@ LoggedSet? bestSet(Iterable<LoggedSet> sets) {
     if (best == null || isBetterSet(s, best)) best = s;
   }
   return best;
+}
+
+/// A set as short text: "62.5 kg × 8", "12 reps" or "75s".
+String describeSet(LoggedSet s, UnitSystem units) {
+  if (s.kind == 'time') return '${s.holdSeconds ?? 0}s';
+  final reps = s.reps ?? 0;
+  final weight = s.weightKg ?? 0;
+  if (weight <= 0) return '$reps reps';
+  return '${weightText(weight, units)} ${weightUnitLabel(units)} × $reps';
 }

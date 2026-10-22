@@ -2,7 +2,9 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import 'package:life_os/features/fitness/data/workout_history_repository.dart';
 import 'package:life_os/features/fitness/data/workout_session_repository.dart';
+import 'package:life_os/features/fitness/domain/personal_best.dart';
 import 'package:life_os/features/fitness/domain/set_input.dart';
 import 'package:life_os/features/fitness/domain/track_state.dart';
 import 'package:life_os/features/fitness/domain/workout_checkin_providers.dart';
@@ -30,6 +32,7 @@ class TrackNotifier extends StateNotifier<TrackState> {
   /// [markTrained] saves today's check-in and [onChanged] refreshes the hub.
   TrackNotifier({
     required this.repository,
+    required this.historyRepository,
     required this.sessionId,
     required this.readPlan,
     required this.markTrained,
@@ -38,6 +41,7 @@ class TrackNotifier extends StateNotifier<TrackState> {
 
   final String sessionId;
   final WorkoutSessionRepository repository;
+  final WorkoutHistoryRepository historyRepository;
   final WorkoutPlan? Function() readPlan;
   final Future<void> Function() markTrained;
   final Future<void> Function() onChanged;
@@ -63,22 +67,39 @@ class TrackNotifier extends StateNotifier<TrackState> {
         for (final e in planned) e.name,
         for (final s in logged) s.exerciseName,
       }.toList();
+      final kinds = _kinds(planned, logged);
       var historyFailed = false;
+      var bestFailed = false;
       var history = <String, List<LoggedSet>>{};
-      try {
-        history = await repository.fetchLastValues(
-          names,
-          excludeSessionId: sessionId,
-        );
-      } catch (e) {
-        debugPrint('Workout history load failed: $e');
-        historyFailed = true;
-      }
+      var bests = <String, LoggedSet>{};
+      await Future.wait([
+        () async {
+          try {
+            history = await repository.fetchLastValues(
+              names,
+              excludeSessionId: sessionId,
+            );
+          } catch (e) {
+            debugPrint('Workout history load failed: $e');
+            historyFailed = true;
+          }
+        }(),
+        () async {
+          try {
+            bests = await historyRepository.fetchBests([
+              for (final n in names) (name: n, kind: kinds[n] ?? 'reps'),
+            ], excludeSessionId: sessionId);
+          } catch (e) {
+            debugPrint('Workout best load failed: $e');
+            bestFailed = true;
+          }
+        }(),
+      ]);
       if (!mounted) return;
       state = TrackState(
         loading: false,
         session: session,
-        exercises: _build(planned, logged, history),
+        exercises: _build(planned, logged, history, bests, bestFailed),
         historyFailed: historyFailed,
       );
     } catch (e) {
@@ -89,6 +110,17 @@ class TrackNotifier extends StateNotifier<TrackState> {
         error: "Couldn't load this workout.",
       );
     }
+  }
+
+  // The kind of each exercise name: the plan's, else the logged sets'.
+  Map<String, String> _kinds(
+    List<PlanExercise> planned,
+    List<LoggedSet> logged,
+  ) {
+    return {
+      for (final s in logged) s.exerciseName: s.kind,
+      for (final e in planned) e.name: e.kind == 'time' ? 'time' : 'reps',
+    };
   }
 
   PlanDay? _dayFor(WorkoutSession session) {
@@ -102,6 +134,8 @@ class TrackNotifier extends StateNotifier<TrackState> {
     List<PlanExercise> planned,
     List<LoggedSet> logged,
     Map<String, List<LoggedSet>> history,
+    Map<String, LoggedSet> bests,
+    bool bestFailed,
   ) {
     final out = <TrackExercise>[];
     final planNames = {for (final e in planned) e.name};
@@ -116,6 +150,8 @@ class TrackNotifier extends StateNotifier<TrackState> {
               if (s.exerciseName == e.name) s,
           ],
           history: history[e.name] ?? const [],
+          best: bests[setGroupKey(e.name, e.kind == 'time' ? 'time' : 'reps')],
+          bestFailed: bestFailed,
           planReps: e.repsMin,
           planHold: e.holdSeconds,
           extra: false,
@@ -142,6 +178,8 @@ class TrackNotifier extends StateNotifier<TrackState> {
           count: 0,
           logged: mine,
           history: history[name] ?? const [],
+          best: bests[setGroupKey(name, mine.first.kind)],
+          bestFailed: bestFailed,
           extra: true,
         ),
       );
@@ -156,6 +194,8 @@ class TrackNotifier extends StateNotifier<TrackState> {
     required List<LoggedSet> logged,
     required List<LoggedSet> history,
     required bool extra,
+    LoggedSet? best,
+    bool bestFailed = false,
     int? planReps,
     int? planHold,
   }) {
@@ -198,6 +238,9 @@ class TrackNotifier extends StateNotifier<TrackState> {
       kind: kind,
       rows: rows,
       extra: extra,
+      lastSets: history,
+      best: best,
+      bestFailed: bestFailed,
     );
   }
 
@@ -308,6 +351,8 @@ class TrackNotifier extends StateNotifier<TrackState> {
   Future<void> addExercise(String name, String kind) async {
     var history = const <LoggedSet>[];
     var failed = state.historyFailed;
+    LoggedSet? best;
+    var bestFailed = false;
     try {
       final found = await repository.fetchLastValues([
         name,
@@ -317,6 +362,15 @@ class TrackNotifier extends StateNotifier<TrackState> {
       debugPrint('Workout history load failed: $e');
       failed = true;
     }
+    try {
+      final found = await historyRepository.fetchBests([
+        (name: name, kind: kind),
+      ], excludeSessionId: sessionId);
+      best = found[setGroupKey(name, kind)];
+    } catch (e) {
+      debugPrint('Workout best load failed: $e');
+      bestFailed = true;
+    }
     if (!mounted) return;
     final ex = _exercise(
       name: name,
@@ -324,6 +378,8 @@ class TrackNotifier extends StateNotifier<TrackState> {
       count: history.isEmpty ? 3 : history.length,
       logged: const [],
       history: history,
+      best: best,
+      bestFailed: bestFailed,
       extra: true,
     );
     state = state.copyWith(
@@ -384,6 +440,7 @@ final trackProvider = StateNotifierProvider.autoDispose
     .family<TrackNotifier, TrackState, String>((ref, sessionId) {
       final notifier = TrackNotifier(
         repository: ref.watch(workoutSessionRepositoryProvider),
+        historyRepository: ref.watch(workoutHistoryRepositoryProvider),
         sessionId: sessionId,
         readPlan: () => ref.read(workoutPlanProvider).plan,
         markTrained: () =>

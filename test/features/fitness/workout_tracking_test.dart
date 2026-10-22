@@ -1,9 +1,15 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:life_os/features/fitness/data/workout_history_repository.dart';
 import 'package:life_os/features/fitness/data/workout_session_repository.dart';
+import 'package:life_os/features/fitness/domain/personal_best.dart';
 import 'package:life_os/features/fitness/domain/set_input.dart';
 import 'package:life_os/features/fitness/domain/track_notifier.dart';
+import 'package:life_os/features/fitness/domain/track_state.dart';
 import 'package:life_os/features/fitness/domain/workout_plan.dart';
 import 'package:life_os/features/fitness/domain/workout_session.dart';
+import 'package:life_os/features/fitness/presentation/widgets/exercise_history_line.dart';
+import 'package:life_os/features/fitness/presentation/widgets/set_row_tile.dart';
 import 'package:life_os/features/nutrition/domain/calorie_target.dart';
 
 WorkoutPlan _plan(int days) => WorkoutPlan(
@@ -130,6 +136,51 @@ class _FakeRepo implements WorkoutSessionRepository {
   Future<WorkoutSession?> fetchOpenSession(String planId, DateTime since) =>
       throw UnimplementedError();
 }
+
+class _FakeHistory implements WorkoutHistoryRepository {
+  Map<String, LoggedSet> bests = {};
+  bool fails = false;
+  String? excluded;
+  int calls = 0;
+
+  @override
+  Future<Map<String, LoggedSet>> fetchBests(
+    List<({String name, String kind})> exercises, {
+    String? excludeSessionId,
+  }) async {
+    calls++;
+    excluded = excludeSessionId;
+    if (fails) throw StateError('offline');
+    return bests;
+  }
+
+  @override
+  Future<WorkoutWindow> fetchWindow(DateTime startUtc, DateTime endUtc) =>
+      throw UnimplementedError();
+}
+
+TrackExercise _exercise(
+  List<LoggedSet?> rows, {
+  LoggedSet? best,
+  bool bestFailed = false,
+  List<LoggedSet> last = const [],
+}) => TrackExercise(
+  key: 'ex',
+  name: 'Squat',
+  kind: 'reps',
+  rows: [
+    for (var i = 0; i < rows.length; i++)
+      TrackRow(
+        key: 'r$i',
+        setNumber: i + 1,
+        initial: const SetValues(reps: 8),
+        logged: rows[i],
+      ),
+  ],
+  best: best,
+  bestFailed: bestFailed,
+  lastSets: last,
+);
 
 void main() {
   group('nextUpDay', () {
@@ -280,9 +331,11 @@ void main() {
     late int trained;
     late int refreshed;
     late bool trainedFails;
+    late _FakeHistory history;
 
     TrackNotifier make() => TrackNotifier(
       repository: repo,
+      historyRepository: history,
       sessionId: 's',
       readPlan: () => _plan(2),
       markTrained: () async {
@@ -294,6 +347,7 @@ void main() {
 
     setUp(() {
       repo = _FakeRepo();
+      history = _FakeHistory();
       trained = 0;
       refreshed = 0;
       trainedFails = false;
@@ -362,5 +416,170 @@ void main() {
       expect(await n.leave(), WorkoutExit.savedCheckinFailed);
       expect(repo.calls, ['finish']);
     });
+
+    test('bests are loaded, excluding the current session', () async {
+      history.bests = {
+        setGroupKey('Squat', 'reps'): _set('Squat', 1, kg: 100, reps: 5),
+      };
+      final n = make();
+      await n.load();
+      expect(n.state.exercises.single.best!.weightKg, 100);
+      expect(n.state.exercises.single.bestFailed, isFalse);
+      expect(history.excluded, 's');
+    });
+
+    test('a failed best load only sets bestFailed', () async {
+      history.fails = true;
+      repo.history = {
+        'Squat': [_set('Squat', 1, reps: 12, kg: 70)],
+      };
+      final n = make();
+      await n.load();
+      expect(n.state.exercises.single.bestFailed, isTrue);
+      expect(n.state.exercises.single.best, isNull);
+      expect(n.state.historyFailed, isFalse);
+      expect(n.state.error, isNull);
+      expect(n.state.exercises.single.lastSets.length, 1);
+    });
+
+    test('an exercise added mid-workout loads its best', () async {
+      history.bests = {
+        setGroupKey('Curl', 'reps'): _set('Curl', 1, kg: 20, reps: 8),
+      };
+      final n = make();
+      await n.load();
+      await n.addExercise('Curl', 'reps');
+      expect(n.state.exercises.last.best!.weightKg, 20);
+      expect(history.excluded, 's');
+    });
+  });
+
+  group('new best marker', () {
+    final before = _set('Squat', 1, kg: 100, reps: 5);
+    LoggedSet mine(int n, double kg, int reps) =>
+        _set('Squat', n, session: 's', kg: kg, reps: reps);
+
+    test('the top set that beats the best is marked', () {
+      final ex = _exercise([mine(1, 90, 8), mine(2, 105, 5)], best: before);
+      expect(ex.newBestRow!.setNumber, 2);
+    });
+
+    test('a tie is not marked', () {
+      expect(_exercise([mine(1, 100, 5)], best: before).newBestRow, isNull);
+    });
+
+    test('with two beating sets only the top one is marked', () {
+      final ex = _exercise([mine(1, 105, 5), mine(2, 110, 3)], best: before);
+      expect(ex.newBestRow!.setNumber, 2);
+    });
+
+    test('a first-time exercise is never marked', () {
+      expect(_exercise([mine(1, 200, 5)]).newBestRow, isNull);
+    });
+
+    test('nothing is marked while the best failed to load', () {
+      final ex = _exercise([mine(1, 200, 5)], bestFailed: true);
+      expect(ex.newBestRow, isNull);
+    });
+
+    test('unlogged rows are ignored', () {
+      expect(_exercise([null, null], best: before).newBestRow, isNull);
+    });
+
+    test('removing the top set moves the mark or clears it', () {
+      final both = _exercise([mine(1, 105, 5), mine(2, 110, 3)], best: before);
+      expect(both.newBestRow!.setNumber, 2);
+      final one = both.copyWith(
+        rows: [both.rows[0], both.rows[1].copyWith(clearLogged: true)],
+      );
+      expect(one.newBestRow!.setNumber, 1);
+      final none = one.copyWith(
+        rows: [one.rows[0].copyWith(clearLogged: true), one.rows[1]],
+      );
+      expect(none.newBestRow, isNull);
+    });
+  });
+
+  group('track widgets', () {
+    Future<void> pump(WidgetTester tester, Widget child) =>
+        tester.pumpWidget(MaterialApp(home: Scaffold(body: child)));
+
+    testWidgets('history line with last time and best', (tester) async {
+      final last = [
+        for (var i = 1; i <= 7; i++) _set('Squat', i, kg: 60, reps: 8),
+      ];
+      await pump(
+        tester,
+        ExerciseHistoryLine(
+          exercise: _exercise(
+            [null],
+            best: _set('Squat', 1, kg: 62.5, reps: 8),
+            last: last,
+          ),
+          units: UnitSystem.metric,
+        ),
+      );
+      expect(
+        find.text(
+          'Last time: 60 kg × 8, 60 kg × 8, 60 kg × 8, 60 kg × 8, 60 kg × 8 +2 more',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Best: 62.5 kg × 8'), findsOneWidget);
+    });
+
+    testWidgets('history line for a first time exercise', (tester) async {
+      await pump(
+        tester,
+        ExerciseHistoryLine(
+          exercise: _exercise([null]),
+          units: UnitSystem.metric,
+        ),
+      );
+      expect(find.text('First time doing this one.'), findsOneWidget);
+      expect(find.textContaining('Best'), findsNothing);
+    });
+
+    testWidgets('history line when the best failed', (tester) async {
+      await pump(
+        tester,
+        ExerciseHistoryLine(
+          exercise: _exercise([null], bestFailed: true),
+          units: UnitSystem.metric,
+        ),
+      );
+      expect(find.text("Couldn't load your best."), findsOneWidget);
+      expect(find.textContaining('Best:'), findsNothing);
+    });
+
+    for (final marked in [true, false]) {
+      testWidgets('logged row ${marked ? 'shows' : 'hides'} New best', (
+        tester,
+      ) async {
+        final logged = _set('Squat', 1, session: 's', kg: 105, reps: 5);
+        await pump(
+          tester,
+          SetRowTile(
+            row: TrackRow(
+              key: 'r',
+              setNumber: 1,
+              initial: const SetValues(reps: 5),
+              logged: logged,
+            ),
+            kind: 'reps',
+            units: UnitSystem.metric,
+            newBest: marked,
+            onLog: (_) async {},
+            onUpdate: (_) async {},
+            onRemove: () async {},
+          ),
+        );
+        expect(find.text('New best'), marked ? findsOneWidget : findsNothing);
+        expect(
+          find.byIcon(Icons.emoji_events_outlined),
+          marked ? findsOneWidget : findsNothing,
+        );
+      });
+    }
   });
 }

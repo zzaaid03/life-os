@@ -2,7 +2,6 @@
 library;
 
 import 'package:life_os/features/fitness/domain/personal_best.dart';
-import 'package:life_os/features/fitness/domain/set_input.dart';
 import 'package:life_os/features/fitness/domain/workout_session.dart';
 import 'package:life_os/features/nutrition/domain/calorie_target.dart';
 
@@ -61,15 +60,6 @@ WeeklyWorkouts buildWeeklyWorkouts({
     setCount: windowSets.length,
     personalBests: bests,
   );
-}
-
-/// A set as short text: "62.5 kg × 8", "12 reps" or "75s".
-String describeSet(LoggedSet s, UnitSystem units) {
-  if (s.kind == 'time') return '${s.holdSeconds ?? 0}s';
-  final reps = s.reps ?? 0;
-  final weight = s.weightKg ?? 0;
-  if (weight <= 0) return '$reps reps';
-  return '${weightText(weight, units)} ${weightUnitLabel(units)} × $reps';
 }
 
 /// The review line for a personal best.
