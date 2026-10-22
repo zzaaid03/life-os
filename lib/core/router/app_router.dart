@@ -16,6 +16,7 @@ import 'package:life_os/features/auth/presentation/screens/splash_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/welcome_screen.dart';
 import 'package:life_os/features/demo/demo_mode.dart';
 import 'package:life_os/features/fitness/presentation/screens/fitness_hub_screen.dart';
+import 'package:life_os/features/fitness/presentation/screens/plan_day_screen.dart';
 import 'package:life_os/features/fitness/presentation/screens/plan_questionnaire_screen.dart';
 import 'package:life_os/features/goals/presentation/screens/goal_breakdown_screen.dart';
 import 'package:life_os/features/goals/presentation/screens/goals_screen.dart';
@@ -88,6 +89,9 @@ abstract final class AppRoutes {
 
   /// The workout plan questionnaire.
   static const String fitnessPlanNew = '/fitness/plan/new';
+
+  /// One day of the saved workout plan.
+  static const String fitnessDay = '/fitness/day/:dayId';
 
   /// The grocery list.
   static const String groceries = '/groceries';
@@ -344,6 +348,12 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.fitnessPlanNew,
         name: 'fitnessPlanNew',
         builder: (context, state) => const PlanQuestionnaireScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.fitnessDay,
+        name: 'fitnessDay',
+        builder: (context, state) =>
+            PlanDayScreen(dayId: state.pathParameters['dayId'] ?? ''),
       ),
       GoRoute(
         path: AppRoutes.recipes,

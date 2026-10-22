@@ -27,7 +27,7 @@ class _FakeNotifier extends CalorieProfileNotifier {
   Future<void> load([String? userId]) async {}
 }
 
-class _PlanRepo implements WorkoutPlanRepository {
+class _PlanRepo extends Fake implements WorkoutPlanRepository {
   @override
   Future<WorkoutPlan?> fetchActivePlan() async => null;
 

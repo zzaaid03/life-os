@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:life_os/core/services/function_errors.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/fitness/data/workout_plan_repository.dart';
 import 'package:life_os/features/fitness/domain/plan_inputs.dart';
@@ -30,6 +31,7 @@ class _PlanQuestionnaireScreenState
       _building = true;
       _error = null;
     });
+    final planBefore = ref.read(workoutPlanProvider).plan?.id;
     try {
       await ref.read(workoutPlanProvider.notifier).generate(_inputs);
       if (!mounted) return;
@@ -43,9 +45,17 @@ class _PlanQuestionnaireScreenState
     } catch (e) {
       debugPrint('Workout plan build failed: $e');
       if (!mounted) return;
+      // A slow build can still finish on the server. The notifier reloaded
+      // the plan, so a new id means it worked after all.
+      final planNow = ref.read(workoutPlanProvider).plan?.id;
+      if (planNow != null && planNow != planBefore) {
+        context.pop();
+        return;
+      }
       setState(() {
         _building = false;
         _error =
+            aiLimitMessage(e) ??
             "Couldn't build your plan. Check your connection and try again.";
       });
     }

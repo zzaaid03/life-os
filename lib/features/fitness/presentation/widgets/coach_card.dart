@@ -167,7 +167,16 @@ class _PlanBody extends StatelessWidget {
               ),
             ),
           ),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.sm),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+            onPressed: () => context.push('/fitness/day/${day.id}'),
+            child: Text('See and edit day $letter'),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
         RotationStrip(
           days: plan.days,
           selected: shown,
