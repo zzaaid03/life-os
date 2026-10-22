@@ -1,4 +1,4 @@
-import 'dart:math' show max;
+import 'dart:math' show max, min;
 
 /// Biological sex used by the Mifflin-St Jeor formula.
 enum Sex {
@@ -21,20 +21,15 @@ enum Sex {
 
 /// How active the user is in a normal week.
 enum ActivityLevel {
-  sedentary('sedentary', 1.2, 'Sedentary', 'Desk job, little exercise'),
-  light('light', 1.375, 'Lightly active', 'Exercise 1 to 3 days a week'),
-  moderate(
-    'moderate',
-    1.55,
-    'Moderately active',
-    'Exercise 3 to 5 days a week',
-  ),
-  active('active', 1.725, 'Very active', 'Exercise 6 to 7 days a week'),
+  sedentary('sedentary', 1.2, 'Sedentary', 'Under 5,000 steps a day'),
+  light('light', 1.375, 'Lightly active', '5,000 to 7,500 steps a day'),
+  moderate('moderate', 1.55, 'Moderately active', '7,500 to 10,000 steps a day'),
+  active('active', 1.725, 'Very active', '10,000 to 12,500 steps a day'),
   veryActive(
     'very_active',
     1.9,
     'Extra active',
-    'Hard training or a physical job',
+    'Over 12,500 steps a day, or a physical job',
   );
 
   const ActivityLevel(this.dbValue, this.factor, this.label, this.description);
@@ -58,18 +53,35 @@ enum ActivityLevel {
 
 /// What the user wants to do with their weight.
 enum CalorieGoal {
-  lose('lose', -500, 'Lose weight'),
-  maintain('maintain', 0, 'Maintain'),
-  gain('gain', 300, 'Gain weight');
+  loseSlow('lose_slow', 'Lose 0.25 kg a week', 0.25),
+  lose('lose', 'Lose 0.5 kg a week', 0.5),
+  loseFast('lose_fast', 'Lose 0.75 kg a week', 0.75),
+  maintain('maintain', 'Maintain', 0),
+  gain('gain', 'Gain weight', 0);
 
-  const CalorieGoal(this.dbValue, this.offsetKcal, this.label);
+  const CalorieGoal(this.dbValue, this.label, this.lossKgPerWeek);
 
   /// The string stored in the database.
   final String dbValue;
-
-  /// Calories added to (or taken from) maintenance each day.
-  final int offsetKcal;
   final String label;
+
+  /// Target weight loss per week in kg. 0 for maintain and gain.
+  final double lossKgPerWeek;
+
+  bool get isLoss => lossKgPerWeek > 0;
+
+  /// Short pace text for the loss goals, empty for the others. The imperial
+  /// numbers are rounded on purpose (0.25 kg is 0.55 lb, shown as 0.5 lb).
+  String paceLabel(UnitSystem u) {
+    if (!isLoss) return '';
+    final metric = u == UnitSystem.metric;
+    return switch (this) {
+      CalorieGoal.loseSlow => metric ? '0.25 kg' : '0.5 lb',
+      CalorieGoal.lose => metric ? '0.5 kg' : '1 lb',
+      CalorieGoal.loseFast => metric ? '0.75 kg' : '1.5 lb',
+      _ => '',
+    };
+  }
 
   /// Returns null for null or unknown values. Never throws.
   static CalorieGoal? fromDb(Object? v) {
@@ -100,8 +112,19 @@ enum UnitSystem {
   }
 }
 
-/// A daily target is never lower than this, whatever the goal says.
-const int kMinDailyKcal = 1200;
+/// Energy in one kg of body fat, the usual rule of thumb.
+const int kKcalPerKgFat = 7700;
+
+/// A deficit never exceeds this share of maintenance, so a heavy pace on a
+/// small person does not turn into crash dieting.
+const double kMaxDeficitShare = 0.25;
+
+/// Safety floors: a loss target is never set below these (and never above
+/// maintenance, for people whose maintenance is already under the floor).
+const int kMinDailyKcalMale = 1500;
+const int kMinDailyKcalFemale = 1200;
+
+const int kGainSurplusKcal = 300;
 
 const double kMinWeightKg = 20;
 const double kMaxWeightKg = 400;
@@ -224,8 +247,17 @@ int? maintenanceKcal(CalorieProfile p, {required DateTime now}) {
 int? dailyTargetKcal(CalorieProfile p, {required DateTime now}) {
   final raw = _rawMaintenance(p, now);
   if (raw == null) return null;
-  // The floor is a safety minimum: never suggest eating below it.
-  return max(kMinDailyKcal, (raw + p.goal!.offsetKcal).round());
+  final goal = p.goal!;
+  if (goal == CalorieGoal.gain) return (raw + kGainSurplusKcal).round();
+  if (!goal.isLoss) return raw.round();
+  // Cap the deficit and respect the sex-specific floor, but never end up
+  // above maintenance.
+  final deficit = min(
+    goal.lossKgPerWeek * kKcalPerKgFat / 7,
+    kMaxDeficitShare * raw,
+  );
+  final floor = p.sex! == Sex.male ? kMinDailyKcalMale : kMinDailyKcalFemale;
+  return min(raw, max(floor.toDouble(), raw - deficit)).round();
 }
 
 /// BMR times the activity factor, before rounding. Null if not usable.
@@ -250,6 +282,36 @@ double? _rawMaintenance(CalorieProfile p, DateTime now) {
 int percentOfDailyTarget(int kcal, int targetKcal) {
   if (kcal <= 0 || targetKcal <= 0) return 0;
   return max(1, (kcal * 100 / targetKcal).round());
+}
+
+/// Body mass index, rounded to 1 decimal.
+double bmi(double weightKg, double heightCm) {
+  final m = heightCm / 100;
+  return (weightKg / (m * m) * 10).round() / 10;
+}
+
+enum BmiCategory {
+  underweight('Underweight'),
+  healthy('Healthy'),
+  overweight('Overweight'),
+  obese('Obese');
+
+  const BmiCategory(this.label);
+
+  final String label;
+
+  static BmiCategory of(double bmi) {
+    if (bmi < 18.5) return underweight;
+    if (bmi < 25) return healthy;
+    if (bmi < 30) return overweight;
+    return obese;
+  }
+}
+
+/// Weights that give a BMI of 18.5 to 24.9 at this height.
+({double minKg, double maxKg}) healthyWeightRangeKg(double heightCm) {
+  final m = heightCm / 100;
+  return (minKg: 18.5 * m * m, maxKg: 24.9 * m * m);
 }
 
 const double _kgPerLb = 0.45359237;

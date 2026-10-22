@@ -10,6 +10,7 @@ import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/utils/number_format.dart';
 import 'package:life_os/features/nutrition/domain/calorie_providers.dart';
 import 'package:life_os/features/nutrition/domain/calorie_target.dart';
+import 'package:life_os/features/nutrition/presentation/bmi_card.dart';
 
 /// Full screen titled "Daily calories". Shows a live result as the user types.
 class CalorieTargetScreen extends ConsumerWidget {
@@ -59,6 +60,9 @@ class CalorieTargetScreen extends ConsumerWidget {
     );
   }
 }
+
+/// The three top-level goal choices; loss has a second row for the pace.
+enum _GoalKind { lose, maintain, gain }
 
 class _CalorieForm extends ConsumerStatefulWidget {
   const _CalorieForm({required this.initial});
@@ -149,6 +153,13 @@ class _CalorieFormState extends ConsumerState<_CalorieForm> {
   }
 
   int? get _year => int.tryParse(_birthYear.text.trim());
+
+  _GoalKind? get _goalKind => switch (_goal) {
+    null => null,
+    CalorieGoal.maintain => _GoalKind.maintain,
+    CalorieGoal.gain => _GoalKind.gain,
+    _ => _GoalKind.lose,
+  };
 
   /// Built with the constructor (not copyWith) so a cleared field stays null.
   CalorieProfile _profile() => CalorieProfile(
@@ -375,20 +386,70 @@ class _CalorieFormState extends ConsumerState<_CalorieForm> {
           ],
           onChanged: (a) => setState(() => _activity = a),
         ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Not sure? Pick the lower level. Most people overestimate.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
         const SizedBox(height: AppSpacing.lg),
-        SegmentedButton<CalorieGoal>(
+        SegmentedButton<_GoalKind>(
           emptySelectionAllowed: true,
           showSelectedIcon: false,
-          segments: [
-            for (final g in CalorieGoal.values)
-              ButtonSegment(value: g, label: Text(g.label)),
+          segments: const [
+            ButtonSegment(value: _GoalKind.lose, label: Text('Lose')),
+            ButtonSegment(value: _GoalKind.maintain, label: Text('Maintain')),
+            ButtonSegment(value: _GoalKind.gain, label: Text('Gain')),
           ],
-          selected: {?_goal},
-          onSelectionChanged: (s) =>
-              setState(() => _goal = s.isEmpty ? null : s.first),
+          selected: {?_goalKind},
+          onSelectionChanged: (s) => setState(() {
+            if (s.isEmpty) {
+              _goal = null;
+              return;
+            }
+            _goal = switch (s.first) {
+              _GoalKind.lose => (_goal?.isLoss ?? false)
+                  ? _goal
+                  : CalorieGoal.lose,
+              _GoalKind.maintain => CalorieGoal.maintain,
+              _GoalKind.gain => CalorieGoal.gain,
+            };
+          }),
         ),
+        if (_goal?.isLoss ?? false) ...[
+          const SizedBox(height: AppSpacing.md),
+          SegmentedButton<CalorieGoal>(
+            showSelectedIcon: false,
+            segments: [
+              for (final g in CalorieGoal.values.where((g) => g.isLoss))
+                ButtonSegment(value: g, label: Text(g.paceLabel(_units))),
+            ],
+            selected: {_goal!},
+            onSelectionChanged: (s) => setState(() => _goal = s.first),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'per week',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
         const SizedBox(height: AppSpacing.xl),
         _ResultCard(profile: _profile(), hasError: _hasError),
+        if (_weightKg != null &&
+            _heightInCm != null &&
+            isValidWeightKg(_weightKg!) &&
+            isValidHeightCm(_heightInCm!)) ...[
+          const SizedBox(height: AppSpacing.md),
+          BmiCard(
+            weightKg: _weightKg!,
+            heightCm: _heightInCm!,
+            age: _year == null ? null : ageFromBirthYear(_year!, DateTime.now()),
+            units: _units,
+          ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         FilledButton(
           onPressed: (_saving || _hasError) ? null : _save,

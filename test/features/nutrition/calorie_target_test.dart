@@ -30,26 +30,55 @@ void main() {
       );
       expect(maintenanceKcal(male, now: now), 2759);
       expect(dailyTargetKcal(male, now: now), 2759);
-      expect(
-        dailyTargetKcal(male.copyWith(goal: CalorieGoal.lose), now: now),
-        2259,
-      );
-      expect(
-        dailyTargetKcal(male.copyWith(goal: CalorieGoal.gain), now: now),
-        3059,
-      );
+      int? t(CalorieGoal g) =>
+          dailyTargetKcal(male.copyWith(goal: g), now: now);
+      expect(t(CalorieGoal.loseSlow), 2484);
+      expect(t(CalorieGoal.lose), 2209);
+      expect(t(CalorieGoal.loseFast), 2069); // capped at 25% of maintenance
+      expect(t(CalorieGoal.maintain), 2759);
+      expect(t(CalorieGoal.gain), 3059);
     });
 
-    test('female worked example and the floor', () {
+    test('female worked example and the deficit cap', () {
       expect(
         bmrKcal(weightKg: 60, heightCm: 165, age: 25, sex: Sex.female),
         closeTo(1345.25, 0.0001),
       );
       expect(maintenanceKcal(female, now: now), 1614);
-      expect(
-        dailyTargetKcal(female.copyWith(goal: CalorieGoal.lose), now: now),
-        kMinDailyKcal,
+      int? t(CalorieGoal g) =>
+          dailyTargetKcal(female.copyWith(goal: g), now: now);
+      expect(t(CalorieGoal.maintain), 1614);
+      expect(t(CalorieGoal.loseSlow), 1339);
+      expect(t(CalorieGoal.lose), 1211);
+      expect(t(CalorieGoal.loseFast), 1211); // capped
+    });
+
+    test('men have a 1500 floor', () {
+      const p = CalorieProfile(
+        weightKg: 60,
+        heightCm: 170,
+        birthYear: 1986,
+        sex: Sex.male,
+        activity: ActivityLevel.sedentary,
+        goal: CalorieGoal.loseFast,
       );
+      expect(dailyTargetKcal(p, now: now), kMinDailyKcalMale);
+      expect(kMinDailyKcalMale, 1500);
+    });
+
+    test('a target is never above maintenance', () {
+      const p = CalorieProfile(
+        weightKg: 45,
+        heightCm: 150,
+        birthYear: 1976,
+        sex: Sex.female,
+        activity: ActivityLevel.sedentary,
+        goal: CalorieGoal.lose,
+      );
+      final target = dailyTargetKcal(p, now: now);
+      expect(target, 1172);
+      final maintenance = maintenanceKcal(p, now: now) as int;
+      expect(target as int, lessThanOrEqualTo(maintenance));
     });
 
     test('null for incomplete or out-of-range profiles', () {
@@ -118,11 +147,47 @@ void main() {
       expect(back.units, UnitSystem.imperial);
     });
 
+    test('fromRow reads the new and the old loss values', () {
+      expect(
+        CalorieProfile.fromRow({'calorie_goal': 'lose_slow'}).goal,
+        CalorieGoal.loseSlow,
+      );
+      expect(
+        CalorieProfile.fromRow({'calorie_goal': 'lose'}).goal,
+        CalorieGoal.lose,
+      );
+    });
+
+    test('paceLabel', () {
+      expect(CalorieGoal.lose.paceLabel(UnitSystem.imperial), '1 lb');
+      expect(CalorieGoal.lose.paceLabel(UnitSystem.metric), '0.5 kg');
+      expect(CalorieGoal.maintain.paceLabel(UnitSystem.metric), '');
+    });
+
     test('fromDb never throws', () {
       expect(Sex.fromDb(null), isNull);
       expect(ActivityLevel.fromDb(42), isNull);
       expect(CalorieGoal.fromDb('x'), isNull);
       expect(UnitSystem.fromDb('x'), isNull);
+    });
+  });
+
+  group('bmi', () {
+    test('values and categories', () {
+      expect(bmi(80, 180), 24.7);
+      expect(BmiCategory.of(bmi(80, 180)), BmiCategory.healthy);
+      expect(bmi(81, 180), 25.0);
+      expect(BmiCategory.of(bmi(81, 180)), BmiCategory.overweight);
+      expect(bmi(100, 180), 30.9);
+      expect(BmiCategory.of(bmi(100, 180)), BmiCategory.obese);
+      expect(bmi(55, 180), 17.0);
+      expect(BmiCategory.of(bmi(55, 180)), BmiCategory.underweight);
+    });
+
+    test('healthy weight range', () {
+      final r = healthyWeightRangeKg(180);
+      expect(r.minKg, closeTo(59.94, 0.01));
+      expect(r.maxKg, closeTo(80.68, 0.01));
     });
   });
 
