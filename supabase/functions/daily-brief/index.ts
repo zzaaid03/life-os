@@ -14,8 +14,14 @@
 // Deploy:  npx supabase functions deploy daily-brief
 // Secrets: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-injected.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse, requireUser } from "../_shared/http.ts";
+import {
+  type BriefSet,
+  fitnessSentences,
+  setKey,
+  type Units,
+} from "./fitness.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -47,6 +53,99 @@ interface JobApplication {
 interface UserFact {
   category: string;
   fact: string;
+}
+
+const SET_COLUMNS = "exercise_name, kind, reps, weight_kg, hold_seconds";
+const MAX_SESSION_SETS = 200;
+const MAX_PRIOR_LOOKUPS = 15;
+
+// The workout sentences for the last 7 days. A failed query logs and gives no
+// sentences, so the rest of the brief still goes out.
+async function loadFitnessSentences(
+  admin: SupabaseClient,
+  userId: string,
+  now: Date,
+  sevenDaysAgo: Date,
+  tzOffsetMinutes: number,
+): Promise<string[]> {
+  try {
+    const lastRes = await admin
+      .from("workout_sets")
+      .select("session_id, workout_sessions(day_title, started_at)")
+      .eq("user_id", userId)
+      .gte("logged_at", sevenDaysAgo.toISOString())
+      .order("logged_at", { ascending: false })
+      .limit(1);
+    if (lastRes.error) throw lastRes.error;
+    const last = lastRes.data?.[0] as
+      | { session_id: string; workout_sessions: unknown }
+      | undefined;
+    if (!last) return [];
+    const embedded = last.workout_sessions;
+    const session = (Array.isArray(embedded) ? embedded[0] : embedded) as
+      | { day_title: string; started_at: string }
+      | undefined;
+    if (!session) return [];
+
+    const [setsRes, profileRes] = await Promise.all([
+      admin
+        .from("workout_sets")
+        .select(SET_COLUMNS)
+        .eq("user_id", userId)
+        .eq("session_id", last.session_id)
+        .limit(MAX_SESSION_SETS),
+      admin
+        .from("profiles")
+        .select("unit_system")
+        .eq("id", userId)
+        .limit(1),
+    ]);
+    if (setsRes.error) throw setsRes.error;
+    if (profileRes.error) throw profileRes.error;
+    const sets = (setsRes.data ?? []) as BriefSet[];
+    const units: Units = profileRes.data?.[0]?.unit_system === "imperial"
+      ? "imperial"
+      : "metric";
+
+    const groups = new Map<string, BriefSet>();
+    for (const s of sets) groups.set(setKey(s), s);
+    const picked = [...groups.values()].slice(0, MAX_PRIOR_LOOKUPS);
+    const priors = await Promise.all(picked.map(async (s) => {
+      const q = admin
+        .from("workout_sets")
+        .select(SET_COLUMNS)
+        .eq("user_id", userId)
+        .eq("exercise_name", s.exercise_name)
+        .eq("kind", s.kind)
+        .lt("logged_at", session.started_at);
+      const ordered = s.kind === "time"
+        ? q.order("hold_seconds", { ascending: false, nullsFirst: false })
+        : q
+          .order("weight_kg", { ascending: false, nullsFirst: false })
+          .order("reps", { ascending: false, nullsFirst: false });
+      const res = await ordered.limit(1);
+      if (res.error) throw res.error;
+      return res.data?.[0] as BriefSet | undefined;
+    }));
+    const priorBests = new Map<string, BriefSet>();
+    picked.forEach((s, i) => {
+      const p = priors[i];
+      if (p) priorBests.set(setKey(s), p);
+    });
+
+    return fitnessSentences({
+      dayTitle: session.day_title,
+      startedAt: new Date(session.started_at),
+      sets,
+      priorBests,
+      units,
+      tzOffsetMinutes,
+      now,
+    });
+  } catch (e) {
+    console.error("daily-brief: fitness sentences skipped", e);
+    return [];
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -251,10 +350,19 @@ Deno.serve(async (req: Request) => {
       dueSoon.length === 0 &&
       standoutJobs.length === 0;
 
+    const fitness = await loadFitnessSentences(
+      admin,
+      userId,
+      now,
+      sevenDaysAgo,
+      tzOffsetMinutes,
+    );
+
     if (hasNothingToReport) {
-      const brief = firstName
+      const line = firstName
         ? `${firstName}, nothing needs your attention today.`
         : "Nothing needs your attention today.";
+      const brief = [line, ...fitness].join(" ");
       return jsonResponse(req, { brief, noticed });
     }
 
@@ -266,6 +374,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    sentences.push(...fitness);
     let brief = sentences.join(" ");
     if (firstName) {
       brief = `${firstName}, ${brief.charAt(0).toLowerCase()}${brief.slice(1)}`;

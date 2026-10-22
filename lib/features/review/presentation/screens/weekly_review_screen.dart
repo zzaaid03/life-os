@@ -12,7 +12,9 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/review/domain/providers/weekly_review_provider.dart';
+import 'package:life_os/features/review/domain/providers/weekly_workouts_provider.dart';
 import 'package:life_os/features/review/domain/weekly_review.dart';
+import 'package:life_os/features/review/presentation/widgets/weekly_workouts_section.dart';
 import 'package:life_os/features/subscriptions/domain/billing.dart';
 
 /// Shows the most recently ended week's review.
@@ -23,6 +25,10 @@ class WeeklyReviewScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final review = ref.watch(weeklyReviewProvider);
+    // Only a loaded, workout-free week counts as quiet. While loading or on
+    // an error the workouts section speaks for itself.
+    final noWorkouts =
+        ref.watch(weeklyWorkoutsProvider).valueOrNull?.sessionCount == 0;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Your week')),
@@ -34,9 +40,9 @@ class WeeklyReviewScreen extends ConsumerWidget {
         children: [
           _WeekRangeLabel(review: review),
           const SizedBox(height: AppSpacing.xl),
-          if (review.isEmpty)
-            const _EmptyState()
-          else ...[
+          if (review.isEmpty) ...[
+            if (noWorkouts) const _EmptyState(),
+          ] else ...[
             if (!review.tasks.isEmpty) ...[
               const _SectionHeader(label: 'Tasks'),
               const SizedBox(height: AppSpacing.sm),
@@ -62,6 +68,7 @@ class WeeklyReviewScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.xl),
             ],
           ],
+          const WeeklyWorkoutsSection(),
         ],
       ),
     );
