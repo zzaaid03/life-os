@@ -10,6 +10,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
+import 'package:life_os/features/fitness/presentation/widgets/home_fitness_card.dart';
 import 'package:life_os/features/home/presentation/widgets/home_brief_cards.dart';
 import 'package:life_os/features/home/presentation/widgets/home_feature_cards.dart';
 import 'package:life_os/features/home/presentation/widgets/home_goals_card.dart';
@@ -106,6 +107,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .animate()
               .fadeIn(duration: 400.ms, delay: 600.ms)
               .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 600.ms),
+          const SizedBox(height: AppSpacing.md),
+          const HomeRecipesSection()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 650.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 650.ms),
+          const SizedBox(height: AppSpacing.md),
+          const HomeFitnessSection()
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 700.ms)
+              .slideY(begin: 0.04, end: 0, duration: 400.ms, delay: 700.ms),
           const SizedBox(height: AppSpacing.massive),
         ],
       ),

@@ -1,9 +1,8 @@
 /// The groceries screen.
 ///
-/// Two tabs. List: an add row pinned at the top, items still to buy, then
-/// the checked ones under an "In basket" header. Tick, tap to edit, swipe to
-/// delete, and clear everything checked from the AppBar. Recipes: ask the AI
-/// chef for a recipe and browse saved ones.
+/// An add row pinned at the top, items still to buy, then the checked ones
+/// under an "In basket" header. Tick, tap to edit, swipe to delete, and clear
+/// everything checked from the AppBar.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,7 +14,6 @@ import 'package:life_os/features/groceries/data/models/grocery_item.dart';
 import 'package:life_os/features/groceries/domain/providers/grocery_provider.dart';
 import 'package:life_os/features/groceries/presentation/widgets/grocery_add_row.dart';
 import 'package:life_os/features/groceries/presentation/widgets/grocery_item_tile.dart';
-import 'package:life_os/features/recipes/presentation/screens/recipes_tab.dart';
 
 /// Shows the grocery list.
 class GroceriesScreen extends ConsumerStatefulWidget {
@@ -26,28 +24,11 @@ class GroceriesScreen extends ConsumerStatefulWidget {
   ConsumerState<GroceriesScreen> createState() => _GroceriesScreenState();
 }
 
-class _GroceriesScreenState extends ConsumerState<GroceriesScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 2, vsync: this)
-    ..addListener(_onTabChanged);
-
-  /// The selected tab, mirrored so the AppBar actions can follow it.
-  int _tabIndex = 0;
-
+class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
   /// Ids swiped away whose delete is still in flight. A dismissed
   /// [Dismissible] must leave the tree at once, but the notifier only drops
   /// the row after its refresh, so these are hidden locally until then.
   final Set<String> _removing = {};
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
-
-  void _onTabChanged() {
-    if (_tabs.index != _tabIndex) setState(() => _tabIndex = _tabs.index);
-  }
 
   GroceryListNotifier get _notifier => ref.read(groceryListProvider.notifier);
 
@@ -143,27 +124,13 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen>
       appBar: AppBar(
         title: const Text('Groceries'),
         actions: [
-          if (_tabIndex == 0)
-            TextButton(
-              onPressed: state.hasChecked ? _clearChecked : null,
-              child: const Text('Clear checked'),
-            ),
-        ],
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: 'List'),
-            Tab(text: 'Recipes'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          _buildBody(state),
-          const RecipesTab(),
+          TextButton(
+            onPressed: state.hasChecked ? _clearChecked : null,
+            child: const Text('Clear checked'),
+          ),
         ],
       ),
+      body: _buildBody(state),
     );
   }
 

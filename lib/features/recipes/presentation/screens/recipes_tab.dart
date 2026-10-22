@@ -1,4 +1,4 @@
-/// The Recipes tab of the Groceries screen.
+/// The body of the Recipes screen.
 ///
 /// Top: the last generated idea (so an unsaved recipe survives pressing
 /// back), then the ask area, which turns into an animated "chef is cooking"
@@ -16,7 +16,6 @@ import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/widgets/error_snackbar.dart';
 import 'package:life_os/features/groceries/domain/providers/grocery_provider.dart';
-import 'package:life_os/features/nutrition/presentation/calorie_target_chip.dart';
 import 'package:life_os/features/recipes/data/models/recipe.dart';
 import 'package:life_os/features/recipes/data/recipe_chef_service.dart';
 import 'package:life_os/features/recipes/domain/providers/recipe_providers.dart';
@@ -434,10 +433,6 @@ class _RecipesTabState extends ConsumerState<RecipesTab>
             onPressed: () => context.push(AppRoutes.settings),
             child: const Text('Add food preferences'),
           ),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: CalorieTargetChip(),
-        ),
         const SizedBox(height: AppSpacing.md),
         Row(
           children: [

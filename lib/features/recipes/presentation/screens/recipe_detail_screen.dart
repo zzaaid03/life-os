@@ -67,7 +67,7 @@ class _RecipeNotFound extends StatelessWidget {
                   if (context.canPop()) {
                     context.pop();
                   } else {
-                    context.go(AppRoutes.groceries);
+                    context.go(AppRoutes.recipes);
                   }
                 },
                 child: const Text('Go back'),

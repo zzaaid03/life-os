@@ -15,6 +15,7 @@ import 'package:life_os/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/splash_screen.dart';
 import 'package:life_os/features/auth/presentation/screens/welcome_screen.dart';
 import 'package:life_os/features/demo/demo_mode.dart';
+import 'package:life_os/features/fitness/presentation/screens/fitness_hub_screen.dart';
 import 'package:life_os/features/goals/presentation/screens/goal_breakdown_screen.dart';
 import 'package:life_os/features/goals/presentation/screens/goals_screen.dart';
 import 'package:life_os/features/groceries/presentation/screens/groceries_screen.dart';
@@ -32,6 +33,7 @@ import 'package:life_os/features/profile/domain/providers/profile_provider.dart'
 import 'package:life_os/features/profile/presentation/screens/create_profile_screen.dart';
 import 'package:life_os/features/recipes/presentation/screens/cook_mode_screen.dart';
 import 'package:life_os/features/recipes/presentation/screens/recipe_detail_screen.dart';
+import 'package:life_os/features/recipes/presentation/screens/recipes_screen.dart';
 import 'package:life_os/features/review/presentation/screens/weekly_review_screen.dart';
 import 'package:life_os/features/search/presentation/screens/search_screen.dart';
 import 'package:life_os/features/settings/presentation/screens/privacy_policy_screen.dart';
@@ -80,8 +82,14 @@ abstract final class AppRoutes {
   /// The weekly review of the most recently ended week.
   static const String weeklyReview = '/weekly-review';
 
-  /// The grocery list (and, from slice 2, recipes).
+  /// The fitness hub: daily calories and BMI.
+  static const String fitness = '/fitness';
+
+  /// The grocery list.
   static const String groceries = '/groceries';
+
+  /// The saved recipes list and the AI chef.
+  static const String recipes = '/recipes';
 
   /// One recipe (extra: `RecipeViewArgs`).
   static const String recipeDetail = '/recipes/view';
@@ -322,6 +330,16 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.groceries,
         name: 'groceries',
         builder: (context, state) => const GroceriesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.fitness,
+        name: 'fitness',
+        builder: (context, state) => const FitnessHubScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.recipes,
+        name: 'recipes',
+        builder: (context, state) => const RecipesScreen(),
       ),
       GoRoute(
         path: AppRoutes.recipeDetail,

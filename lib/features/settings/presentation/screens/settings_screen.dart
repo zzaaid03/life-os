@@ -9,11 +9,9 @@ import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_radius.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/core/theme/theme_mode_provider.dart';
-import 'package:life_os/core/utils/number_format.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/inbox/data/google_credentials_repository.dart';
 import 'package:life_os/features/notifications/domain/providers/reminder_settings_provider.dart';
-import 'package:life_os/features/nutrition/domain/calorie_providers.dart';
 import 'package:life_os/features/onboarding/domain/release_notes.dart';
 import 'package:life_os/features/onboarding/presentation/announcements_sheet.dart';
 import 'package:life_os/features/profile/domain/providers/profile_provider.dart';
@@ -106,14 +104,6 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: ref.watch(foodPreferencesProvider).value ??
                     'Not set, the recipe chef will assume anything goes',
                 onTap: () => FoodPreferencesDialog.show(context),
-              ),
-              _SettingsTile(
-                icon: Icons.local_fire_department_outlined,
-                title: 'Daily calories',
-                subtitle: ref.watch(dailyTargetProvider) == null
-                    ? 'Not set'
-                    : '${formatThousands(ref.watch(dailyTargetProvider)!)} kcal a day',
-                onTap: () => context.push(AppRoutes.calorieTarget),
               ),
               _SettingsTile(
                 icon: Icons.language_rounded,
