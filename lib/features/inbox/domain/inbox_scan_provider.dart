@@ -19,6 +19,7 @@ import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
+import 'package:life_os/features/packages/data/repositories/package_repository.dart';
 import 'package:riverpod/riverpod.dart';
 
 /// The phase of the scan flow.
@@ -124,6 +125,14 @@ class InboxScanController extends StateNotifier<InboxScanState> {
             .read(jobApplicationRepositoryProvider)
             .applyKnownAndCollectNew(jobUpdates, userId);
         await _ref.read(jobListProvider.notifier).refresh();
+      }
+
+      // Packages are written straight away, like job updates. A throw lands
+      // in the error state below, never as "nothing found".
+      if (userId != null && result.packages.isNotEmpty) {
+        await _ref
+            .read(packageRepositoryProvider)
+            .applyScanUpdates(result.packages, userId);
       }
 
       state = InboxScanState(

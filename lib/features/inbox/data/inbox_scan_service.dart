@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:life_os/core/services/function_errors.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
+import 'package:life_os/features/packages/data/models/package.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
 import 'package:life_os/features/subscriptions/domain/billing.dart';
 import 'package:riverpod/riverpod.dart';
@@ -146,6 +147,93 @@ class JobUpdate {
   final String? sourceEmailId;
 }
 
+/// An AI-derived package update extracted from an email.
+///
+/// Already sanitized: a valid status, at least one normalized number, strings
+/// capped to the `packages` column limits. Applied automatically, no review.
+class PackageUpdate {
+  /// Creates a [PackageUpdate].
+  const PackageUpdate({
+    this.merchant,
+    this.item,
+    this.carrier,
+    this.trackingNumber,
+    this.orderNumber,
+    required this.status,
+    this.expectedDate,
+    this.summary = '',
+    required this.sourceEmailId,
+  });
+
+  /// Sanitizes one model-supplied package, or returns null when it cannot be
+  /// used: unknown status, no tracking AND no order number, or no email id.
+  static PackageUpdate? tryParse(Map<String, dynamic> json) {
+    final status = PackageStatus.tryParse(json['status']);
+    if (status == null) return null;
+    final tracking = _normalizeNumber(json['trackingNumber']);
+    final order = _normalizeNumber(json['orderNumber']);
+    if (tracking == null && order == null) return null;
+    final emailId = _text(json['sourceEmailId'], 200);
+    if (emailId == null) return null;
+    return PackageUpdate(
+      merchant: _text(json['merchant'], 120),
+      item: _text(json['item'], 200),
+      carrier: _text(json['carrier'], 60),
+      trackingNumber: tracking,
+      orderNumber: order,
+      status: status,
+      expectedDate: _parseIsoDate(json['expectedDate']),
+      summary: _text(json['summary'], 300) ?? '',
+      sourceEmailId: emailId,
+    );
+  }
+
+  static String? _text(Object? raw, int max) {
+    if (raw is! String) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    return trimmed.length > max ? trimmed.substring(0, max) : trimmed;
+  }
+
+  /// Trim, drop all whitespace, uppercase, cap at the column limit. Numbers
+  /// are the only identity key, so the model's spacing and casing must never
+  /// make one package look like two.
+  static String? _normalizeNumber(Object? raw) {
+    final text = raw is num ? raw.toString() : raw;
+    if (text is! String) return null;
+    final cleaned = text.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+    if (cleaned.isEmpty) return null;
+    return cleaned.length > 60 ? cleaned.substring(0, 60) : cleaned;
+  }
+
+  /// The shop or sender.
+  final String? merchant;
+
+  /// What was ordered.
+  final String? item;
+
+  /// The carrier.
+  final String? carrier;
+
+  /// Normalized tracking number, or null.
+  final String? trackingNumber;
+
+  /// Normalized order number, or null.
+  final String? orderNumber;
+
+  /// Where the package is.
+  final PackageStatus status;
+
+  /// Expected delivery day at local midnight, or null.
+  final DateTime? expectedDate;
+
+  /// One-sentence summary, empty when the model gave none.
+  final String summary;
+
+  /// The Gmail message id this update came from.
+  final String sourceEmailId;
+}
+
 /// An AI-suggested recurring charge extracted from an email.
 ///
 /// This is a *suggestion*, never a stored row. It is deliberately looser than
@@ -266,6 +354,7 @@ class ScanResult {
     required this.tasks,
     required this.jobUpdates,
     this.subscriptions = const [],
+    this.packages = const [],
     this.scannedAccount,
     this.remaining = 0,
   });
@@ -288,6 +377,9 @@ class ScanResult {
     final rawSubs = json['subscriptions'] is List
         ? json['subscriptions'] as List<dynamic>
         : const <dynamic>[];
+    final rawPackages = json['packages'] is List
+        ? json['packages'] as List<dynamic>
+        : const <dynamic>[];
     final rawRemaining = json['remaining'];
     return ScanResult(
       tasks: rawTasks
@@ -309,6 +401,11 @@ class ScanResult {
           // row and the editor would open with nothing identifying it.
           .where((s) => s.name.isNotEmpty)
           .toList(),
+      packages: rawPackages
+          .whereType<Map<String, dynamic>>()
+          .map(PackageUpdate.tryParse)
+          .whereType<PackageUpdate>()
+          .toList(),
       scannedAccount: (json['scannedAccount'] as String?)?.trim(),
       remaining: rawRemaining is num ? rawRemaining.toInt() : 0,
     );
@@ -323,6 +420,10 @@ class ScanResult {
   /// Recurring charges detected. Always empty against a server that predates
   /// the feature, and never auto-created: these surface as review cards.
   final List<SuggestedSubscription> subscriptions;
+
+  /// Package updates detected, sanitized. Applied automatically by the scan
+  /// controller; empty against a server that predates the feature.
+  final List<PackageUpdate> packages;
 
   /// The Gmail address that was scanned, as reported by the function.
   final String? scannedAccount;

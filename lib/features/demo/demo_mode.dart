@@ -18,6 +18,7 @@ import 'package:life_os/features/demo/data/repositories/demo_daily_brief_notifie
 import 'package:life_os/features/demo/data/repositories/demo_file_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_goal_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_job_application_repository.dart';
+import 'package:life_os/features/demo/data/repositories/demo_package_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_profile_repository.dart';
 import 'package:life_os/features/demo/data/repositories/demo_task_repository.dart';
 import 'package:life_os/features/demo/data/services/demo_file_picker_service.dart';
@@ -36,6 +37,7 @@ import 'package:life_os/features/learning/data/repositories/fact_repository.dart
 import 'package:life_os/features/notifications/data/noop_notification_service.dart';
 import 'package:life_os/features/notifications/domain/providers/notification_service_provider.dart';
 import 'package:life_os/features/nutrition/data/calorie_profile_repository.dart';
+import 'package:life_os/features/packages/data/repositories/package_repository.dart';
 import 'package:life_os/features/profile/data/repositories/supabase_profile_repository.dart';
 import 'package:life_os/features/recipes/data/recipe_chef_service.dart';
 import 'package:life_os/features/recipes/data/repositories/recipe_repository.dart';
@@ -69,6 +71,7 @@ List<Override> buildDemoOverrides() {
     jobApplicationRepositoryProvider.overrideWithValue(
       DemoJobApplicationRepository(),
     ),
+    packageRepositoryProvider.overrideWithValue(const DemoPackageRepository()),
     goalRepositoryProvider.overrideWithValue(DemoGoalRepository()),
     dailyBriefProvider.overrideWith(DemoDailyBriefNotifier.new),
     inboxScanServiceProvider.overrideWithValue(DemoInboxScanService()),

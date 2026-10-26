@@ -1,0 +1,96 @@
+/// Supabase-backed repository for packages.
+///
+/// Reads and writes `public.packages`. RLS scopes rows to the user, and every
+/// query also filters on `user_id` explicitly.
+library;
+
+import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
+import 'package:life_os/features/packages/data/models/package.dart';
+import 'package:life_os/features/packages/data/repositories/package_repository.dart';
+import 'package:life_os/features/packages/domain/package_match.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Repository for [Package] records backed by Supabase.
+class SupabasePackageRepository implements PackageRepository {
+  /// Creates a [SupabasePackageRepository].
+  const SupabasePackageRepository(this._client);
+
+  final SupabaseClient _client;
+
+  static const String _table = 'packages';
+
+  @override
+  Future<void> applyScanUpdates(
+    List<PackageUpdate> updates,
+    String userId,
+  ) async {
+    if (updates.isEmpty) return;
+    final existing = await _loadCandidates(updates, userId);
+    final changes = matchPackageUpdates(
+      existing,
+      updates,
+      now: DateTime.now().toUtc(),
+    );
+
+    if (changes.inserts.isNotEmpty) {
+      final rows = await _client
+          .from(_table)
+          .insert([
+            for (final p in changes.inserts)
+              {'user_id': userId, ...p.toScanJson()},
+          ])
+          .select('id');
+      if ((rows as List).length != changes.inserts.length) {
+        throw StateError('Could not save every new package.');
+      }
+    }
+
+    for (final p in changes.updates) {
+      final rows = await _client
+          .from(_table)
+          .update(p.toScanJson())
+          .eq('id', p.id)
+          .eq('user_id', userId)
+          .select('id');
+      if ((rows as List).isEmpty) {
+        throw StateError('Could not update package ${p.id}.');
+      }
+    }
+  }
+
+  /// Loads only the rows that share a tracking or order number with the
+  /// batch, soft-deleted ones included. Never "load all".
+  Future<List<Package>> _loadCandidates(
+    List<PackageUpdate> updates,
+    String userId,
+  ) async {
+    final tracking = {
+      for (final u in updates)
+        if (u.trackingNumber != null) u.trackingNumber!,
+    }.toList();
+    final orders = {
+      for (final u in updates)
+        if (u.orderNumber != null) u.orderNumber!,
+    }.toList();
+
+    final byId = <String, Package>{};
+    Future<void> load(String column, List<String> values) async {
+      if (values.isEmpty) return;
+      // One scan batch carries a few dozen numbers at most, so a match set
+      // this size cannot reach the 1000-row cap.
+      final rows = await _client
+          .from(_table)
+          .select()
+          .eq('user_id', userId)
+          .inFilter(column, values);
+      for (final row in (rows as List).cast<Map<String, dynamic>>()) {
+        final p = Package.fromJson(row);
+        byId[p.id] = p;
+      }
+    }
+
+    await load('tracking_number', tracking);
+    await load('order_number', orders);
+    return byId.values.toList();
+  }
+}

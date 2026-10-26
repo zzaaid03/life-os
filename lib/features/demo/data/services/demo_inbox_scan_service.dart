@@ -6,6 +6,7 @@ library;
 import 'package:life_os/core/utils/date_format.dart';
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
+import 'package:life_os/features/packages/data/models/package.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -88,6 +89,19 @@ class DemoInboxScanService extends InboxScanService {
               'Cascade Robotics is not moving forward with your application '
               'for the Associate Product Manager role.',
           sourceEmailId: 'demo-email-cascade-decision',
+        ),
+      ],
+      packages: [
+        PackageUpdate(
+          merchant: 'Northwind Outdoor',
+          item: 'Trail running shoes',
+          carrier: 'DHL',
+          trackingNumber: 'JD014600003SE',
+          orderNumber: 'NW-48213',
+          status: PackageStatus.shipped,
+          expectedDate: dueDate(3),
+          summary: 'Your Northwind Outdoor order has shipped with DHL.',
+          sourceEmailId: 'demo-email-northwind-shipped',
         ),
       ],
       subscriptions: [
