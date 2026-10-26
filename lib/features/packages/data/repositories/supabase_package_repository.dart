@@ -20,6 +20,51 @@ class SupabasePackageRepository implements PackageRepository {
   static const String _table = 'packages';
 
   @override
+  Future<List<Package>> fetchPackages(String userId) async {
+    // Capped at 200: a list longer than that is not useful on one screen, and
+    // it keeps the response far below the 1000-row cap.
+    final rows = await _client
+        .from(_table)
+        .select()
+        .eq('user_id', userId)
+        .filter('deleted_at', 'is', null)
+        .order('updated_at', ascending: false)
+        .limit(200);
+    return (rows as List)
+        .cast<Map<String, dynamic>>()
+        .map(Package.fromJson)
+        .toList();
+  }
+
+  @override
+  Future<void> markDelivered(String id) {
+    return _write(id, {
+      'status': PackageStatus.delivered.dbValue,
+      'delivered_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  @override
+  Future<void> softDelete(String id) {
+    return _write(id, {'deleted_at': DateTime.now().toUtc().toIso8601String()});
+  }
+
+  @override
+  Future<void> restore(String id) => _write(id, {'deleted_at': null});
+
+  /// Updates one row and throws when RLS or a missing row matched nothing.
+  Future<void> _write(String id, Map<String, dynamic> values) async {
+    final rows = await _client
+        .from(_table)
+        .update(values)
+        .eq('id', id)
+        .select('id');
+    if ((rows as List).isEmpty) {
+      throw StateError('Could not update package $id.');
+    }
+  }
+
+  @override
   Future<void> applyScanUpdates(
     List<PackageUpdate> updates,
     String userId,

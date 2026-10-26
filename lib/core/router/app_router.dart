@@ -29,6 +29,7 @@ import 'package:life_os/features/learning/presentation/screens/known_facts_scree
 import 'package:life_os/features/life/presentation/screens/life_screen.dart';
 import 'package:life_os/features/nutrition/presentation/calorie_target_screen.dart';
 import 'package:life_os/features/onboarding/domain/onboarding_provider.dart';
+import 'package:life_os/features/packages/presentation/screens/packages_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/calendar_permission_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/files_permission_screen.dart';
 import 'package:life_os/features/permissions/presentation/screens/notification_permission_screen.dart';
@@ -81,6 +82,7 @@ abstract final class AppRoutes {
   static const String inboxScan = '/inbox-scan';
   static const String jobApplications = '/job-applications';
   static const String subscriptions = '/subscriptions';
+  static const String packages = '/packages';
 
   /// The weekly review of the most recently ended week.
   static const String weeklyReview = '/weekly-review';
@@ -332,6 +334,11 @@ GoRouter createRouter(Ref ref) {
         path: AppRoutes.subscriptions,
         name: 'subscriptions',
         builder: (context, state) => const SubscriptionsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.packages,
+        name: 'packages',
+        builder: (context, state) => const PackagesScreen(),
       ),
       GoRoute(
         path: AppRoutes.weeklyReview,

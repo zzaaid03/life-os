@@ -71,7 +71,7 @@ List<Override> buildDemoOverrides() {
     jobApplicationRepositoryProvider.overrideWithValue(
       DemoJobApplicationRepository(),
     ),
-    packageRepositoryProvider.overrideWithValue(const DemoPackageRepository()),
+    packageRepositoryProvider.overrideWithValue(DemoPackageRepository()),
     goalRepositoryProvider.overrideWithValue(DemoGoalRepository()),
     dailyBriefProvider.overrideWith(DemoDailyBriefNotifier.new),
     inboxScanServiceProvider.overrideWithValue(DemoInboxScanService()),

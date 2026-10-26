@@ -9,6 +9,8 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:life_os/core/router/app_router.dart';
 import 'package:life_os/core/theme/app_spacing.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
@@ -301,7 +303,16 @@ class InboxScanScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => context.push(AppRoutes.packages),
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('Packages'),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
             if (scanState.phase == InboxScanPhase.done &&
                 scanState.scannedAccount != null) ...[
               ScannedAccountLine(account: scanState.scannedAccount!),
