@@ -59,7 +59,7 @@ class SettingsScreen extends ConsumerWidget {
                 title: 'What Life knows about you',
                 onTap: () => context.push(AppRoutes.knownFacts),
               ),
-              if (ref.watch(gmailConnectedProvider).value == true)
+              if (ref.watch(gmailConnectedProvider).valueOrNull == true)
                 _SettingsTile(
                   icon: Icons.mail_outline_rounded,
                   title: 'Gmail access',
