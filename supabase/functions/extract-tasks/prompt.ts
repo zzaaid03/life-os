@@ -21,7 +21,8 @@ names something dated they cannot afford to miss. That means any of:
 1. REQUESTS AND DEADLINES: a real person asking them to send/review/reply/prepare
    something, or a deadline they must act on.
 2. BILLS AND PAYMENTS DUE: an amount the recipient still owes. A paid receipt or a
-   successful payment confirmation is NOT a bill.
+   successful payment confirmation is NOT a bill (this is for tasks only; a receipt can
+   still be a subscription).
 3. APPOINTMENTS AND EVENTS: something at a specific time they must attend, book,
    confirm or reschedule.
 4. SUBSCRIPTION RENEWALS: a subscription, plan or membership that will auto-renew,
@@ -101,7 +102,8 @@ NEVER emit a subscription from (these are the expensive mistakes):
 - Marketing that advertises a plan they do NOT have: "upgrade to Pro", "plans from
   9.99/month", "go premium", a discount offer, or a free-trial invitation. An email
   saying a price EXISTS is not the recipient paying it.
-- A one-off purchase, a single order, or a one-time payment. Recurring is the whole test.
+- A one-off purchase, a single order, or a one-time payment. A receipt that mentions a
+  renewal, a plan or a next billing date is NOT one-off.
 - Someone else's subscription, or a plan the sender is trying to sell them.
 - A cancellation confirmation, or a plan that has already ended. Those are over.
 If you cannot tell whether the recipient actually holds the subscription, emit nothing.
@@ -120,6 +122,15 @@ active." IS a subscription, and you MUST emit:
 It names the service and says the payment recurs, which is everything required. Four null
 fields is a correct answer, not a reason to stay silent. The name is what makes it worth
 keeping; the user fills in the number.
+
+Words like "renews", "next billing date" or "your plan" prove it recurs even without the
+words "subscription" or "recurring". Worked example: subject "Your Netflix receipt", body
+"Thanks for your payment of 13.99 EUR. Your plan renews on November 26." IS a
+subscription (the TASKS rule that ignores receipts does not apply here), emit:
+  {"name": "Netflix", "amount": "13.99", "currency": "EUR", "cycle": null,
+   "nextChargeDate": "2026-11-26", "sourceEmailId": "<that email's id>"}
+A receipt addressed to the recipient for a service named in the subject or body counts
+even if the sender address looks personal (forwarded receipts); take the name from that service.
 
 A subscription does NOT replace a task. If a renewal email also warrants a renewal task
 under TASKS rule 4, emit BOTH: the task and the subscription. Emitting one does not
@@ -186,6 +197,10 @@ Tracking number 00340434161094042557. Delivery expected 28 October 2026." gives:
   {"merchant": "Zalando", "item": null, "carrier": "DHL", "trackingNumber": "00340434161094042557",
    "orderNumber": "10293847", "status": "shipped", "expectedDate": "2026-10-28",
    "summary": "Shipped with DHL", "sourceEmailId": "<that email's id>"}
+
+Counter-example, follow it exactly. Subject "Your Wolt order is on the way", body "Your
+courier will arrive in 12 minutes. Order #7KQ9." produces NO package item. Meal, grocery
+and ride deliveries arriving within the hour are not shipped parcels.
 
 Respond with ONLY a JSON object of this exact form:
 {"tasks":[{"title": string, "dueDate": string|null, "dueDateHint": string|null, "priority": string, "sourceEmailId": string}],
