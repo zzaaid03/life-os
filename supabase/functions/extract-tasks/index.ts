@@ -223,6 +223,7 @@ Deno.serve(async (req: Request) => {
         tasks: [],
         jobUpdates: [],
         subscriptions: [],
+        packages: [],
         scannedAccount: account,
       });
     }
@@ -245,6 +246,7 @@ Deno.serve(async (req: Request) => {
         tasks: [],
         jobUpdates: [],
         subscriptions: [],
+        packages: [],
         scannedAccount: account,
         analyzedCount: batchIds.length,
         remaining: Math.max(pendingIds.length - batchIds.length, 0),
@@ -275,6 +277,7 @@ Deno.serve(async (req: Request) => {
       tasks?: unknown[];
       jobUpdates?: unknown[];
       subscriptions?: unknown[];
+      packages?: unknown[];
     };
     try {
       parsed = JSON.parse(content);
@@ -292,6 +295,7 @@ Deno.serve(async (req: Request) => {
       tasks: parsed.tasks ?? [],
       jobUpdates: parsed.jobUpdates ?? [],
       subscriptions: parsed.subscriptions ?? [],
+      packages: Array.isArray(parsed.packages) ? parsed.packages.slice(0, 100) : [],
       scannedAccount: account,
       analyzedCount,
       remaining,
