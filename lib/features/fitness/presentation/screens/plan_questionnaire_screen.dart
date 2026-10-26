@@ -124,6 +124,7 @@ class _PlanQuestionnaireScreenState
             enabled: !_building,
             maxLength: kPlanLimitsMaxLength,
             maxLines: 2,
+            textInputAction: TextInputAction.done,
             decoration: const InputDecoration(
               hintText: 'For example: sore left shoulder',
             ),

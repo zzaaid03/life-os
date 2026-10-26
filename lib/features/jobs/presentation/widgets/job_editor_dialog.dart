@@ -191,6 +191,7 @@ class _JobEditorDialogState extends State<JobEditorDialog> {
                 TextField(
                   controller: _summaryController,
                   maxLines: 2,
+                  textInputAction: TextInputAction.done,
                   decoration: const InputDecoration(
                     labelText: 'Summary (optional)',
                     hintText: 'Latest update in one sentence',

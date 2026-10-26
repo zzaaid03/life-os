@@ -20,6 +20,7 @@ import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/core/theme/app_colors.dart';
 import 'package:life_os/core/theme/app_theme.dart';
 import 'package:life_os/core/theme/theme_mode_provider.dart';
+import 'package:life_os/core/utils/tap_outside_unfocus.dart';
 import 'package:life_os/features/auth/domain/providers/auth_provider.dart';
 import 'package:life_os/features/auth/domain/providers/oauth_tab_dismiss_provider.dart';
 import 'package:life_os/features/demo/demo_mode.dart';
@@ -180,6 +181,7 @@ class _LifeOSAppState extends ConsumerState<LifeOSApp> {
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
       routerConfig: router,
+      actions: tapOutsideUnfocusActions,
       locale: const Locale('en'),
       supportedLocales: const [Locale('en')],
       localizationsDelegates: const [

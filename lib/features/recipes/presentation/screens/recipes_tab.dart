@@ -345,6 +345,7 @@ class _RecipesTabState extends ConsumerState<RecipesTab>
           controller: _prompt,
           minLines: 2,
           maxLines: 5,
+          textInputAction: TextInputAction.done,
           textCapitalization: TextCapitalization.sentences,
           decoration: InputDecoration(
             hintText: 'Something cosy with chicken…',
@@ -387,6 +388,7 @@ class _RecipesTabState extends ConsumerState<RecipesTab>
                       controller: _pantry,
                       minLines: 1,
                       maxLines: 4,
+                      textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
                         hintText: "What's in your fridge?",
                         filled: true,

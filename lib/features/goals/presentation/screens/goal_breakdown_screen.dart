@@ -267,6 +267,7 @@ class _GoalBreakdownScreenState extends ConsumerState<GoalBreakdownScreen> {
               controller: _descriptionController,
               enabled: reviewItems == null,
               maxLines: 2,
+              textInputAction: TextInputAction.done,
               decoration: const InputDecoration(
                 labelText: 'Description (optional)',
                 hintText: 'What does success look like?',

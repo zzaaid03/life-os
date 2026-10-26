@@ -408,6 +408,7 @@ class _SubscriptionEditorDialogState extends State<SubscriptionEditorDialog> {
                 TextField(
                   controller: _notesController,
                   maxLines: 2,
+                  textInputAction: TextInputAction.done,
                   decoration: const InputDecoration(
                     labelText: 'Notes (optional)',
                   ),
