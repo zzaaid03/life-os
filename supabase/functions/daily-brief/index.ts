@@ -22,6 +22,7 @@ import {
   setKey,
   type Units,
 } from "./fitness.ts";
+import { type BriefPackage, packageSentences } from "./packages.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -144,6 +145,36 @@ async function loadFitnessSentences(
     });
   } catch (e) {
     console.error("daily-brief: fitness sentences skipped", e);
+    return [];
+  }
+}
+
+// Package sentences (out for delivery, expected today, delivered today). A
+// failed query logs and gives no sentences, like the fitness ones.
+async function loadPackageSentences(
+  admin: SupabaseClient,
+  userId: string,
+  now: Date,
+  day0Start: Date,
+  tzOffsetMinutes: number,
+): Promise<string[]> {
+  try {
+    // 50 is plenty for a daily summary, and older delivered rows are filtered out.
+    const res = await admin
+      .from("packages")
+      .select("merchant, item, status, expected_date, delivered_at")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .or(`status.neq.delivered,delivered_at.gte.${day0Start.toISOString()}`)
+      .limit(50);
+    if (res.error) throw res.error;
+    return packageSentences({
+      packages: (res.data ?? []) as BriefPackage[],
+      now,
+      tzOffsetMinutes,
+    });
+  } catch (e) {
+    console.error("daily-brief: package sentences skipped", e);
     return [];
   }
 }
@@ -350,19 +381,16 @@ Deno.serve(async (req: Request) => {
       dueSoon.length === 0 &&
       standoutJobs.length === 0;
 
-    const fitness = await loadFitnessSentences(
-      admin,
-      userId,
-      now,
-      sevenDaysAgo,
-      tzOffsetMinutes,
-    );
+    const [fitness, packages] = await Promise.all([
+      loadFitnessSentences(admin, userId, now, sevenDaysAgo, tzOffsetMinutes),
+      loadPackageSentences(admin, userId, now, day0Start, tzOffsetMinutes),
+    ]);
 
     if (hasNothingToReport) {
       const line = firstName
         ? `${firstName}, nothing needs your attention today.`
         : "Nothing needs your attention today.";
-      const brief = [line, ...fitness].join(" ");
+      const brief = [line, ...fitness, ...packages].join(" ");
       return jsonResponse(req, { brief, noticed });
     }
 
@@ -374,7 +402,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    sentences.push(...fitness);
+    sentences.push(...fitness, ...packages);
     let brief = sentences.join(" ");
     if (firstName) {
       brief = `${firstName}, ${brief.charAt(0).toLowerCase()}${brief.slice(1)}`;
