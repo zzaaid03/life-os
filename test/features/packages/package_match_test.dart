@@ -197,5 +197,61 @@ void main() {
       expect(changes.inserts, hasLength(1));
       expect(changes.changedCount, 1);
     });
+
+    test('an older ordered email after a shipped one keeps the shipped details',
+        () {
+      final changes = matchPackageUpdates(
+        const [],
+        [
+          _update(
+            order: 'A1',
+            status: PackageStatus.shipped,
+            email: 'shipped',
+          ),
+          _update(order: 'A1', email: 'ordered'),
+        ],
+        now: _now,
+      );
+      expect(changes.inserts, hasLength(1));
+      final pkg = changes.inserts.single;
+      expect(pkg.status, PackageStatus.shipped);
+      expect(pkg.lastUpdate, 'update shipped');
+      expect(pkg.sourceEmailId, 'shipped');
+    });
+
+    test('same status twice: the second summary wins', () {
+      final changes = matchPackageUpdates(
+        const [],
+        [
+          _update(order: 'A1', email: 'first'),
+          _update(order: 'A1', email: 'second'),
+        ],
+        now: _now,
+      );
+      final pkg = changes.inserts.single;
+      expect(pkg.lastUpdate, 'update second');
+      expect(pkg.sourceEmailId, 'second');
+    });
+
+    test('an ordered email does not touch a shipped row', () {
+      final existing = Package(
+        id: 'p1',
+        orderNumber: 'A1',
+        status: PackageStatus.shipped,
+        expectedDate: DateTime(2026, 10, 28),
+        lastUpdate: 'Shipped by DHL',
+        sourceEmailId: 'shipped',
+      );
+      final changes = matchPackageUpdates(
+        [existing],
+        [_update(order: 'A1', expected: DateTime(2026, 11, 2))],
+        now: _now,
+      );
+      final pkg = changes.updates.single;
+      expect(pkg.status, PackageStatus.shipped);
+      expect(pkg.lastUpdate, 'Shipped by DHL');
+      expect(pkg.expectedDate, DateTime(2026, 10, 28));
+      expect(pkg.sourceEmailId, 'shipped');
+    });
   });
 }

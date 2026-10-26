@@ -104,6 +104,9 @@ Package _merge(Package old, PackageUpdate u, DateTime now) {
   final status = u.status.rank > old.status.rank ? u.status : old.status;
   final becameDelivered =
       status == PackageStatus.delivered && old.deliveredAt == null;
+  // Emails can arrive newest first, so an older one must not overwrite the
+  // details of a package that is further along.
+  final advances = u.status.rank >= old.status.rank;
   return old.copyWith(
     merchant: old.merchant ?? u.merchant,
     item: old.item ?? u.item,
@@ -111,10 +114,11 @@ Package _merge(Package old, PackageUpdate u, DateTime now) {
     trackingNumber: old.trackingNumber ?? u.trackingNumber,
     orderNumber: old.orderNumber ?? u.orderNumber,
     status: status,
-    expectedDate: status == PackageStatus.delivered ? null : u.expectedDate,
+    expectedDate:
+        advances && status != PackageStatus.delivered ? u.expectedDate : null,
     deliveredAt: becameDelivered ? now.toUtc() : null,
-    lastUpdate: u.summary.isEmpty ? null : u.summary,
-    sourceEmailId: u.sourceEmailId,
+    lastUpdate: advances && u.summary.isNotEmpty ? u.summary : null,
+    sourceEmailId: advances ? u.sourceEmailId : null,
     lastEmailAt: now.toUtc(),
   );
 }
