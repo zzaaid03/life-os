@@ -52,6 +52,26 @@ void main() {
       expect(u.orderNumber, isNull);
     });
 
+    test('drops a package with no merchant and no item', () {
+      expect(
+        PackageUpdate.tryParse(_json({'merchant': ' ', 'item': null})),
+        isNull,
+      );
+    });
+
+    test('keeps a package with only an item', () {
+      final u = PackageUpdate.tryParse(_json({'merchant': null}))!;
+      expect(u.item, 'Shoes');
+      expect(u.merchant, isNull);
+    });
+
+    test('strips # from an order number', () {
+      final u = PackageUpdate.tryParse(
+        _json({'orderNumber': '#305-7712094-8830215'}),
+      )!;
+      expect(u.orderNumber, '305-7712094-8830215');
+    });
+
     test('caps strings to the column limits', () {
       final u = PackageUpdate.tryParse(
         _json({

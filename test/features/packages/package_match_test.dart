@@ -157,5 +157,45 @@ void main() {
       );
       expect(changes.updates.single.expectedDate, DateTime(2026, 10, 30));
     });
+
+    test('a stored #305-... order matches an update with 305-...', () {
+      const existing = Package(
+        id: 'p1',
+        orderNumber: '#305-7712094-8830215',
+        status: PackageStatus.ordered,
+      );
+      final changes = matchPackageUpdates(
+        [existing],
+        [
+          _update(
+            order: '305-7712094-8830215',
+            status: PackageStatus.shipped,
+          ),
+        ],
+        now: _now,
+      );
+      expect(changes.inserts, isEmpty);
+      expect(changes.updates.single.id, 'p1');
+      expect(changes.changedCount, 1);
+    });
+
+    test('changedCount counts inserts and real changes, not repeats', () {
+      const existing = Package(
+        id: 'p1',
+        trackingNumber: 'T1',
+        status: PackageStatus.shipped,
+        lastUpdate: 'update e1',
+      );
+      final changes = matchPackageUpdates(
+        [existing],
+        [
+          _update(tracking: 'T1', status: PackageStatus.shipped, email: 'e1'),
+          _update(order: 'NEW1', email: 'e2'),
+        ],
+        now: _now,
+      );
+      expect(changes.inserts, hasLength(1));
+      expect(changes.changedCount, 1);
+    });
   });
 }

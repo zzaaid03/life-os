@@ -6,17 +6,27 @@ library;
 
 import 'package:life_os/features/inbox/data/inbox_scan_service.dart';
 import 'package:life_os/features/packages/data/models/package.dart';
+import 'package:life_os/features/packages/domain/package_number.dart';
 
 /// What to write after matching a batch of updates.
 class PackageChanges {
   /// Creates [PackageChanges].
-  const PackageChanges({required this.inserts, required this.updates});
+  const PackageChanges({
+    required this.inserts,
+    required this.updates,
+    required this.changedCount,
+  });
 
   /// Brand-new packages (their `id` is empty).
   final List<Package> inserts;
 
   /// Existing packages in their final merged state.
   final List<Package> updates;
+
+  /// How many packages were inserted or visibly changed. A known package
+  /// whose email told us nothing new is still rewritten (last email time) but
+  /// does not count.
+  final int changedCount;
 }
 
 /// Applies [updates] one at a time against a working copy of [existing], so
@@ -46,7 +56,9 @@ PackageChanges matchPackageUpdates(
       continue;
     }
     if (match.pkg.isDeleted) continue;
-    match.pkg = _merge(match.pkg, u, now);
+    final merged = _merge(match.pkg, u, now);
+    if (_visiblyDiffers(match.pkg, merged)) match.changed = true;
+    match.pkg = merged;
     match.dirty = true;
   }
 
@@ -59,6 +71,10 @@ PackageChanges matchPackageUpdates(
       for (final e in working)
         if (!e.isNew && e.dirty) e.pkg,
     ],
+    changedCount: [
+      for (final e in working)
+        if (e.isNew || e.changed) e,
+    ].length,
   );
 }
 
@@ -66,13 +82,15 @@ _Entry? _find(List<_Entry> working, PackageUpdate u) {
   final tracking = u.trackingNumber;
   if (tracking != null) {
     for (final e in working) {
-      if (e.pkg.trackingNumber == tracking) return e;
+      // Stored rows may predate normalization (e.g. a saved "#305-..."), so
+      // normalize them before comparing.
+      if (normalizePackageNumber(e.pkg.trackingNumber) == tracking) return e;
     }
   }
   final order = u.orderNumber;
   if (order != null) {
     for (final e in working) {
-      if (e.pkg.orderNumber != order) continue;
+      if (normalizePackageNumber(e.pkg.orderNumber) != order) continue;
       // Same order, but it already has a different tracking number and this
       // email brings its own: a split shipment, so a separate package.
       if (e.pkg.trackingNumber != null && tracking != null) continue;
@@ -101,10 +119,21 @@ Package _merge(Package old, PackageUpdate u, DateTime now) {
   );
 }
 
+bool _visiblyDiffers(Package a, Package b) =>
+    a.status != b.status ||
+    a.merchant != b.merchant ||
+    a.item != b.item ||
+    a.carrier != b.carrier ||
+    a.trackingNumber != b.trackingNumber ||
+    a.orderNumber != b.orderNumber ||
+    a.expectedDate != b.expectedDate ||
+    a.lastUpdate != b.lastUpdate;
+
 class _Entry {
   _Entry(this.pkg, {required this.isNew});
 
   Package pkg;
   final bool isNew;
   bool dirty = false;
+  bool changed = false;
 }

@@ -13,6 +13,7 @@ import 'package:life_os/core/services/function_errors.dart';
 import 'package:life_os/core/services/supabase_service.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:life_os/features/packages/data/models/package.dart';
+import 'package:life_os/features/packages/domain/package_number.dart';
 import 'package:life_os/features/subscriptions/data/models/subscription.dart';
 import 'package:life_os/features/subscriptions/domain/billing.dart';
 import 'package:riverpod/riverpod.dart';
@@ -170,14 +171,18 @@ class PackageUpdate {
   static PackageUpdate? tryParse(Map<String, dynamic> json) {
     final status = PackageStatus.tryParse(json['status']);
     if (status == null) return null;
-    final tracking = _normalizeNumber(json['trackingNumber']);
-    final order = _normalizeNumber(json['orderNumber']);
+    final tracking = normalizePackageNumber(json['trackingNumber']);
+    final order = normalizePackageNumber(json['orderNumber']);
     if (tracking == null && order == null) return null;
     final emailId = _text(json['sourceEmailId'], 200);
     if (emailId == null) return null;
+    final merchant = _text(json['merchant'], 120);
+    final item = _text(json['item'], 200);
+    // A food delivery once got saved as a package with neither.
+    if (merchant == null && item == null) return null;
     return PackageUpdate(
-      merchant: _text(json['merchant'], 120),
-      item: _text(json['item'], 200),
+      merchant: merchant,
+      item: item,
       carrier: _text(json['carrier'], 60),
       trackingNumber: tracking,
       orderNumber: order,
@@ -193,17 +198,6 @@ class PackageUpdate {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return null;
     return trimmed.length > max ? trimmed.substring(0, max) : trimmed;
-  }
-
-  /// Trim, drop all whitespace, uppercase, cap at the column limit. Numbers
-  /// are the only identity key, so the model's spacing and casing must never
-  /// make one package look like two.
-  static String? _normalizeNumber(Object? raw) {
-    final text = raw is num ? raw.toString() : raw;
-    if (text is! String) return null;
-    final cleaned = text.replaceAll(RegExp(r'\s+'), '').toUpperCase();
-    if (cleaned.isEmpty) return null;
-    return cleaned.length > 60 ? cleaned.substring(0, 60) : cleaned;
   }
 
   /// The shop or sender.

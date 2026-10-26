@@ -18,6 +18,7 @@ import 'package:life_os/features/inbox/domain/inbox_consent_provider.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:life_os/features/inbox/domain/inbox_scan_provider.dart';
 import 'package:life_os/features/inbox/presentation/widgets/inbox_consent_dialog.dart';
+import 'package:life_os/features/inbox/presentation/widgets/packages_updated_line.dart';
 import 'package:life_os/features/inbox/presentation/widgets/scan_backlog_sheet.dart';
 import 'package:life_os/features/inbox/presentation/widgets/scan_result_cards.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
@@ -319,6 +320,11 @@ class InboxScanScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.sm),
             ],
             if (scanState.phase == InboxScanPhase.done &&
+                scanState.packagesChanged > 0) ...[
+              PackagesUpdatedLine(count: scanState.packagesChanged),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            if (scanState.phase == InboxScanPhase.done &&
                 scanState.remaining > 0) ...[
               Text(
                 '${scanState.remaining} more waiting. Tap Update to keep going.',
@@ -362,7 +368,10 @@ class InboxScanScreen extends ConsumerWidget {
         : scanState.subscriptions;
     final hasSubs = visibleSubscriptions.isNotEmpty;
 
-    if (!hasTasks && !hasJobs && !hasSubs) {
+    if (!hasTasks &&
+        !hasJobs &&
+        !hasSubs &&
+        scanState.packagesChanged == 0) {
       return [
         const SizedBox(height: AppSpacing.xxl),
         Center(

@@ -20,6 +20,7 @@ import 'package:life_os/features/inbox/domain/inbox_scan_pending.dart';
 import 'package:life_os/features/jobs/data/repositories/job_application_repository.dart';
 import 'package:life_os/features/jobs/domain/providers/job_provider.dart';
 import 'package:life_os/features/packages/data/repositories/package_repository.dart';
+import 'package:life_os/features/packages/domain/providers/package_provider.dart';
 import 'package:riverpod/riverpod.dart';
 
 /// The phase of the scan flow.
@@ -37,6 +38,7 @@ class InboxScanState {
     this.errorMessage,
     this.hasScannedOnce = false,
     this.remaining = 0,
+    this.packagesChanged = 0,
   });
 
   /// Current phase of the flow.
@@ -64,6 +66,9 @@ class InboxScanState {
   /// How many pending emails the last scan did not get to.
   final int remaining;
 
+  /// How many packages the last scan inserted or changed (already saved).
+  final int packagesChanged;
+
   /// Returns a copy with the given overrides.
   InboxScanState copyWith({
     InboxScanPhase? phase,
@@ -74,6 +79,7 @@ class InboxScanState {
     String? errorMessage,
     bool? hasScannedOnce,
     int? remaining,
+    int? packagesChanged,
   }) {
     return InboxScanState(
       phase: phase ?? this.phase,
@@ -84,6 +90,7 @@ class InboxScanState {
       errorMessage: errorMessage,
       hasScannedOnce: hasScannedOnce ?? this.hasScannedOnce,
       remaining: remaining ?? this.remaining,
+      packagesChanged: packagesChanged ?? this.packagesChanged,
     );
   }
 }
@@ -129,10 +136,12 @@ class InboxScanController extends StateNotifier<InboxScanState> {
 
       // Packages are written straight away, like job updates. A throw lands
       // in the error state below, never as "nothing found".
+      var packagesChanged = 0;
       if (userId != null && result.packages.isNotEmpty) {
-        await _ref
+        packagesChanged = await _ref
             .read(packageRepositoryProvider)
             .applyScanUpdates(result.packages, userId);
+        await _ref.read(packageListProvider.notifier).refresh();
       }
 
       state = InboxScanState(
@@ -143,6 +152,7 @@ class InboxScanController extends StateNotifier<InboxScanState> {
         scannedAccount: result.scannedAccount,
         hasScannedOnce: true,
         remaining: result.remaining,
+        packagesChanged: packagesChanged,
       );
     } on GmailNotConnectedException {
       state = state.copyWith(phase: InboxScanPhase.idle);

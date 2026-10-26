@@ -65,11 +65,11 @@ class SupabasePackageRepository implements PackageRepository {
   }
 
   @override
-  Future<void> applyScanUpdates(
+  Future<int> applyScanUpdates(
     List<PackageUpdate> updates,
     String userId,
   ) async {
-    if (updates.isEmpty) return;
+    if (updates.isEmpty) return 0;
     final existing = await _loadCandidates(updates, userId);
     final changes = matchPackageUpdates(
       existing,
@@ -101,6 +101,7 @@ class SupabasePackageRepository implements PackageRepository {
         throw StateError('Could not update package ${p.id}.');
       }
     }
+    return changes.changedCount;
   }
 
   /// Loads only the rows that share a tracking or order number with the
@@ -109,13 +110,18 @@ class SupabasePackageRepository implements PackageRepository {
     List<PackageUpdate> updates,
     String userId,
   ) async {
+    // Rows saved before normalization may still carry a leading "#", so look
+    // for that spelling too. matchPackageUpdates normalizes them to compare.
     final tracking = {
       for (final u in updates)
-        if (u.trackingNumber != null) u.trackingNumber!,
+        if (u.trackingNumber != null) ...[
+          u.trackingNumber!,
+          '#${u.trackingNumber!}',
+        ],
     }.toList();
     final orders = {
       for (final u in updates)
-        if (u.orderNumber != null) u.orderNumber!,
+        if (u.orderNumber != null) ...[u.orderNumber!, '#${u.orderNumber!}'],
     }.toList();
 
     final byId = <String, Package>{};

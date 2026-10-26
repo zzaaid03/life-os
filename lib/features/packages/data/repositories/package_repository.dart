@@ -23,9 +23,10 @@ abstract class PackageRepository {
   Future<void> restore(String id);
 
   /// Matches scan-derived [updates] against the user's packages and writes
-  /// the result: new packages are inserted, known ones updated. Throws when
-  /// any write does not land.
-  Future<void> applyScanUpdates(List<PackageUpdate> updates, String userId);
+  /// the result: new packages are inserted, known ones updated. Returns how
+  /// many packages were inserted or visibly changed. Throws when any write
+  /// does not land.
+  Future<int> applyScanUpdates(List<PackageUpdate> updates, String userId);
 }
 
 /// Provides the [PackageRepository].

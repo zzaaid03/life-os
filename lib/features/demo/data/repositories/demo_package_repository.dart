@@ -48,10 +48,10 @@ class DemoPackageRepository implements PackageRepository {
   final Set<String> _deleted = {};
 
   @override
-  Future<void> applyScanUpdates(
+  Future<int> applyScanUpdates(
     List<PackageUpdate> updates,
     String userId,
-  ) async {}
+  ) async => 0;
 
   @override
   Future<List<Package>> fetchPackages(String userId) async => [
